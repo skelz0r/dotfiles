@@ -54,8 +54,12 @@ setopt CORRECT CORRECT_ALL
 # Enable extended globbing
 setopt EXTENDED_GLOB
 
+# rvm
+[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" 
+
 # prompt
-export RPS1='$(git_prompt_info)'
+export RPS1='$(git_prompt_info)$(rvm_prompt_info)'
+
 # for root
 if [ "`id -u`" -eq 0 ]; then
   export PS1="%{[33;33;1m%}%T%{[0m%} %{[33;31;1m%}%n%{[0m[33;33;1m%}@%{[33;32;1m%}%m %{[33;32;1m%}%~%{[0m[33;33;1m%}%#%{[0m%} "
@@ -64,6 +68,3 @@ else
 fi
 
 export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
-
-# rvm
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" && rvm use --default &> /dev/null
