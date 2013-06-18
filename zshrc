@@ -49,13 +49,14 @@ setopt histignoredups
 export HISTSIZE=4096
 
 # Try to correct command line spelling
-setopt CORRECT CORRECT_ALL
+setopt CORRECT 
 
 # Enable extended globbing
 setopt EXTENDED_GLOB
 
 # rvm
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" 
+[[ -s "/usr/local/rvm/scripts/rvm" ]] && source "/usr/local/rvm/scripts/rvm" 
+[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 
 # prompt
 export RPS1='$(git_prompt_info)$(rvm_prompt_info)'
