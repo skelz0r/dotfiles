@@ -68,3 +68,9 @@ else
 fi
 
 export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
+
+# locales customs
+if [ -e "$HOME/.zshrc.local" ]; then
+  source "$HOME/.zshrc.local"
+fi
+

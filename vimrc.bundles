@@ -25,5 +25,6 @@ Bundle 'vim-scripts/greplace.vim'
 Bundle 'vim-scripts/tComment'
 Bundle 'xenoterracide/html.vim'
 Bundle 'mileszs/ack.vim'
+Bundle 'rodjek/vim-puppet'
 
 filetype on

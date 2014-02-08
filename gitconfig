@@ -1,6 +1,6 @@
 [user]
-  name = Loïc Delmaire
-  email = loic.delmaire@gmail.com
+	name = Loïc Delmaire
+	email = loic.delmaire@gmail.com
 
 # DO NOTE EDIT BELOW THIS LINE
 
@@ -20,6 +20,12 @@
   lgp = log -p
   lgn = log --name-only
 [core]
-  excludesfile = ~/.gitignore
+	excludesfile = /Users/skelz0r/.gitignore_global
   autocrlf = input
   editor = vim
+[difftool "sourcetree"]
+	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+	path = 
+[mergetool "sourcetree"]
+	cmd = /Applications/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	trustExitCode = true

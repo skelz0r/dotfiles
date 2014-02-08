@@ -16,6 +16,9 @@ set gcr=a:blinkon0  " Disable cursor blink
 set visualbell      " No sounds
 set autoread        " Reload files changed outside vim
 set hidden					" buffer can exist in background
+colors peachpuff
+set modeline
+set modelines=1
 
 " Turn off swap files
 set nobackup
@@ -133,6 +136,9 @@ let g:syntastic_check_on_open=1
 " Cucumber navigation commands
 autocmd User Rails Rnavcommand step features/step_definitions -glob=**/* -suffix=_steps.rb
 autocmd User Rails Rnavcommand config config -glob=**/* -suffix=.rb -default=routes
+
+" vim-rspec
+let g:rspec_command = "!bundle exec rspec --drb {spec}"
 
 " vim-rspec mappings
 nnoremap <Leader>t :call RunCurrentSpecFile()<CR>

@@ -29,3 +29,12 @@ alias m="migrate"
 alias rk="rake"
 alias s="rspec"
 alias z="zeus"
+
+# Shame
+alias shame="ack -i '(TODO|FIXME|XXX)'"
+alias SHAME="ack -i '((TODO|FIXME|XXX) ){3}'"
+
+# git
+alias gdiff="git difftool -y -x 'colordiff -y -W $COLUMNS'"
+
+fliptable() { echo "（╯°□°）╯ ┻━┻"; }
