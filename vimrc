@@ -165,3 +165,5 @@ au BufRead,BufNewFile *.md setlocal textwidth=80
 if filereadable($HOME . "/.vimrc.local")
   source ~/.vimrc.local
 endif
+
+autocmd BufWritePre * :%s/\s\+$//e

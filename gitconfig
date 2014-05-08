@@ -1,15 +1,10 @@
-[user]
-	name = Loïc Delmaire
-	email = loic.delmaire@gmail.com
-
-# DO NOTE EDIT BELOW THIS LINE
-
 [push]
   default = upstream
 [color]
   ui = true
 [alias]
   aa = add --all
+  d  = diff -w
   st = status
   br = branch
   ca = commit --amend
@@ -19,13 +14,16 @@
   lg = log --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
   lgp = log -p
   lgn = log --name-only
+[pull]
+  rebase = true
 [core]
 	excludesfile = /Users/skelz0r/.gitignore_global
   autocrlf = input
   editor = vim
+  whitespace = -trailing-space,-indent-with-non-tab,-tab-in-indent
 [difftool "sourcetree"]
 	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
-	path = 
+	path =
 [mergetool "sourcetree"]
 	cmd = /Applications/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
 	trustExitCode = true
