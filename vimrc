@@ -23,7 +23,7 @@ set modelines=1
 " Turn off swap files
 set nobackup
 set nowritebackup
-set noswapfile 
+set noswapfile
 
 " completion
 set wildmode=list:longest
@@ -55,6 +55,10 @@ nnoremap <C-h> <C-w>h
 nnoremap <C-j> <C-w>j
 nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
+
+" Vertical resize shortcuts
+nnoremap <silent> - :exe "resize " . (winheight(0) * 2/3)<CR>
+nnoremap <silent> + :exe "resize " . (winheight(0) * 3/2)<CR>
 
 " Open new split and focus on it
 nnoremap <leader>w <C-w>v<C-w>l
@@ -128,7 +132,7 @@ filetype indent on
 map <Leader>ct :!ctags -R .<CR>
 
 " quick ctags
-nnoremap <leader>a :Ack 
+nnoremap <leader>a :Ack
 
 " configure syntastic syntax checking to check on open as well as save
 let g:syntastic_check_on_open=1
@@ -138,12 +142,14 @@ autocmd User Rails Rnavcommand step features/step_definitions -glob=**/* -suffix
 autocmd User Rails Rnavcommand config config -glob=**/* -suffix=.rb -default=routes
 
 " vim-rspec
-let g:rspec_command = "!bundle exec rspec --drb {spec}"
+let g:rspec_command = "Dispatch bundle exec ./bin/rspec --drb {spec}"
 
 " vim-rspec mappings
 nnoremap <Leader>t :call RunCurrentSpecFile()<CR>
 nnoremap <Leader>s :call RunNearestSpec()<CR>
 nnoremap <Leader>l :call RunLastSpec()<CR>
+
+nnoremap <Leader>k :AV<CR>
 
 " Use Ag (https://github.com/ggreer/the_silver_searcher) instead of Grep when
 " available
@@ -167,3 +173,12 @@ if filereadable($HOME . "/.vimrc.local")
 endif
 
 autocmd BufWritePre * :%s/\s\+$//e
+
+nnoremap <C-p> :Unite file_rec/async<cr>
+
+" Syntastic + Angular.js
+let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"ng-", "proprietary attribute \"ion-", "<ion-", "<ng-", "</ng-", "</ion-", "trimming empty <i>"]
+let g:used_javascript_libs = 'jquery,angularjs'
+imap ,/ </<C-X><C-O><ESC>x
+
+autocmd VimResized * :normal =
