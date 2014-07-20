@@ -142,7 +142,7 @@ autocmd User Rails Rnavcommand step features/step_definitions -glob=**/* -suffix
 autocmd User Rails Rnavcommand config config -glob=**/* -suffix=.rb -default=routes
 
 " vim-rspec
-let g:rspec_command = "Dispatch bundle exec ./bin/rspec --drb {spec}"
+let g:rspec_command = "Dispatch bundle exec ./bin/rspec {spec}"
 
 " vim-rspec mappings
 nnoremap <Leader>t :call RunCurrentSpecFile()<CR>
@@ -177,7 +177,7 @@ autocmd BufWritePre * :%s/\s\+$//e
 nnoremap <C-p> :Unite file_rec/async<cr>
 
 " Syntastic + Angular.js
-let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"ng-", "proprietary attribute \"ion-", "<ion-", "<ng-", "</ng-", "</ion-", "trimming empty <i>"]
+let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"ng-", "proprietary attribute \"ion-", "<ion-", "<ng-", "</ng-", "</ion-", "<bbird-", "</bbird-", "trimming empty <i>"]
 let g:used_javascript_libs = 'jquery,angularjs'
 imap ,/ </<C-X><C-O><ESC>x
 
