@@ -175,6 +175,7 @@ endif
 autocmd BufWritePre * :%s/\s\+$//e
 
 nnoremap <C-p> :Unite file_rec/async<cr>
+nnoremap <leader>d :Dash<cr>
 
 " Syntastic + Angular.js
 let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"ng-", "proprietary attribute \"ion-", "<ion-", "<ng-", "</ng-", "</ion-", "<bbird-", "</bbird-", "trimming empty <i>"]
