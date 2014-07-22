@@ -49,13 +49,13 @@ setopt histignoredups
 export HISTSIZE=4096
 
 # Try to correct command line spelling
-setopt CORRECT 
+setopt CORRECT
 
 # Enable extended globbing
 setopt EXTENDED_GLOB
 
 # rvm
-[[ -s "/usr/local/rvm/scripts/rvm" ]] && source "/usr/local/rvm/scripts/rvm" 
+[[ -s "/usr/local/rvm/scripts/rvm" ]] && source "/usr/local/rvm/scripts/rvm"
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 
 # prompt
@@ -74,3 +74,5 @@ export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
 if [ -e "$HOME/.zshrc.local" ]; then
   source "$HOME/.zshrc.local"
 fi
+
+export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
