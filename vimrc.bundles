@@ -30,6 +30,7 @@ Bundle 'rodjek/vim-puppet'
 Bundle 'kien/ctrlp.vim'
 Bundle 'Shougo/unite.vim'
 Bundle 'rizzatti/dash.vim'
+Bundle 'jpalardy/vim-slime'
 
 " js / angular
 Bundle 'vim-scripts/HTML-AutoCloseTag'

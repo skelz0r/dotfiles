@@ -143,6 +143,7 @@ autocmd User Rails Rnavcommand config config -glob=**/* -suffix=.rb -default=rou
 
 " vim-rspec
 let g:rspec_command = "Dispatch bundle exec ./bin/rspec {spec}"
+let g:rspec_runner = "os_x_iterm"
 
 " vim-rspec mappings
 nnoremap <Leader>t :call RunCurrentSpecFile()<CR>
@@ -183,3 +184,5 @@ let g:used_javascript_libs = 'jquery,angularjs'
 imap ,/ </<C-X><C-O><ESC>x
 
 autocmd VimResized * :normal =
+
+let g:slime_target = "tmux"

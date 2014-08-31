@@ -29,6 +29,7 @@ alias m="migrate"
 alias rk="rake"
 alias s="rspec"
 alias z="zeus"
+alias rs="b exec ./bin/rspec"
 
 # Shame
 alias shame="ack -i '(TODO|FIXME|XXX)'"
