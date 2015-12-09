@@ -123,6 +123,7 @@ set shiftwidth=2
 set softtabstop=2
 set tabstop=2
 set expandtab
+set backspace=2
 
 filetype plugin on
 filetype indent on
@@ -179,10 +180,22 @@ nnoremap <C-p> :Unite file_rec/async<cr>
 nnoremap <leader>d :Dash<cr>
 
 " Syntastic + Angular.js
-let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"ng-", "proprietary attribute \"ion-", "<ion-", "<ng-", "</ng-", "</ion-", "<bbird-", "</bbird-", "trimming empty <i>"]
+let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"", "<form> lacks \"action\" attribute", "discarding unexpected", "is not recognized!", "trimming empty <i>", "discarding unexpected </"]
 let g:used_javascript_libs = 'jquery,angularjs'
+let g:syntastic_javascript_checkers = ['jshint']
+let g:syntastic_ruby_mri_exec = "/Users/skelz0r/.rvm/rubies/ruby-2.2.0/bin/ruby"
+
 imap ,/ </<C-X><C-O><ESC>x
 
 autocmd VimResized * :normal =
 
 let g:slime_target = "tmux"
+
+" Dash
+nmap <silent> <leader>d <Plug>DashSearch
+
+nnoremap <Leader>c :tabclose<cr>
+
+" Emmet
+let g:user_emmet_leader_key='<C-y>'
+let g:user_emmet_install_global = 1

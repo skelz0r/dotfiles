@@ -4,18 +4,24 @@
   ui = true
 [alias]
   aa = add --all
-  d  = diff -w
+  au = add -u
   st = status
+  d  = diff -w
   br = branch
   ca = commit --amend
   ci = commit -v
+  fix = commit --amend --no-edit
   co = checkout
-  pr = !hub pull-request
+  pr = !hub pull-request -b develop
   lg = log --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
+  lgr = log --pretty=format:'%s'
   lgp = log -p
   lgn = log --name-only
+  cancel = reset "HEAD^"
 [pull]
   rebase = true
+[diff]
+  algorithm = patience
 [core]
 	excludesfile = /Users/skelz0r/.gitignore_global
   autocrlf = input

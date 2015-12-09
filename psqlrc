@@ -1,0 +1,28 @@
+\set ON_ERROR_ROLLBACK interactive
+\set COMP_KEYWORD_CASE upper
+
+-- Don't use a pager (eg /bin/less) when query return lots of lines
+-- Multiplexer can do this
+\pset pager off
+
+-- Show null value as '(null)' instead of blanks
+\pset null '(null)'
+
+-- Show query time
+\timing on
+
+-- Format each record as a set of rows when there are too many columns too fit the screen
+\x auto
+
+
+-- PRESENTATION
+\pset linestyle unicode
+\pset border 2
+\pset format wrapped
+
+-- Standard prompt
+\set PROMPT1 '%[%033[1m%]%M %n@%/%R%[%033[0m%]%# '
+-- Unfinished command promt
+\set PROMPT2 '[more] %R > '
+
+\set VERBOSITY verbose
