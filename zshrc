@@ -62,10 +62,21 @@ setopt EXTENDED_GLOB
 export RPS1='$(git_prompt_info)$(rvm_prompt_info)'
 
 # for root
+# use http://www.nparikh.org/unix/prompt.php#zsh for moar config
 if [ "`id -u`" -eq 0 ]; then
-  export PS1="%{[33;33;1m%}%T%{[0m%} %{[33;31;1m%}%n%{[0m[33;33;1m%}@%{[33;32;1m%}%m %{[33;32;1m%}%~%{[0m[33;33;1m%}%#%{[0m%} "
+  export PS1="%B%{$fg[yellow]%}%T%{$reset_color%}%b " # hour in bold yellow + space
+  PS1+="%B%{$fg[red]%}%n%{$reset_color%}%b"           # user in bold red
+  PS1+="%B%{$fg[yellow]%}@%{$reset_color%}%b"         # @ in bold yellow
+  PS1+="%B%{$fg[green]%}%m%{$reset_color%}%b "        # short hostname in bold green
+  PS1+="%B%{$fg[green]%}%~%{$reset_color%}%b"         # pwd in bold green
+  PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "       # prompt delimitor in bold yellow + space
 else
-  export PS1="%{[33;33;1m%}%T%{[0m%} %{[33;32;1m%}%n%{[0m[33;33;1m%}@%{[33;31;1m%}%m %{[33;32;1m%}%~%{[0m[33;33;1m%}%#%{[0m%} "
+  export PS1="%B%{$fg[yellow]%}%T%{$reset_color%}%b " # hour in bold yellow + space
+  PS1+="%B%{$fg[green]%}%n%{$reset_color%}%b"         # user in bold green
+  PS1+="%B%{$fg[yellow]%}@%{$reset_color%}%b"         # @ in bold yellow
+  PS1+="%B%{$fg[red]%}%m%{$reset_color%}%b "          # short hostname in bold red
+  PS1+="%B%{$fg[green]%}%~%{$reset_color%}%b"         # pwd in bold green
+  PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "       # prompt delimitor in bold yellow + space
 fi
 
 export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
