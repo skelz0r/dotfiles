@@ -1,0 +1,12 @@
+#!/bin/zsh
+
+from=$1
+shift
+to=$1
+shift
+
+for file in $*
+do
+  perl -i.bak -p -e "s{$from}{$to}g;" $file
+done
+rm -f **/*.bak
