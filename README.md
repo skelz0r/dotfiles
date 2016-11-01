@@ -1,7 +1,7 @@
-blackbird dotfiles
-==================
+skelz0r dotfiles
+================
 
-Commons dotfiles for Blackbird Team, for unix system, with vim, git, pry and tmux.
+For unix system, with vim, git, pry and tmux.
 Install some must-have plugins and aliases for developping with rails framework.
 
 Requirements
@@ -22,17 +22,17 @@ Install [ag](https://github.com/ggreer/the_silver_searcher) (ack-like more power
 
 Install [hub](https://github.com/defunkt/hub) (git wrapper for github):
 
-    git clone https://github.com/defunkt/hub 
+    git clone https://github.com/defunkt/hub
 
 Install [rvm](https://rvm.io) (Ruby Version Manager) :
 
-		
+
 
 Install
 -------
 
 Clone onto your laptop:
-    
+
     git clone https://github.com/blackbirdco/dotfiles.git
 
 Install:
@@ -56,7 +56,7 @@ THIS LINE."
 For example, the top of your `~/.gitconfig` might look like this:
 
     [user]
-      name = Loïc Delmaire 
+      name = Loïc Delmaire
       email = loic@blackbird.co
 
     # DO NOT EDIT BELOW THIS LINE
