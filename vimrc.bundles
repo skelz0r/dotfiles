@@ -32,6 +32,10 @@ Bundle 'Shougo/unite.vim'
 Bundle 'rizzatti/dash.vim'
 Bundle 'jpalardy/vim-slime'
 Bundle 'mattn/emmet-vim'
+Bundle 'mattn/gist-vim'
+Bundle 'mattn/webapi-vim'
+Bundle 'dsawardekar/ember.vim'
+Bundle 'joukevandermaas/vim-ember-hbs'
 
 " js / angular
 Bundle 'vim-scripts/HTML-AutoCloseTag'
