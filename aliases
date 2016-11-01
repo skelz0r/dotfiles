@@ -26,15 +26,31 @@ alias giv="gem install -v"
 alias migrate="bundle exec rake db:migrate && bundle exec rake db:rollback && bundle exec rake db:migrate"
 alias m="migrate"
 alias rk="rake"
-alias s="rspec"
 alias rs="b exec ./bin/rspec"
+alias test-reset="RAILS_ENV=test rails db:environment:set db:setup"
 
 # Shame
-alias shame="ack -i '(TODO|FIXME|XXX)'"
-alias SHAME="ack -i '((TODO|FIXME|XXX) ){3}'"
+alias shame="ag -i '(TODO|FIXME|XXX)'"
+alias SHAME="ag -i '((TODO|FIXME|XXX) ){3}'"
 
 # git
 alias gdiff="git difftool -y -x 'colordiff -y -W $COLUMNS'"
 
 fliptable() { echo "（╯°□°）╯ ┻━┻"; }
 alias -g rot13="tr '[A-Za-z]' '[N-ZA-Mn-za-m]'"
+
+# Docker
+function dm-env() {
+  eval "$(docker-machine env "${1:-default}")"
+}
+
+function docker-clean() {
+  docker rmi -f $(docker images -q -a -f dangling=true)
+}
+
+alias de="env | grep DOCKER_"
+alias dm-list="docker-machine ls"
+alias http-server="python -m SimpleHTTPServer"
+alias fig="docker-compose"
+alias docker-up="docker start default && eval \"$(docker-machine env default)\""
+alias cprod="bundle exec mina console to=production"
