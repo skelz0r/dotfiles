@@ -7,6 +7,7 @@
   ui = true
 [alias]
   aa = add --all
+  r  = rebase
   au = add -u
   st = status
   d  = diff -w
@@ -14,6 +15,8 @@
   ca = commit --amend
   ci = commit -v
   fix = commit --amend --no-edit
+  boyscout = commit -m "Boyscout"
+  bs = commit -m "Boyscout"
   co = checkout
   pr = !hub pull-request -b develop
   lg = log --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
@@ -21,6 +24,7 @@
   lgp = log -p
   lgn = log --name-only
   cancel = reset "HEAD^"
+  report-csv = "log --format='\"%cd\",\"%cn\",\"%s\"' --date=short --no-merges"
 [pull]
   rebase = true
 [diff]
@@ -40,3 +44,6 @@
 	user = skelz0r
 [ghi]
 	token = !security find-internet-password -a skelz0r -s github.com -l 'ghi token' -w
+[rebase]
+	autostash = true
+	required = true
