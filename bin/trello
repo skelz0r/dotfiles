@@ -1,0 +1,24 @@
+# vim: set syntax=sh:
+#!/bin/bash
+#
+# Wrapper for trello api
+
+if [ $# -lt 2 ] ; then
+  echo "Usage $0 method endpoint [args]"
+  exit 1
+fi
+
+URL="https://api.trello.com/1"
+METHOD=$1
+ENDPOINT=$2
+
+API_KEY="API_KEY"
+API_TOKEN="API_TOKEN"
+
+ARGS="key=$API_KEY&token=$API_TOKEN"
+
+if [ $3 != "" ] ; then
+  ARGS="$ARGS&$3"
+fi
+
+curl -X $METHOD "$URL/$ENDPOINT?$ARGS" | python -m json.tool
