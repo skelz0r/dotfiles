@@ -6,6 +6,8 @@
 [color]
   ui = true
 [alias]
+  aliases = !git config --get-regexp 'alias.*' | colrm 1 6 | sed 's/[ ]/ = /' | sort
+  classifier = commit -m "Enhance classifier"
   aa = add --all
   r  = rebase
   au = add -u

@@ -79,7 +79,7 @@ else
   PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "       # prompt delimitor in bold yellow + space
 fi
 
-export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
+export PATH="/Applications/OpenOffice.app/Contents/MacOS:$HOME/bin:$HOME/.bin:./bin:$PATH"
 
 # locales customs
 if [ -e "$HOME/.zshrc.local" ]; then
@@ -87,3 +87,6 @@ if [ -e "$HOME/.zshrc.local" ]; then
 fi
 
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+
+source '/Users/skelz0r/tmp/google-cloud-sdk/path.zsh.inc'
+source '/Users/skelz0r/tmp/google-cloud-sdk/completion.zsh.inc'
