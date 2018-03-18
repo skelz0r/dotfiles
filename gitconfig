@@ -14,6 +14,7 @@
   st = status
   d  = diff -w
   br = branch
+  f = fetch
   ca = commit --amend
   ci = commit -v
   fix = commit --amend --no-edit
@@ -27,6 +28,10 @@
   lgn = log --name-only
   cancel = reset "HEAD^"
   report-csv = "log --format='\"%cd\",\"%cn\",\"%s\"' --date=short --no-merges"
+  pl = pull
+  plo = pull origin
+  pod = push origin develop
+  pom = push origin master
 [pull]
   rebase = true
 [diff]
@@ -48,4 +53,8 @@
 	token = !security find-internet-password -a skelz0r -s github.com -l 'ghi token' -w
 [rebase]
 	autostash = true
+	required = true
+[filter "lfs"]
+	clean = git-lfs clean %f
+	smudge = git-lfs smudge %f
 	required = true
