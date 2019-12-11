@@ -56,3 +56,5 @@ alias docker-up="docker start default && eval \"$(docker-machine env default)\""
 alias cprod="bundle exec mina console to=production"
 
 alias mf="mdfind -onlyin ./ -name"
+alias gpod="g pull origin develop"
+alias horn="afplay ~/siren.wav"
