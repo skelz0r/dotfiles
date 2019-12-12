@@ -140,10 +140,6 @@ nnoremap <leader>a :Ack
 " configure syntastic syntax checking to check on open as well as save
 let g:syntastic_check_on_open=1
 
-" Cucumber navigation commands
-autocmd User Rails Rnavcommand step features/step_definitions -glob=**/* -suffix=_steps.rb
-autocmd User Rails Rnavcommand config config -glob=**/* -suffix=.rb -default=routes
-
 " vim-rspec
 let g:rspec_command = "Dispatch bundle exec ./bin/rspec {spec}"
 let g:rspec_runner = "os_x_iterm"
