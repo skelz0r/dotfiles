@@ -48,13 +48,16 @@ function docker-clean() {
   docker rmi -f $(docker images -q -a -f dangling=true)
 }
 
-alias de="env | grep DOCKER_"
-alias dm-list="docker-machine ls"
+alias h="heroku"
+alias hr="h run"
+
 alias http-server="python -m SimpleHTTPServer"
-alias fig="docker-compose"
-alias docker-up="docker start default && eval \"$(docker-machine env default)\""
-alias cprod="bundle exec mina console to=production"
 
 alias mf="mdfind -onlyin ./ -name"
 alias gpod="g pull origin develop"
 alias horn="afplay ~/siren.wav"
+
+alias weather="curl http://wttr.in"
+
+alias soge="cat ~/notes/soge.txt|pbcopy"
+alias societe="cat ~/Dropbox/Jam/Admin/SOCIETE"
