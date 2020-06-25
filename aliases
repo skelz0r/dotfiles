@@ -25,7 +25,7 @@ alias giv="gem install -v"
 # Rails
 alias migrate="bundle exec rake db:migrate && bundle exec rake db:rollback && bundle exec rake db:migrate"
 alias m="migrate"
-alias rk="rake"
+alias rk="b exec rake"
 alias rs="b exec ./bin/rspec"
 alias test-reset="RAILS_ENV=test rails db:environment:set db:setup"
 
