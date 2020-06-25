@@ -181,7 +181,8 @@ nnoremap <leader>d :Dash<cr>
 let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"", "<form> lacks \"action\" attribute", "discarding unexpected", "is not recognized!", "trimming empty <i>", "discarding unexpected </"]
 let g:used_javascript_libs = 'jquery,angularjs'
 let g:syntastic_javascript_checkers = ['jshint']
-let g:syntastic_ruby_mri_exec = "/Users/skelz0r/.rvm/rubies/ruby-2.2.0/bin/ruby"
+let g:syntastic_ruby_mri_exec = "/Users/skelz0r/.rvm/rubies/ruby-2.6.5/bin/ruby"
+" let g:syntastic_ruby_checkers = ['flog']
 
 imap ,/ </<C-X><C-O><ESC>x
 

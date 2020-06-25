@@ -10,7 +10,7 @@ Bundle 'gmarik/vundle'
 " Define bundles via Github repos
 Bundle 'danro/rename.vim'
 Bundle 'kchmck/vim-coffee-script'
-Bundle 'scrooloose/syntastic'
+Bundle 'vim-syntastic/syntastic'
 Bundle 'thoughtbot/vim-rspec'
 Bundle 'tpope/vim-bundler'
 Bundle 'tpope/vim-endwise'
@@ -37,6 +37,7 @@ Bundle 'mattn/webapi-vim'
 Bundle 'dsawardekar/ember.vim'
 Bundle 'joukevandermaas/vim-ember-hbs'
 Bundle 'amadeus/vim-mjml'
+Bundle 'vim-ruby/vim-ruby'
 
 " js / angular
 Bundle 'vim-scripts/HTML-AutoCloseTag'
