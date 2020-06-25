@@ -88,5 +88,18 @@ fi
 
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
+# FIXME
+# source '/Users/skelz0r/tmp/google-cloud-sdk/path.zsh.inc'
+# source '/Users/skelz0r/tmp/google-cloud-sdk/completion.zsh.inc'
+export PATH="$(brew --prefix qt@5.5)/bin:$PATH"
+
+# The next line updates PATH for the Google Cloud SDK.
 source '/Users/skelz0r/tmp/google-cloud-sdk/path.zsh.inc'
+
+# The next line enables shell command completion for gcloud.
 source '/Users/skelz0r/tmp/google-cloud-sdk/completion.zsh.inc'
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
+# Install of capybara webkit for catalina https://github.com/thoughtbot/capybara-webkit/wiki/Installing-Qt-and-compiling-capybara-webkit#macOS-catalina-1015
+export PATH="$(brew --prefix qt@5.5)/bin:$PATH"
