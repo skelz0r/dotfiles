@@ -7,7 +7,6 @@
   ui = true
 [alias]
   aliases = !git config --get-regexp 'alias.*' | colrm 1 6 | sed 's/[ ]/ = /' | sort
-  classifier = commit -m "Enhance classifier"
   aa = add --all
   r  = rebase
   au = add -u
@@ -18,13 +17,14 @@
   ca = commit --amend
   ci = commit -v
   fix = commit --amend --no-edit
-  boyscout = commit -m "Boyscout"
-  bs = commit -m "Boyscout"
+  boyscout = "commit -m \"Scout commit\""
+  bs = "commit -m \"Scout commit\""
   co = checkout
   pr = !hub pull-request -b develop
   lg = log --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
   lgb = log --graph --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
   lgr = log --pretty=format:'%s'
+  tree = log --all --decorate --oneline --graph
   lgp = log -p
   lgn = log --name-only
   cancel = reset "HEAD^"
@@ -33,6 +33,7 @@
   plo = pull origin
   pod = push origin develop
   pom = push origin master
+  p = "!git push origin \"$(git rev-parse --abbrev-ref HEAD)\""
 [pull]
   rebase = true
 [diff]
