@@ -57,6 +57,8 @@ alias mf="mdfind -onlyin ./ -name"
 alias gpod="g pull origin develop"
 alias horn="afplay ~/siren.wav"
 
+alias ssh-id='eval `ssh-agent -s` && ssh-add ~/.ssh/id_rsa'
+
 alias weather="curl http://wttr.in"
 
 alias soge="cat ~/notes/soge.txt|pbcopy"
