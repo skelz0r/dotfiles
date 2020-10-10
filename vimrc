@@ -201,3 +201,13 @@ nnoremap sf O# frozen_string_literal: true<cr><esc>ddO<esc>
 " Emmet
 let g:user_emmet_leader_key='<C-y>'
 let g:user_emmet_install_global = 1
+
+" Templates
+if has("autocmd")
+  augroup templates
+    autocmd BufNewFile *_spec.rb  0r ~/dotfiles/vim/templates/skeleton_spec.rb
+    autocmd BufNewFile *[^_spec].rb       0r ~/dotfiles/vim/templates/skeleton.rb
+
+    autocmd BufNewFile * %substitute#\[:VIM_EVAL:\]\(.\{-\}\)\[:END_EVAL:\]#\=eval(submatch(1))#ge
+  augroup END
+endif
