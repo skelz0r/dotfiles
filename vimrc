@@ -177,6 +177,11 @@ autocmd BufWritePre * :%s/\s\+$//e
 nnoremap <C-p> :Unite file_rec/async<cr>
 nnoremap <leader>d :Dash<cr>
 
+" Syntastic
+let g:syntastic_scss_checkers = [ 'sasslint' ]
+let g:syntastic_sass_checkers = [ 'sasslint' ]
+let g:sass_lint_config = '~/.sass-lint.yml'
+
 " Syntastic + Angular.js
 let g:syntastic_html_tidy_ignore_errors=["proprietary attribute \"", "<form> lacks \"action\" attribute", "discarding unexpected", "is not recognized!", "trimming empty <i>", "discarding unexpected </"]
 let g:used_javascript_libs = 'jquery,angularjs'

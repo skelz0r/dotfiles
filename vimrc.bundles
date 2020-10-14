@@ -39,6 +39,7 @@ Bundle 'dsawardekar/ember.vim'
 Bundle 'joukevandermaas/vim-ember-hbs'
 Bundle 'amadeus/vim-mjml'
 Bundle 'vim-ruby/vim-ruby'
+Bundle 'gcorne/vim-sass-lint'
 
 " js / angular
 Bundle 'vim-scripts/HTML-AutoCloseTag'
