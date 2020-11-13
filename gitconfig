@@ -1,6 +1,7 @@
 [user]
 	name = Loïc Delmaire
 	email = loic.delmaire@gmail.com
+	signingkey = 99498832BA5D842AB3B3954B44D18BC81F983E1D
 [push]
   default = upstream
 [color]
@@ -61,3 +62,5 @@
 	smudge = git-lfs smudge -- %f
 	required = true
 	process = git-lfs filter-process
+[commit]
+	gpgsign = true
