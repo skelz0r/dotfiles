@@ -35,6 +35,7 @@
   pod = push origin develop
   pom = push origin master
   p = "!git push origin \"$(git rev-parse --abbrev-ref HEAD)\""
+  pf = "!git push origin -f \"$(git rev-parse --abbrev-ref HEAD)\""
 [pull]
   rebase = true
 [diff]
@@ -64,3 +65,5 @@
 	process = git-lfs filter-process
 [commit]
 	gpgsign = true
+[gpg]
+	program = gpg
