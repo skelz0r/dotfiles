@@ -216,3 +216,25 @@ if has("autocmd")
     autocmd BufNewFile * %substitute#\[:VIM_EVAL:\]\(.\{-\}\)\[:END_EVAL:\]#\=eval(submatch(1))#ge
   augroup END
 endif
+
+" CoC
+let g:coc_global_extensions = [
+  \ 'coc-css',
+  \ 'coc-eslint',
+  \ 'coc-json',
+  \ 'coc-html',
+  \ 'coc-markdownlint',
+  \ 'coc-pairs',
+  \ 'coc-prettier',
+  \ 'coc-snippets',
+  \ 'coc-solargraph',
+  \ 'coc-stylelintplus',
+  \ 'coc-sql',
+  \ 'coc-yaml',
+  \ ]
+
+nmap <silent> qf <Plug>(coc-fix-current)
+nmap <silent> gd <Plug>(coc-definition)
+nmap <silent> gi <Plug>(coc-implementation)
+nmap <silent> gr <Plug>(coc-references)
+
