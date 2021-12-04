@@ -2,3 +2,5 @@ rules:
   nesting-depth:
     - 1
     - max-depth: 5
+  no-color-literals: 0
+  no-ids: 0
