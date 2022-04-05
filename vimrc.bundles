@@ -41,11 +41,11 @@ Bundle 'amadeus/vim-mjml'
 Bundle 'vim-ruby/vim-ruby'
 Bundle 'gcorne/vim-sass-lint'
 Bundle 'neoclide/coc.nvim'
+Bundle 'elixir-editors/vim-elixir'
 
 " js / angular
 Bundle 'vim-scripts/HTML-AutoCloseTag'
 Bundle 'pangloss/vim-javascript'
 Bundle 'othree/javascript-libraries-syntax.vim'
-Bundle 'matthewsimo/angular-vim-snippets'
 
 filetype on
