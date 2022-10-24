@@ -60,8 +60,3 @@ alias horn="afplay ~/siren.wav"
 alias ssh-id='eval `ssh-agent -s` && ssh-add ~/.ssh/id_rsa'
 
 alias curltime="curl -w \"@$HOME/.curl-format.txt\" -o NUL -s "
-
-alias weather="curl http://wttr.in"
-
-alias soge="cat ~/notes/soge.txt|pbcopy"
-alias societe="cat ~/Dropbox/Jam/Admin/SOCIETE"
