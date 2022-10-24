@@ -43,7 +43,7 @@
 [core]
 	excludesfile = /Users/skelz0r/.gitignore_global
   autocrlf = input
-  editor = vim
+  editor = nvim
   whitespace = -trailing-space,-indent-with-non-tab,-tab-in-indent
 [difftool "sourcetree"]
 	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
@@ -67,3 +67,5 @@
 	gpgsign = true
 [gpg]
 	program = gpg
+[init]
+	defaultBranch = main
