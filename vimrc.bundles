@@ -42,6 +42,7 @@ Bundle 'vim-ruby/vim-ruby'
 Bundle 'gcorne/vim-sass-lint'
 Bundle 'neoclide/coc.nvim'
 Bundle 'elixir-editors/vim-elixir'
+Bundle 'romainl/vim-cool'
 
 " js / angular
 Bundle 'vim-scripts/HTML-AutoCloseTag'

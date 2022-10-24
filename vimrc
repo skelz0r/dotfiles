@@ -202,6 +202,7 @@ nnoremap <Leader>c :tabclose<cr>
 
 nnoremap sb obinding.pry<cr><esc>
 nnoremap sf O# frozen_string_literal: true<cr><esc>ddO<esc>
+nnoremap sjson oprint JSON.pretty_generate(JSON.parse(response.body))<cr><esc>
 
 " Emmet
 let g:user_emmet_leader_key='<C-y>'
