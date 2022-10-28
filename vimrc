@@ -16,9 +16,12 @@ set gcr=a:blinkon0  " Disable cursor blink
 set visualbell      " No sounds
 set autoread        " Reload files changed outside vim
 set hidden					" buffer can exist in background
-colors legacy_peachpuff
+set mouse=          " disable mouse
+colors peachpuff-custom
 set modeline
 set modelines=1
+
+set fillchars=stl:─,stlnc:─,vert:│,fold:·,diff:- " for split style
 
 " Turn off swap files
 set nobackup
@@ -218,6 +221,10 @@ if has("autocmd")
   augroup END
 endif
 
+" vim-gist
+let g:gist_post_private = 1
+let g:gist_clip_command = 'pbcopy'
+
 " CoC
 let g:coc_global_extensions = [
   \ 'coc-css',
@@ -227,7 +234,6 @@ let g:coc_global_extensions = [
   \ 'coc-markdownlint',
   \ 'coc-pairs',
   \ 'coc-prettier',
-  \ 'coc-snippets',
   \ 'coc-solargraph',
   \ 'coc-stylelintplus',
   \ 'coc-sql',
@@ -239,3 +245,4 @@ nmap <silent> gd <Plug>(coc-definition)
 nmap <silent> gi <Plug>(coc-implementation)
 nmap <silent> gr <Plug>(coc-references)
 
+hi CocFloating ctermbg=255 ctermfg=black
