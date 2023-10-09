@@ -16,7 +16,7 @@ set gcr=a:blinkon0  " Disable cursor blink
 set visualbell      " No sounds
 set autoread        " Reload files changed outside vim
 set hidden					" buffer can exist in background
-colors peachpuff
+colors legacy_peachpuff
 set modeline
 set modelines=1
 
