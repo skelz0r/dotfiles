@@ -51,7 +51,7 @@ function docker-clean() {
 alias h="heroku"
 alias hr="h run"
 
-alias http-server="python -m SimpleHTTPServer"
+alias http-server="python3 -m http.server 4000"
 
 alias mf="mdfind -onlyin ./ -name"
 alias gpod="g pull origin develop"
@@ -60,3 +60,5 @@ alias horn="afplay ~/siren.wav"
 alias ssh-id='eval `ssh-agent -s` && ssh-add ~/.ssh/id_rsa'
 
 alias curltime="curl -w \"@$HOME/.curl-format.txt\" -o NUL -s "
+
+alias python="python3"
