@@ -43,9 +43,11 @@ Bundle 'gcorne/vim-sass-lint'
 Bundle 'neoclide/coc.nvim'
 Bundle 'elixir-editors/vim-elixir'
 Bundle 'romainl/vim-cool'
-Bundle 'github/copilot.vim'
+
 Bundle 'vim-scripts/HTML-AutoCloseTag'
 Bundle 'pangloss/vim-javascript'
+
+Bundle 'github/copilot.vim'
 
 Plugin 'jpo/vim-railscasts-theme'
 
