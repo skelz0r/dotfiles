@@ -47,4 +47,6 @@ Bundle 'github/copilot.vim'
 Bundle 'vim-scripts/HTML-AutoCloseTag'
 Bundle 'pangloss/vim-javascript'
 
+Plugin 'jpo/vim-railscasts-theme'
+
 filetype on

@@ -17,7 +17,6 @@ set visualbell      " No sounds
 set autoread        " Reload files changed outside vim
 set hidden					" buffer can exist in background
 set mouse=          " disable mouse
-colors peachpuff-custom
 set modeline
 set modelines=1
 
@@ -119,6 +118,8 @@ set undofile
 if filereadable(expand("~/.vimrc.bundles"))
   source ~/.vimrc.bundles
 endif
+
+colors railscasts
 
 " Softtabs, 2 spaces
 set autoindent
