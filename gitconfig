@@ -21,7 +21,6 @@
   boyscout = "commit -m \"Scout commit\""
   bs = "commit -m \"Scout commit\""
   co = checkout
-  pr = !hub pull-request -b develop
   lg = log --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
   lgb = log --graph --pretty=format:'%C(bold)–%Creset %C(red bold)%h%d%Creset | %C(green)%an%Creset | %C(magenta)%cr%Creset | %C(cyan)%s%Creset'
   lgr = log --pretty=format:'%s'
@@ -33,9 +32,8 @@
   pl = pull
   plo = pull origin
   pod = push origin develop
-  pom = push origin master
   p = "!git push origin \"$(git rev-parse --abbrev-ref HEAD)\""
-  pf = "!git push origin -f \"$(git rev-parse --abbrev-ref HEAD)\""
+  pf = "!git push origin --force-with-lease \"$(git rev-parse --abbrev-ref HEAD)\""
 [pull]
   rebase = true
 [diff]
@@ -69,3 +67,5 @@
 	program = gpg
 [init]
 	defaultBranch = main
+[diff "ansible-vault"]
+	textconv = ansible-vault view
