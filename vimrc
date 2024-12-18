@@ -119,7 +119,7 @@ if filereadable(expand("~/.vimrc.bundles"))
   source ~/.vimrc.bundles
 endif
 
-colors railscasts
+colors new-railscasts
 
 " Softtabs, 2 spaces
 set autoindent
@@ -216,7 +216,6 @@ let g:user_emmet_install_global = 1
 if has("autocmd")
   augroup templates
     autocmd BufNewFile *_spec.rb  0r ~/dotfiles/vim/templates/skeleton_spec.rb
-    autocmd BufNewFile *[^_spec].rb       0r ~/dotfiles/vim/templates/skeleton.rb
 
     autocmd BufNewFile * %substitute#\[:VIM_EVAL:\]\(.\{-\}\)\[:END_EVAL:\]#\=eval(submatch(1))#ge
   augroup END

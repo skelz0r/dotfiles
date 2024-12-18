@@ -49,6 +49,6 @@ Bundle 'pangloss/vim-javascript'
 
 Bundle 'github/copilot.vim'
 
-Plugin 'jpo/vim-railscasts-theme'
+Plugin 'carakan/new-railscasts-theme'
 
 filetype on
