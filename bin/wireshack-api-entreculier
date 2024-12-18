@@ -1,0 +1,4 @@
+#!/bin/bash
+
+wg-quick down wgAPI
+wg-quick up wgAPI
