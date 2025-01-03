@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 <port>"
+  exit 1
+fi
+
+PORT="$1"
+
+# Use TCP listening filter for clarity
+PIDS=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN)
+
+if [ -n "$PIDS" ]; then
+  echo "Found the following PID(s): $PIDS"
+  kill -9 $PIDS
+  echo "Killed process(es) $PIDS on port $PORT."
+else
+  echo "No processes found listening on port $PORT."
+fi
+
