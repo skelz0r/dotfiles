@@ -1,44 +1,30 @@
-skelz0r dotfiles
-================
+# skelz0r dotfiles
 
 For unix system, with vim, git, pry and tmux.
 Install some must-have plugins and aliases for developping with rails framework.
 
-Requirements
-------------
+## Requirements
 
 Install and set **zsh** as your login shell.
 
-   chsh -s /bin/zsh
+```sh
+chsh -s /bin/zsh
+```
 
-Recommandations
----------------
+## Recommandations
 
 Some aliases and plugins recommand/use following programmes:
 
-Install [ag](https://github.com/ggreer/the_silver_searcher) (ack-like more powerfull):
+* [ag](https://github.com/ggreer/the_silver_searcher) (ack-like more powerfull):
+* [rvm](https://rvm.io) (Ruby Version Manager) :
 
-    git clone https://github.com/ggreer/the_silver_searcher
+## Install
 
-Install [hub](https://github.com/defunkt/hub) (git wrapper for github):
-
-    git clone https://github.com/defunkt/hub
-
-Install [rvm](https://rvm.io) (Ruby Version Manager) :
-
-
-
-Install
--------
-
-Clone onto your laptop:
-
-    git clone https://github.com/blackbirdco/dotfiles.git
-
-Install:
-
-    cd dotfiles
-    ./install.sh
+```sh
+git clone https://github.com/skelz0r/dotfiles.git
+cd dotfiles
+./install.sh
+```
 
 This will create symlinks for config files in your home directory. If you
 include the line "DO NOT EDIT BELOW THIS LINE" anywhere in a config file, it
@@ -47,36 +33,38 @@ everything above that line in your local config intact.
 
 You can safely run `./install.sh` multiple times to update.
 
-Make your own customizations
-----------------------------
+## Make your own customizations
 
 Put your customizations at the top of files, separated by "DO NOT EDIT BELOW
 THIS LINE."
 
 For example, the top of your `~/.gitconfig` might look like this:
 
-    [user]
-      name = Loïc Delmaire
-      email = loic@blackbird.co
+```sh
+[user]
+name = Loïc Delmaire
+email = loic@blackbird.co
 
-    # DO NOT EDIT BELOW THIS LINE
+# DO NOT EDIT BELOW THIS LINE
 
-    [color]
-      diff = auto
+[color]
+diff = auto
+```
 
 The top of your `~/.zshrc` might look like this:
 
-    # Productivity
-    alias todo='$EDITOR ~/.todo'
+```
+# Productivity
+alias todo='$EDITOR ~/.todo'
 
-    # DO NOT EDIT BELOW THIS LINE
+# DO NOT EDIT BELOW THIS LINE
 
-    # add the current branch name in green
-    git_prompt_info() {
+# add the current branch name in green
+git_prompt_info() {
+```
 
 
-What's in it?
--------------
+## What's in it?
 
 [zsh](http://www.zsh.org/) for default shell:
 
@@ -101,6 +89,7 @@ Details in vimrc.bundles for others plugins.
 You can use your a local configuration in `~/.vimrc.local`.
 
 [tmux](http://tmux.sourceforge.net/) configuration.
+
 * Set prefix to `Ctrl+a` (like GNU screen).
 
 [git](http://git-scm.com/) configuration.
@@ -109,12 +98,7 @@ Shell aliases and scripts:
 
 * `b` for `bundle`.
 * `g` with no arguments is `git status` and with arguments acts like `git`.
-* `m` for `rake db:migrate && rake db:rollback && rake db:migrate && rake db:test:prepare`.
 * `mcd` to make a directory and change into it.
-* `rake` is `zeus rake` if using [Zeus](https://github.com/burke/zeus) on the
-  project in current directory.
-* `rk` for `rake`.
-* `rspec` is `zeus rspec` if using Zeus on the project in current directory.
 * `tat` to attach to tmux session named the same as the current directory.
 * `v` for `$VISUAL`.
 
@@ -123,13 +107,7 @@ Shell aliases and scripts:
 * Set pry as the default ruby/rails console (pry-everywhere)
 * Add hirb for rails console
 
-TODO
-----
-
-* More tests needed
-
-Credits
--------
+## Credits
 
 Inspired by [thoughtbot's dotfiles](https://github.com/thoughtbot/dotfiles)
 
