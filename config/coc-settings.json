@@ -1,0 +1,55 @@
+{
+  "languageserver": {
+    "ruby-lsp": {
+      "command": "ruby-lsp",
+      "initializationOptions": {
+        "enabledFeatures": {
+          "codeActions": true,
+          "codeLens": true,
+          "completion": true,
+          "definition": true,
+          "diagnostics": true,
+          "documentHighlights": true,
+          "documentLink": true,
+          "documentSymbols": true,
+          "foldingRanges": true,
+          "formatting": false,
+          "hover": true,
+          "inlayHint": true,
+          "onTypeFormatting": true,
+          "selectionRanges": true,
+          "semanticHighlighting": true,
+          "signatureHelp": true,
+          "typeHierarchy": true,
+          "workspaceSymbol": true
+        }
+      },
+      "filetypes": ["ruby"],
+      "featuresConfiguration": {
+        "inlayHint": {
+          "implicitHashValue": true,
+          "implicitRescue": true
+        }
+      },
+      "indexing": {
+        "excludedPatterns": ["path/to/excluded/file.rb"],
+        "includedPatterns": ["path/to/included/file.rb"],
+        "excludedGems": ["gem1", "gem2", "etc."],
+        "excludedMagicComments": ["compiled:true"]
+      },
+      "formatter": "auto",
+      "linters": [],
+      "experimentalFeaturesEnabled": false
+    },
+    "rubocop": {
+      "command": "bundle",
+      "args": ["exec", "rubocop", "--lsp"],
+      "filetypes": ["ruby"],
+      "rootPatterns": [".git", "Gemfile"],
+      "requireRootPattern": true,
+      "initializationOptions": {
+        "safeAutocorrect": false
+      }
+    }
+  }
+}

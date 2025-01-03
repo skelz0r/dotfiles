@@ -23,7 +23,7 @@ for name in *; do
       fi
     fi
   else
-    if [ "$name" != 'install.sh' ] && [ "$name" != 'symlink.sh' ] && [ "$name" != 'README.md' ] && [ "$name" != 'osx' ] &&  [ "$name" != 'brew.list' ] && [ "$name" != 'brew-cask.list' ] && [ "$name" != 'brew.sh' ] ; then
+    if [ "$name" != 'install.sh' ] && [ "$name" != 'symlink.sh' ] && [ "$name" != 'README.md' ] && [ "$name" != 'config' ] &&  [ "$name" != 'brew.list' ] && [ "$name" != 'brew-cask.list' ] && [ "$name" != 'brew.sh' ] ; then
       echo "Creating $target"
       if [ -n "$(grep "$cutstring" "$name")" ]; then
         cp "$PWD/$name" "$target"

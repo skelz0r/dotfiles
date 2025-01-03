@@ -234,7 +234,6 @@ let g:coc_global_extensions = [
   \ 'coc-markdownlint',
   \ 'coc-pairs',
   \ 'coc-prettier',
-  \ 'coc-solargraph',
   \ 'coc-stylelintplus',
   \ 'coc-sql',
   \ 'coc-yaml',
@@ -244,5 +243,7 @@ nmap <silent> qf <Plug>(coc-fix-current)
 nmap <silent> gd <Plug>(coc-definition)
 nmap <silent> gi <Plug>(coc-implementation)
 nmap <silent> gr <Plug>(coc-references)
+
+autocmd BufWritePre *.rb :call CocAction('format')
 
 hi CocFloating ctermbg=255 ctermfg=black
