@@ -1,5 +1,7 @@
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+export LANG=en_US.UTF-8
+
 # adds the current branch name in green
 git_prompt_info() {
   ref=$(git symbolic-ref HEAD 2> /dev/null)
@@ -56,12 +58,8 @@ setopt CORRECT
 # Enable extended globbing
 setopt EXTENDED_GLOB
 
-# rvm
-[[ -s "/usr/local/rvm/scripts/rvm" ]] && source "/usr/local/rvm/scripts/rvm"
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
-
 # prompt
-export RPS1='$(git_prompt_info)$(rvm_prompt_info)'
+export RPS1='$(git_prompt_info)$(rbenv_prompt_info)'
 
 # for root
 # use http://www.nparikh.org/unix/prompt.php#zsh for moar config
@@ -87,8 +85,6 @@ export PATH="/Applications/OpenOffice.app/Contents/MacOS:$HOME/bin:$HOME/.bin:./
 if [ -e "$HOME/.zshrc.local" ]; then
   source "$HOME/.zshrc.local"
 fi
-
-export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 

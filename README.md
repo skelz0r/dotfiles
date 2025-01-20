@@ -16,7 +16,6 @@ chsh -s /bin/zsh
 Some aliases and plugins recommand/use following programmes:
 
 * [ag](https://github.com/ggreer/the_silver_searcher) (ack-like more powerfull):
-* [rvm](https://rvm.io) (Ruby Version Manager) :
 
 ## Install
 
