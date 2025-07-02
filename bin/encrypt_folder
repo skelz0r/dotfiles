@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 <folder>"
+  exit 1
+fi
+
+FOLDER="$1"
+
+tar -czf $FOLDER.tar.gz $FOLDER/
+gpg --encrypt --recipient 1F983E1D $FOLDER.tar.gz
+rm $FOLDER.tar.gz
+
+# gpg --output folder.tar.gz --decrypt folder.tar.gz.gpg
+# tar -xzf folder.tar.gz

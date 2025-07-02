@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# wt - Git Worktree Manager
+# Creates a new git worktree and branch, with optional setup script execution
+
+set -e  # Exit on any error
+
+# Configuration
+BASE_BRANCH="develop"
+SETUP_SCRIPT="./worktree_setup.sh"
+WORKTREES_DIR="../worktrees"
+
+usage() {
+	echo "Usage: wt <branch-name>"
+	echo "Creates a new git worktree in ../worktrees/<branch-name> from $BASE_BRANCH branch"
+	echo "and checks out a new branch with the same name."
+	exit 1
+}
+
+if [ $# -eq 0 ] || [ -z "$1" ]; then
+	echo "Error: Branch name is required"
+	usage
+	exit 1
+fi
+
+BRANCH_NAME="features/$1"
+WORKTREE_DIR="$WORKTREES_DIR/$1"
+
+if [ ! -d "$WORKTREES_DIR" ]; then
+	mkdir -p "$WORKTREES_DIR"
+fi
+
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+	echo "Error: Not in a git repository"
+	exit 1
+fi
+
+if ! git show-ref --verify --quiet "refs/heads/$BASE_BRANCH"; then
+	echo "Error: '$BASE_BRANCH' branch does not exist"
+	exit 1
+fi
+
+if [ -d "$WORKTREE_DIR" ]; then
+	echo "Error: Directory '$WORKTREE_DIR' already exists"
+	exit 1
+fi
+
+if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+	echo "Error: Branch '$BRANCH_NAME' already exists"
+	exit 1
+fi
+
+echo "Creating worktree: $WORKTREE_DIR"
+
+if ! git worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR" "$BASE_BRANCH"; then
+	echo "Error: Failed to create worktree"
+	exit 1
+fi
+
+cd "$WORKTREE_DIR" || {
+	echo "Error: Failed to change to worktree directory"
+	exit 1
+}
+
+if [ -f "$SETUP_SCRIPT" ]; then
+	if [ -x "$SETUP_SCRIPT" ]; then
+		echo "Found executable setup script: $SETUP_SCRIPT"
+		echo "Running setup script..."
+		if ! "$SETUP_SCRIPT" "$BRANCH_NAME"; then
+			echo "Warning: Setup script failed with exit code $?"
+		else
+			echo "Setup script completed successfully"
+		fi
+	else
+		echo "Found setup script but it's not executable: $SETUP_SCRIPT"
+		echo "Run 'chmod +x $SETUP_SCRIPT' to make it executable"
+	fi
+fi
+
+if [ "$(basename "$(pwd)")" != "$1" ]; then
+	cd "$WORKTREE_DIR" || {
+		echo "Error: Failed to change to final worktree directory"
+		exit 1
+	}
+fi
