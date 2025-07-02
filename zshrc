@@ -59,7 +59,7 @@ setopt CORRECT
 setopt EXTENDED_GLOB
 
 # prompt
-export RPS1='$(git_prompt_info)$(rbenv_prompt_info)'
+export RPS1='$(git_prompt_info)$(rbenv_prompt_info)$(nvm_prompt_info)'
 
 # for root
 # use http://www.nparikh.org/unix/prompt.php#zsh for moar config
@@ -79,7 +79,6 @@ else
   PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "       # prompt delimitor in bold yellow + space
 fi
 
-export PATH="/Applications/OpenOffice.app/Contents/MacOS:$HOME/bin:$HOME/.bin:./bin:$PATH"
 
 # locales customs
 if [ -e "$HOME/.zshrc.local" ]; then
@@ -93,11 +92,19 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && . "/usr/local/opt/nvm/etc/bash_completion.d/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-export PATH="/usr/local/opt/libpq/bin:$PATH"
-export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 
 export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
+export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 export PATH="$PYENV_ROOT/bin:$PATH"
+
 eval "$(pyenv init --path)"
 eval "$(pyenv init -)"
+
+# Added by `rbenv init` on Wed Jan 22 11:04:28 CET 2025
+eval "$(rbenv init - --no-rehash zsh)"
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
