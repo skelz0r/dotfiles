@@ -108,3 +108,6 @@ eval "$(rbenv init - --no-rehash zsh)"
 
 # Added by LM Studio CLI (lms)
 export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
+
+# opencode
+export PATH=/Users/skelz0r/.opencode/bin:$PATH
