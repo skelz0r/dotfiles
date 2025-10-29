@@ -1,8 +1,4 @@
 #!/bin/bash
 git branch --merged | \
-  grep -v "\*" | \
-  grep -v master | \
-  grep -v main | \
-  grep -v develop | \
-  grep -v gh-pages | \
-  xargs -n 1 git branch -d
+  grep -vE '^\*|^\+|^  (main|master|develop|gh-pages)$' | \
+  xargs -r git branch -d
