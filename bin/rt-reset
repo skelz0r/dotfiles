@@ -1,0 +1,2 @@
+#!/bin/bash
+bin/rails db:environment:set RAILS_ENV=test ; rails db:drop:all db:create:all db:schema:load
