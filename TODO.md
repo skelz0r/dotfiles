@@ -8,22 +8,22 @@
 
 ## Scripts bin/
 
-- [x] **Uniformiser les shebangs** - Mélange de `#!/bin/bash`, `#!/bin/sh`, `#!/usr/bin/env ruby`
-- [x] **Ajouter --help** à tous les scripts - Documentation inline manquante
-- [x] **Renommer `git-clean-merged-branchs`** - Typo: "branchs" → "branches"
-- [x] **Script `kill_port`** - Ajouter validation du port (numérique, range valide)
+- [x] **Uniformiser les shebangs** - `#!/usr/bin/env bash` partout
+- [x] **Ajouter --help** à tous les scripts - Documentation inline
+- [x] **Renommer `git-clean-merged-branchs`** - Typo corrigée
+- [x] **Script `kill_port`** - Validation du port (1-65535)
+- [x] **Support Linux** - `battery`, `flushdns` cross-platform
 
 ## Installation
 
-- [x] **Idempotence install.sh** - Vérifier existence avant création symlinks
-- [ ] **Support Linux** - Certains scripts hardcodés macOS (`dscacheutil`, `diskutil`)
-- [x] **Backup automatique** - Sauvegarder fichiers existants avant symlink
-- [x] **Dry-run mode** - Option `--dry-run` pour preview des changements
+- [x] **Idempotence install.sh** - Vérifier existence avant création
+- [x] **Backup automatique** - Sauvegarde dans `~/.dotfiles_backup/`
+- [x] **Dry-run mode** - Option `--dry-run` ajoutée
 
 ## Zsh
 
 - [ ] **Migrer vers modern prompt** - Considérer starship ou powerlevel10k
-- [ ] **Lazy loading** - nvm/rbenv/pyenv ralentissent le démarrage
+- [x] **Lazy loading** - nvm/rbenv/pyenv chargés à la demande
 - [ ] **Complétion moderne** - Ajouter fzf, zoxide pour navigation rapide
 
 ## Vim
@@ -40,7 +40,7 @@
 ## Sécurité
 
 - [ ] **Audit GPG config** - Vérifier clés expirées
-- [ ] **SSH config** - Ajouter config SSH avec best practices
+- [x] **SSH config** - Config avec best practices (ed25519, multiplexing)
 - [ ] **Secrets management** - Documenter gestion des tokens/API keys
 
 ## Documentation
@@ -51,7 +51,7 @@
 
 ## Nouvelles fonctionnalités
 
-- [x] **Script migration** - Ajouté `bin/migration`
-- [ ] **Dotfiles diff** - Comparer config locale vs repo
-- [ ] **Health check** - Script vérifiant dépendances installées
+- [x] **Script migration** - `bin/migration` (rsync)
+- [x] **Dotfiles diff** - `bin/dotfiles-diff`
+- [x] **Health check** - `bin/dotfiles-health`
 - [ ] **Profile switching** - Configs work vs personal
