@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+#
+# dotfiles-diff - Compare local dotfiles with repository
+#
+
+set -euo pipefail
+
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+DIFF_TOOL="${DIFF_TOOL:-diff}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS] [file...]
+
+Compare local dotfiles with repository versions.
+
+Options:
+  -a, --all       Check all dotfiles
+  -v, --verbose   Show full diff output
+  -h, --help      Show this help message
+
+Examples:
+  $(basename "$0")              # Check common dotfiles
+  $(basename "$0") -a           # Check all dotfiles
+  $(basename "$0") zshrc vimrc  # Check specific files
+  $(basename "$0") -v zshrc     # Show full diff for zshrc
+
+Environment:
+  DOTFILES_DIR    Path to dotfiles repo (default: ~/dotfiles)
+  DIFF_TOOL       Diff command to use (default: diff)
+EOF
+  exit 0
+}
+
+log() { echo -e "${BLUE}→${NC} $*"; }
+ok() { echo -e "${GREEN}✓${NC} $*"; }
+changed() { echo -e "${YELLOW}~${NC} $*"; }
+missing() { echo -e "${RED}✗${NC} $*"; }
+
+# Common dotfiles to check
+COMMON_FILES=(
+  zshrc
+  vimrc
+  tmux.conf
+  gitconfig
+  aliases
+  pryrc
+)
+
+ALL_MODE=false
+VERBOSE=false
+FILES=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -a|--all) ALL_MODE=true; shift ;;
+    -v|--verbose) VERBOSE=true; shift ;;
+    -h|--help) usage ;;
+    -*) echo "Unknown option: $1"; exit 1 ;;
+    *) FILES+=("$1"); shift ;;
+  esac
+done
+
+if [[ ! -d "$DOTFILES_DIR" ]]; then
+  echo "Dotfiles directory not found: $DOTFILES_DIR"
+  exit 1
+fi
+
+# Determine files to check
+if [[ ${#FILES[@]} -gt 0 ]]; then
+  CHECK_FILES=("${FILES[@]}")
+elif $ALL_MODE; then
+  # Get all dotfiles from repo (excluding special files)
+  CHECK_FILES=()
+  for f in "$DOTFILES_DIR"/*; do
+    name=$(basename "$f")
+    [[ -f "$f" ]] || continue
+    [[ "$name" =~ ^(install|symlink|README|TODO|Brewfile|macos|Gemfile)\.?(sh|md|lock)?$ ]] && continue
+    [[ "$name" =~ ^\. ]] && continue
+    CHECK_FILES+=("$name")
+  done
+else
+  CHECK_FILES=("${COMMON_FILES[@]}")
+fi
+
+echo "Comparing dotfiles..."
+echo ""
+
+CHANGED=0
+SYNCED=0
+MISSING=0
+
+for name in "${CHECK_FILES[@]}"; do
+  repo_file="$DOTFILES_DIR/$name"
+  local_file="$HOME/.$name"
+
+  if [[ ! -f "$repo_file" ]]; then
+    continue
+  fi
+
+  if [[ ! -e "$local_file" ]]; then
+    missing "$name (not installed)"
+    ((MISSING++))
+    continue
+  fi
+
+  if [[ -L "$local_file" ]]; then
+    # Symlinked - check if pointing to correct location
+    link_target=$(readlink "$local_file")
+    if [[ "$link_target" == "$repo_file" ]]; then
+      ok "$name (symlinked)"
+      ((SYNCED++))
+    else
+      changed "$name → $link_target (wrong symlink)"
+      ((CHANGED++))
+    fi
+  else
+    # Not symlinked - compare content
+    if diff -q "$local_file" "$repo_file" &>/dev/null; then
+      ok "$name (identical)"
+      ((SYNCED++))
+    else
+      changed "$name (differs)"
+      ((CHANGED++))
+
+      if $VERBOSE; then
+        echo ""
+        $DIFF_TOOL -u "$repo_file" "$local_file" | head -50 || true
+        echo ""
+      fi
+    fi
+  fi
+done
+
+echo ""
+echo "Summary: $SYNCED synced, $CHANGED changed, $MISSING missing"
+
+if [[ $CHANGED -gt 0 || $MISSING -gt 0 ]]; then
+  echo ""
+  echo "To sync changes, run: cd $DOTFILES_DIR && ./symlink.sh"
+fi
+
+exit $CHANGED
