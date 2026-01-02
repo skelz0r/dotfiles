@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+#
+# migration - Synchronize folders between machines
+# Usage: migration [options] <source_host> <dest_host>
+#        migration --local <dest_host>
+#
+# Examples:
+#   migration --dry-run oldmac newmac     # Preview sync from oldmac to newmac
+#   migration --local user@newmac.local   # Sync from current machine to newmac
+#   migration --pull user@oldmac.local    # Pull from oldmac to current machine
+
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Default config file
+CONFIG_FILE="${MIGRATION_CONFIG:-$HOME/.migration.conf}"
+
+# Default folders to sync (can be overridden in config)
+DEFAULT_FOLDERS=(
+    "$HOME/Documents"
+    "$HOME/Desktop"
+    "$HOME/Pictures"
+    "$HOME/Downloads"
+    "$HOME/.ssh"
+    "$HOME/.gnupg"
+    "$HOME/.config"
+    "$HOME/.local/share"
+)
+
+# Folders to exclude
+DEFAULT_EXCLUDES=(
+    ".DS_Store"
+    ".Trash"
+    "*.tmp"
+    "*.log"
+    "node_modules"
+    ".git"
+    "__pycache__"
+    "*.pyc"
+    ".cache"
+    "Cache"
+    "CachedData"
+)
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS] <destination>
+
+Synchronize folders between machines using rsync.
+
+OPTIONS:
+    -n, --dry-run       Show what would be transferred (no changes)
+    -l, --local         Sync FROM current machine TO destination
+    -p, --pull          Sync FROM source TO current machine
+    -c, --config FILE   Use custom config file (default: ~/.migration.conf)
+    -v, --verbose       Verbose output
+    -d, --delete        Delete files on dest not present on source
+    -b, --bandwidth KB  Limit bandwidth in KB/s
+    -h, --help          Show this help
+
+EXAMPLES:
+    $(basename "$0") --dry-run --local user@newmac.local
+    $(basename "$0") --pull user@oldmac.local
+    $(basename "$0") -n -l -d user@backup-server:/backups/
+
+CONFIG FILE (~/.migration.conf):
+    FOLDERS=(
+        "\$HOME/Documents"
+        "\$HOME/Projects"
+        "\$HOME/.config"
+    )
+    EXCLUDES=(
+        "node_modules"
+        ".git"
+    )
+EOF
+    exit 0
+}
+
+log() { echo -e "${BLUE}[INFO]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+error() { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+success() { echo -e "${GREEN}[OK]${NC} $*"; }
+
+# Parse arguments
+DRY_RUN=false
+LOCAL_MODE=false
+PULL_MODE=false
+VERBOSE=false
+DELETE=false
+BANDWIDTH=""
+DESTINATION=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--dry-run) DRY_RUN=true; shift ;;
+        -l|--local) LOCAL_MODE=true; shift ;;
+        -p|--pull) PULL_MODE=true; shift ;;
+        -c|--config) CONFIG_FILE="$2"; shift 2 ;;
+        -v|--verbose) VERBOSE=true; shift ;;
+        -d|--delete) DELETE=true; shift ;;
+        -b|--bandwidth) BANDWIDTH="$2"; shift 2 ;;
+        -h|--help) usage ;;
+        -*) error "Unknown option: $1" ;;
+        *) DESTINATION="$1"; shift ;;
+    esac
+done
+
+[[ -z "$DESTINATION" ]] && error "Destination required. Use --help for usage."
+
+# Load config if exists
+if [[ -f "$CONFIG_FILE" ]]; then
+    log "Loading config from $CONFIG_FILE"
+    # shellcheck source=/dev/null
+    source "$CONFIG_FILE"
+fi
+
+# Use defaults if not set in config
+FOLDERS=("${FOLDERS[@]:-${DEFAULT_FOLDERS[@]}}")
+EXCLUDES=("${EXCLUDES[@]:-${DEFAULT_EXCLUDES[@]}}")
+
+# Build rsync options
+RSYNC_OPTS=(
+    -avz                    # archive, verbose, compress
+    --progress              # show progress
+    --human-readable        # human readable sizes
+    --partial               # keep partial files (resume)
+    --partial-dir=.rsync-partial
+)
+
+# Add excludes
+for excl in "${EXCLUDES[@]}"; do
+    RSYNC_OPTS+=(--exclude="$excl")
+done
+
+# Optional flags
+$DRY_RUN && RSYNC_OPTS+=(--dry-run)
+$VERBOSE && RSYNC_OPTS+=(-v)
+$DELETE && RSYNC_OPTS+=(--delete)
+[[ -n "$BANDWIDTH" ]] && RSYNC_OPTS+=(--bwlimit="$BANDWIDTH")
+
+# Summary
+echo ""
+echo "======================================"
+echo "       MIGRATION SYNC SUMMARY"
+echo "======================================"
+echo ""
+if $LOCAL_MODE; then
+    echo "Direction: LOCAL → $DESTINATION"
+elif $PULL_MODE; then
+    echo "Direction: $DESTINATION → LOCAL"
+else
+    error "Specify --local or --pull mode"
+fi
+echo ""
+echo "Folders to sync:"
+for folder in "${FOLDERS[@]}"; do
+    if [[ -d "$folder" ]] || $PULL_MODE; then
+        echo "  ✓ $folder"
+    else
+        echo "  ✗ $folder (not found, skipping)"
+    fi
+done
+echo ""
+echo "Excludes: ${EXCLUDES[*]}"
+echo ""
+$DRY_RUN && echo -e "${YELLOW}DRY RUN MODE - No changes will be made${NC}"
+$DELETE && echo -e "${RED}DELETE MODE - Files not on source will be removed${NC}"
+echo ""
+echo "======================================"
+echo ""
+
+# Confirmation
+if ! $DRY_RUN; then
+    read -rp "Proceed with sync? [y/N] " confirm
+    [[ "$confirm" != "y" && "$confirm" != "Y" ]] && exit 0
+fi
+
+# Execute sync for each folder
+TOTAL_FOLDERS=${#FOLDERS[@]}
+CURRENT=0
+
+for folder in "${FOLDERS[@]}"; do
+    ((CURRENT++))
+
+    # Skip non-existent folders in local mode
+    if $LOCAL_MODE && [[ ! -d "$folder" ]]; then
+        warn "[$CURRENT/$TOTAL_FOLDERS] Skipping $folder (not found)"
+        continue
+    fi
+
+    log "[$CURRENT/$TOTAL_FOLDERS] Syncing $folder"
+
+    # Determine source and dest
+    FOLDER_NAME=$(basename "$folder")
+    FOLDER_PARENT=$(dirname "$folder")
+
+    if $LOCAL_MODE; then
+        SRC="$folder/"
+        DST="$DESTINATION:$folder/"
+    else
+        SRC="$DESTINATION:$folder/"
+        DST="$folder/"
+        # Ensure local parent exists
+        mkdir -p "$FOLDER_PARENT"
+    fi
+
+    # Run rsync
+    if rsync "${RSYNC_OPTS[@]}" "$SRC" "$DST"; then
+        success "Completed: $folder"
+    else
+        warn "Issues with: $folder (continuing...)"
+    fi
+
+    echo ""
+done
+
+echo "======================================"
+success "Migration complete!"
+echo "======================================"
+
+# Post-sync suggestions
+cat << EOF
+
+Next steps:
+  1. Verify synced data on destination
+  2. Check permissions: chmod 700 ~/.ssh ~/.gnupg
+  3. Test SSH keys: ssh -T git@github.com
+  4. Reinstall Homebrew packages: brew bundle --file=~/dotfiles/Brewfile
+
+EOF
