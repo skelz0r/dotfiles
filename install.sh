@@ -152,7 +152,17 @@ fi
 mkdir -p "$HOME/.config/nvim"
 safe_symlink "$DOTFILES_DIR/config/coc-settings.json" "$HOME/.config/nvim/coc-settings.json"
 
-# Step 6: Claude config
+# Step 6: SSH config
+mkdir -p "$HOME/.ssh/sockets"
+chmod 700 "$HOME/.ssh"
+chmod 700 "$HOME/.ssh/sockets"
+if [[ ! -f "$HOME/.ssh/config" ]]; then
+  safe_symlink "$DOTFILES_DIR/ssh_config" "$HOME/.ssh/config"
+else
+  log "SSH config exists, skipping (manual merge may be needed)"
+fi
+
+# Step 7: Claude config
 mkdir -p "$HOME/.claude"
 if ! dry "copy Claude settings"; then
   cp -n claude/settings.json "$HOME/.claude/settings.json" 2>/dev/null || log "Claude settings exists"
