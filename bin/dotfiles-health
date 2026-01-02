@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+#
+# dotfiles-health - Check dotfiles dependencies and configuration
+#
+
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+ERRORS=0
+WARNINGS=0
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Check that all dotfiles dependencies are installed and configured.
+
+Options:
+  -q, --quiet     Only show errors and warnings
+  -h, --help      Show this help message
+EOF
+  exit 0
+}
+
+QUIET=false
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+[[ "${1:-}" == "-q" || "${1:-}" == "--quiet" ]] && QUIET=true
+
+ok() { $QUIET || echo -e "${GREEN}✓${NC} $*"; }
+warn() { echo -e "${YELLOW}⚠${NC} $*"; ((WARNINGS++)); }
+fail() { echo -e "${RED}✗${NC} $*"; ((ERRORS++)); }
+info() { $QUIET || echo -e "${BLUE}→${NC} $*"; }
+section() { $QUIET || echo -e "\n${BLUE}[$1]${NC}"; }
+
+check_cmd() {
+  local cmd="$1"
+  local install_hint="${2:-}"
+  if command -v "$cmd" &>/dev/null; then
+    ok "$cmd"
+  else
+    if [[ -n "$install_hint" ]]; then
+      fail "$cmd (install: $install_hint)"
+    else
+      fail "$cmd"
+    fi
+  fi
+}
+
+check_file() {
+  local file="$1"
+  local desc="${2:-$file}"
+  if [[ -e "$file" ]]; then
+    ok "$desc"
+  else
+    warn "$desc missing"
+  fi
+}
+
+check_symlink() {
+  local link="$1"
+  local desc="${2:-$link}"
+  if [[ -L "$link" ]]; then
+    ok "$desc (symlinked)"
+  elif [[ -e "$link" ]]; then
+    warn "$desc exists but not symlinked"
+  else
+    fail "$desc missing"
+  fi
+}
+
+# Header
+echo "Dotfiles Health Check"
+echo "====================="
+
+# Essential tools
+section "Essential Tools"
+check_cmd git "brew install git"
+check_cmd zsh "brew install zsh"
+check_cmd nvim "brew install neovim"
+check_cmd tmux "brew install tmux"
+check_cmd curl "brew install curl"
+
+# Development tools
+section "Development Tools"
+check_cmd rbenv "brew install rbenv"
+check_cmd pyenv "brew install pyenv"
+check_cmd node "install via nvm"
+check_cmd gh "brew install gh"
+check_cmd ag "brew install the_silver_searcher"
+check_cmd rg "brew install ripgrep"
+check_cmd fzf "brew install fzf"
+check_cmd jq "brew install jq"
+
+# Version managers
+section "Version Managers"
+if command -v rbenv &>/dev/null; then
+  RUBY_V=$(rbenv version-name 2>/dev/null || echo "none")
+  ok "rbenv → Ruby $RUBY_V"
+else
+  fail "rbenv not installed"
+fi
+
+if [[ -d "$HOME/.nvm" ]]; then
+  ok "nvm installed"
+else
+  warn "nvm not installed"
+fi
+
+if command -v pyenv &>/dev/null; then
+  PYTHON_V=$(pyenv version-name 2>/dev/null || echo "none")
+  ok "pyenv → Python $PYTHON_V"
+else
+  warn "pyenv not installed"
+fi
+
+# Dotfiles symlinks
+section "Dotfiles Symlinks"
+check_symlink "$HOME/.zshrc" "zshrc"
+check_symlink "$HOME/.vimrc" "vimrc"
+check_symlink "$HOME/.tmux.conf" "tmux.conf"
+check_symlink "$HOME/.gitconfig" "gitconfig"
+check_symlink "$HOME/.aliases" "aliases"
+check_symlink "$HOME/.pryrc" "pryrc"
+
+# Config directories
+section "Config Directories"
+check_file "$HOME/.vim/bundle/vundle" "Vundle"
+check_file "$HOME/.tmux/plugins/tpm" "TPM (tmux plugins)"
+check_file "$HOME/.config/nvim/coc-settings.json" "coc-settings.json"
+
+# SSH
+section "SSH Configuration"
+check_file "$HOME/.ssh/id_ed25519" "SSH key (ed25519)"
+check_file "$HOME/.ssh/id_ed25519.pub" "SSH public key"
+if [[ -d "$HOME/.ssh/sockets" ]]; then
+  ok "SSH sockets directory"
+else
+  warn "SSH sockets directory missing (for multiplexing)"
+fi
+
+# GPG
+section "GPG Configuration"
+if command -v gpg &>/dev/null; then
+  GPG_KEYS=$(gpg --list-secret-keys 2>/dev/null | grep -c "^sec" || echo "0")
+  if [[ "$GPG_KEYS" -gt 0 ]]; then
+    ok "GPG: $GPG_KEYS secret key(s)"
+  else
+    warn "GPG: no secret keys found"
+  fi
+else
+  warn "GPG not installed"
+fi
+
+# Git config
+section "Git Configuration"
+GIT_NAME=$(git config --global user.name 2>/dev/null || echo "")
+GIT_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
+GIT_SIGN=$(git config --global commit.gpgsign 2>/dev/null || echo "false")
+
+[[ -n "$GIT_NAME" ]] && ok "user.name: $GIT_NAME" || fail "user.name not set"
+[[ -n "$GIT_EMAIL" ]] && ok "user.email: $GIT_EMAIL" || fail "user.email not set"
+[[ "$GIT_SIGN" == "true" ]] && ok "GPG signing enabled" || info "GPG signing disabled"
+
+# Summary
+echo ""
+echo "====================="
+if [[ $ERRORS -eq 0 && $WARNINGS -eq 0 ]]; then
+  echo -e "${GREEN}All checks passed!${NC}"
+elif [[ $ERRORS -eq 0 ]]; then
+  echo -e "${YELLOW}$WARNINGS warning(s)${NC}"
+else
+  echo -e "${RED}$ERRORS error(s), $WARNINGS warning(s)${NC}"
+fi
+
+exit $ERRORS
