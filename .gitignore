@@ -1,3 +1,23 @@
+# Vim
 vim/backups/
 vim/bundle/*
+vim/.netrwhist
+
+# Binaries
 bin/gactions
+
+# Local overrides
+*.local
+
+# Temp files
+*.tmp
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ruby LSP cache
+.ruby-lsp/
