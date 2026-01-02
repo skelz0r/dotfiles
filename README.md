@@ -1,114 +1,188 @@
 # skelz0r dotfiles
 
-For unix system, with vim, git, pry and tmux.
-Install some must-have plugins and aliases for developping with rails framework.
+Personal dotfiles for macOS/Linux with zsh, vim, git, tmux, and pry.
+Optimized for Rails development with lazy-loaded version managers.
+
+## Quick Start
+
+```sh
+git clone https://github.com/skelz0r/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./install.sh --dry-run  # Preview changes
+./install.sh            # Install
+```
 
 ## Requirements
 
-Install and set **zsh** as your login shell.
+- **zsh** as login shell: `chsh -s $(which zsh)`
+- **Homebrew** (macOS) or equivalent package manager
+
+## Installation
 
 ```sh
-chsh -s /bin/zsh
+./install.sh [OPTIONS]
+
+Options:
+  -n, --dry-run    Preview changes without applying
+  -h, --help       Show help
 ```
 
-## Recommandations
+The installer:
+1. Creates symlinks for dotfiles in `$HOME`
+2. Installs Ruby via rbenv + ruby-lsp
+3. Clones tmux/vim plugin managers
+4. Sets up SSH and Claude configs
 
-Some aliases and plugins recommand/use following programmes:
+**Backups**: Existing files are saved to `~/.dotfiles_backup/YYYYMMDD_HHMMSS/`
 
-* [ag](https://github.com/ggreer/the_silver_searcher) (ack-like more powerfull):
+## Customization
 
-## Install
+Add your customizations **above** the line `DO NOT EDIT BELOW THIS LINE`.
+
+Example `~/.gitconfig`:
+```gitconfig
+[user]
+  name = Your Name
+  email = you@example.com
+
+# DO NOT EDIT BELOW THIS LINE
+[color]
+  diff = auto
+```
+
+Local overrides (not synced):
+- `~/.zshrc.local` - Shell customizations
+- `~/.vimrc.local` - Vim customizations
+- `~/.aliases` - Custom aliases
+
+## What's Included
+
+### Shell (zsh)
+
+- Git branch in prompt
+- **Lazy loading** for nvm/rbenv/pyenv (faster startup)
+- Common aliases: `g`, `b`, `v`, `mcd`, `tat`
+
+### Vim/Neovim
+
+- [vim-rails](https://github.com/tpope/vim-rails) - Rails navigation
+- [coc.nvim](https://github.com/neoclide/coc.nvim) - LSP support
+- [copilot.vim](https://github.com/github/copilot.vim) - GitHub Copilot
+- 40+ plugins via [Vundle](https://github.com/gmarik/vundle)
+
+### Tmux
+
+- Prefix: `Ctrl+a`
+- [TPM](https://github.com/tmux-plugins/tpm) for plugins
+- Battery indicator in status bar
+
+### Git
+
+- Useful aliases (`lg`, `tree`, `pod`, `pf`)
+- GPG signing ready
+
+### SSH
+
+- Secure defaults (ed25519, strong ciphers)
+- Connection multiplexing
+- Pre-configured for GitHub/GitLab
+
+## Utility Scripts
+
+| Script | Description |
+|--------|-------------|
+| `migration` | Sync folders between machines (rsync) |
+| `dotfiles-health` | Check dependencies and configuration |
+| `dotfiles-diff` | Compare local vs repo dotfiles |
+| `kill_port <port>` | Kill process on port |
+| `tat` | Attach to tmux session (named after directory) |
+| `wt <name>` | Create git worktree with branch |
+| `encrypt_folder <dir>` | GPG encrypt a folder |
+| `flushdns` | Flush DNS cache (macOS/Linux) |
+| `battery` | Show battery level for tmux |
+
+### Migration Script
+
+Sync dotfiles and documents to a new machine:
 
 ```sh
-git clone https://github.com/skelz0r/dotfiles.git
-cd dotfiles
+# Push to remote
+migration --local user@newmac.local
+
+# Pull from remote
+migration --pull user@oldmac.local
+
+# Preview only
+migration --dry-run --local user@newmac.local
+```
+
+Configure folders in `~/.migration.conf`:
+```sh
+FOLDERS=(
+  "$HOME/Documents"
+  "$HOME/Projects"
+  "$HOME/.ssh"
+)
+```
+
+### Health Check
+
+```sh
+dotfiles-health        # Full check
+dotfiles-health -q     # Errors/warnings only
+```
+
+Checks: git, zsh, nvim, tmux, rbenv, pyenv, nvm, symlinks, SSH, GPG
+
+## Directory Structure
+
+```
+dotfiles/
+├── bin/                 # Utility scripts
+├── zsh/
+│   ├── completion/      # Shell completions
+│   └── functions/       # Shell functions (lazy-load, etc.)
+├── vim/
+│   ├── bundle/          # Vundle plugins (git-ignored)
+│   └── colors/          # Color schemes
+├── config/              # App configs (coc-settings.json)
+├── claude/              # Claude Code commands
+├── zshrc, vimrc, ...    # Dotfiles
+├── ssh_config           # SSH configuration
+├── install.sh           # Installer
+└── symlink.sh           # Symlink creator
+```
+
+## Version Managers
+
+Lazy-loaded for fast shell startup:
+
+| Manager | Commands |
+|---------|----------|
+| **rbenv** | `ruby`, `gem`, `bundle`, `rails`, `rake`, `rspec` |
+| **nvm** | `node`, `npm`, `npx`, `yarn`, `pnpm` |
+| **pyenv** | `python`, `pip` |
+
+First invocation loads the manager, subsequent calls are direct.
+
+## Updating
+
+```sh
+cd ~/dotfiles
+git pull
 ./install.sh
 ```
 
-This will create symlinks for config files in your home directory. If you
-include the line "DO NOT EDIT BELOW THIS LINE" anywhere in a config file, it
-will copy that file over instead of symlinking it, and it will leave
-everything above that line in your local config intact.
-
-You can safely run `./install.sh` multiple times to update.
-
-## Make your own customizations
-
-Put your customizations at the top of files, separated by "DO NOT EDIT BELOW
-THIS LINE."
-
-For example, the top of your `~/.gitconfig` might look like this:
-
+Check for drift:
 ```sh
-[user]
-name = Loïc Delmaire
-email = loic@blackbird.co
-
-# DO NOT EDIT BELOW THIS LINE
-
-[color]
-diff = auto
+dotfiles-diff -a        # Check all files
+dotfiles-diff -v zshrc  # Show diff for specific file
 ```
-
-The top of your `~/.zshrc` might look like this:
-
-```
-# Productivity
-alias todo='$EDITOR ~/.todo'
-
-# DO NOT EDIT BELOW THIS LINE
-
-# add the current branch name in green
-git_prompt_info() {
-```
-
-
-## What's in it?
-
-[zsh](http://www.zsh.org/) for default shell:
-
-* Add git branch to right prompt
-* Some common options and configurations extract from oh-my-zsh
-
-[vim](http://www.vim.org/) configuration:
-
-* [Rails.vim](https://github.com/tpope/vim-rails) for enhanced navigation of
-  Rails file structure via `gf` and `:A` (alternate), `:Rextract` partials,
-  `:Rinvert` migrations, etc.
-* Run [RSpec](https://www.relishapp.com/rspec) specs from vim.
-* Syntax highlighting for : CoffeeScript, Cucumber, Haml, Markdown, and
-  HTML5.
-* Use [Ag](https://github.com/ggreer/the_silver_searcher) instead of Grep when
-  available.
-* Use [Exuberant Ctags](http://ctags.sourceforge.net/) for tab completion.
-* Use [Vundle](https://github.com/gmarik/vundle) to manage plugins.
-
-Details in vimrc.bundles for others plugins.
-
-You can use your a local configuration in `~/.vimrc.local`.
-
-[tmux](http://tmux.sourceforge.net/) configuration.
-
-* Set prefix to `Ctrl+a` (like GNU screen).
-
-[git](http://git-scm.com/) configuration.
-
-Shell aliases and scripts:
-
-* `b` for `bundle`.
-* `g` with no arguments is `git status` and with arguments acts like `git`.
-* `mcd` to make a directory and change into it.
-* `tat` to attach to tmux session named the same as the current directory.
-* `v` for `$VISUAL`.
-
-[pry](https://github.com/pry/pry) configuration:
-
-* Set pry as the default ruby/rails console (pry-everywhere)
-* Add hirb for rails console
 
 ## Credits
 
 Inspired by [thoughtbot's dotfiles](https://github.com/thoughtbot/dotfiles)
 
-It is free software and may be
-redistributed under the terms specified in the [LICENSE](LICENSE) file.
+## License
+
+Free software under [LICENSE](LICENSE).
