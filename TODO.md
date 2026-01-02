@@ -45,7 +45,7 @@
 
 ## Documentation
 
-- [ ] **README complet** - Screenshots, prerequisites, quickstart
+- [x] **README complet** - Quick start, scripts, structure, lazy loading
 - [ ] **Changelog** - Historique des changements majeurs
 - [ ] **Documenter claude/commands/** - Expliquer workflow Claude
 
