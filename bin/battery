@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Show MacBook battery level formatted for tmux status bar.
 #
-# Adapted from: https://github.com/Goles/Battery
+# battery - Show battery level formatted for tmux status bar
+#
+# Supports macOS and Linux
 
-battery_charge() {
+battery_charge_macos() {
   ioreg -c AppleSmartBattery -w0 | \
     grep -o '"[^"]*" = [^ ]*' | \
     sed -e 's/= //g' -e 's/"//g' | \
@@ -23,13 +24,37 @@ battery_charge() {
     done
 }
 
-BATTERY_STATUS=`battery_charge`
+battery_charge_linux() {
+  local bat_path="/sys/class/power_supply/BAT0"
+  [[ -d "$bat_path" ]] || bat_path="/sys/class/power_supply/BAT1"
+  [[ -d "$bat_path" ]] || return 1
+
+  if [[ -f "$bat_path/capacity" ]]; then
+    cat "$bat_path/capacity"
+  elif [[ -f "$bat_path/energy_now" && -f "$bat_path/energy_full" ]]; then
+    local now=$(cat "$bat_path/energy_now")
+    local full=$(cat "$bat_path/energy_full")
+    echo $(( 100 * now / full ))
+  else
+    return 1
+  fi
+}
+
+battery_charge() {
+  case "$(uname -s)" in
+    Darwin) battery_charge_macos ;;
+    Linux)  battery_charge_linux ;;
+    *)      return 1 ;;
+  esac
+}
+
+BATTERY_STATUS=$(battery_charge)
 [ -z "$BATTERY_STATUS" ] && exit 1
 
-if [ $BATTERY_STATUS -lt 25 ]; then
+if [ "$BATTERY_STATUS" -lt 25 ]; then
   fg=colour210
   bg=colour88
-elif [ $BATTERY_STATUS -lt 75 ]; then
+elif [ "$BATTERY_STATUS" -lt 75 ]; then
   fg=colour228
   bg=colour94
 else
@@ -37,4 +62,4 @@ else
   bg=colour234
 fi
 
-printf "#[fg=${fg},bg=${bg}] %2d%%" $BATTERY_STATUS
+printf "#[fg=${fg},bg=${bg}] %2d%%" "$BATTERY_STATUS"

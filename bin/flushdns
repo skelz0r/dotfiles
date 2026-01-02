@@ -1,2 +1,30 @@
 #!/usr/bin/env bash
-sudo killall -HUP mDNSResponder
+#
+# flushdns - Flush DNS cache
+#
+# Supports macOS and Linux
+
+case "$(uname -s)" in
+  Darwin)
+    sudo dscacheutil -flushcache
+    sudo killall -HUP mDNSResponder
+    echo "DNS cache flushed (macOS)"
+    ;;
+  Linux)
+    if command -v systemd-resolve &> /dev/null; then
+      sudo systemd-resolve --flush-caches
+    elif command -v resolvectl &> /dev/null; then
+      sudo resolvectl flush-caches
+    elif [[ -f /etc/init.d/nscd ]]; then
+      sudo /etc/init.d/nscd restart
+    else
+      echo "No supported DNS cache service found"
+      exit 1
+    fi
+    echo "DNS cache flushed (Linux)"
+    ;;
+  *)
+    echo "Unsupported OS: $(uname -s)"
+    exit 1
+    ;;
+esac
