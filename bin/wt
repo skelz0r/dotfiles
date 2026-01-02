@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # wt - Git Worktree Manager
 # Creates a new git worktree and branch, with optional setup script execution

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 wg-quick down wgAPI
 wg-quick up wgAPI

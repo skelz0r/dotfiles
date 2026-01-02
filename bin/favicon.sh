@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # from
 # http://bergamini.org/computers/creating-favicon.ico-icon-files-with-imagemagick-convert.html

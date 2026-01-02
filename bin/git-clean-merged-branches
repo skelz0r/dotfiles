@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 git branch --merged | \
   grep -vE '^\*|^\+|^  (main|master|develop|gh-pages)$' | \
   xargs -r git branch -d
