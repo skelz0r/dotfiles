@@ -1,2 +1,18 @@
 #!/usr/bin/env bash
+#
+# rt-reset - Reset Rails test database
+#
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Reset the Rails test database: drop, create, and load schema.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
 bin/rails db:environment:set RAILS_ENV=test ; rails db:drop:all db:create:all db:schema:load

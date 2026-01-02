@@ -1,7 +1,29 @@
 #!/usr/bin/env bash
+#
+# encrypt_folder - Encrypt folder with GPG
+#
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <folder>
+
+Compress and encrypt a folder using GPG.
+Creates <folder>.tar.gz.gpg
+
+To decrypt:
+  gpg --output folder.tar.gz --decrypt folder.tar.gz.gpg
+  tar -xzf folder.tar.gz
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+}
+
+[[ "$1" == "-h" || "$1" == "--help" ]] && usage
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <folder>"
+  echo "Error: Folder required. Use --help for usage."
   exit 1
 fi
 

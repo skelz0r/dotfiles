@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+#
+# git-clean-merged-branches - Delete merged local branches
+#
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Delete all local branches that have been merged into the current branch.
+Protected branches: main, master, develop, gh-pages
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
 git branch --merged | \
   grep -vE '^\*|^\+|^  (main|master|develop|gh-pages)$' | \
   xargs -r git branch -d

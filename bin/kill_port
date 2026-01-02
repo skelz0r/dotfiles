@@ -1,11 +1,41 @@
 #!/usr/bin/env bash
+#
+# kill_port - Kill processes listening on a specific port
+#
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <port>
+
+Kill all processes listening on the specified TCP port.
+
+Arguments:
+  port    Port number (1-65535)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0") 3000
+  $(basename "$0") 8080
+EOF
+  exit 0
+}
+
+[[ "$1" == "-h" || "$1" == "--help" ]] && usage
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <port>"
+  echo "Error: Port required. Use --help for usage."
   exit 1
 fi
 
 PORT="$1"
+
+# Validate port is numeric and in valid range
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+  echo "Error: Invalid port '$PORT'. Must be 1-65535."
+  exit 1
+fi
 
 # Use TCP listening filter for clarity
 PIDS=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN)
