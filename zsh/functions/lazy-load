@@ -1,57 +1,47 @@
 # Lazy loading for version managers
-# Speeds up shell startup by deferring initialization
+# Adds shims to PATH immediately, defers full init until needed
 
-# NVM
+# Rbenv - add shims to PATH immediately
+if [[ -d "$HOME/.rbenv/shims" ]]; then
+  path=("$HOME/.rbenv/shims" $path)
+fi
+
+# Pyenv - add shims to PATH immediately
+if [[ -d "$PYENV_ROOT/shims" ]]; then
+  path=("$PYENV_ROOT/shims" $path)
+fi
+
+# NVM - lazy load (no shims, must load fully)
 _nvm_loaded=0
 _load_nvm() {
   (( _nvm_loaded )) && return
   _nvm_loaded=1
-  unset -f nvm node npm npx yarn pnpm 2>/dev/null
+  unset -f nvm 2>/dev/null
   [[ -s "/opt/homebrew/opt/nvm/nvm.sh" ]] && source "/opt/homebrew/opt/nvm/nvm.sh"
   [[ -s "/usr/local/opt/nvm/nvm.sh" ]] && source "/usr/local/opt/nvm/nvm.sh"
   [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
 }
 
-nvm()  { _load_nvm; nvm "$@"; }
-node() { _load_nvm; node "$@"; }
-npm()  { _load_nvm; npm "$@"; }
-npx()  { _load_nvm; npx "$@"; }
-yarn() { _load_nvm; yarn "$@"; }
-pnpm() { _load_nvm; pnpm "$@"; }
+nvm() { _load_nvm; nvm "$@"; }
 
-# Pyenv
-_pyenv_loaded=0
-_load_pyenv() {
-  (( _pyenv_loaded )) && return
-  _pyenv_loaded=1
-  unset -f pyenv python python3 pip pip3 2>/dev/null
-  if command -v pyenv &>/dev/null; then
-    eval "$(pyenv init --path)"
-    eval "$(pyenv init -)"
+# Rbenv init - lazy (shims already in PATH)
+_rbenv_inited=0
+rbenv() {
+  if (( ! _rbenv_inited )); then
+    _rbenv_inited=1
+    unset -f rbenv 2>/dev/null
+    eval "$(command rbenv init - --no-rehash zsh)"
   fi
+  command rbenv "$@"
 }
 
-pyenv()   { _load_pyenv; pyenv "$@"; }
-python()  { _load_pyenv; python "$@"; }
-python3() { _load_pyenv; python3 "$@"; }
-pip()     { _load_pyenv; pip "$@"; }
-pip3()    { _load_pyenv; pip3 "$@"; }
-
-# Rbenv
-_rbenv_loaded=0
-_load_rbenv() {
-  (( _rbenv_loaded )) && return
-  _rbenv_loaded=1
-  unset -f rbenv ruby gem bundle rails rake rspec 2>/dev/null
-  if command -v rbenv &>/dev/null; then
-    eval "$(rbenv init - --no-rehash zsh)"
+# Pyenv init - lazy (shims already in PATH)
+_pyenv_inited=0
+pyenv() {
+  if (( ! _pyenv_inited )); then
+    _pyenv_inited=1
+    unset -f pyenv 2>/dev/null
+    eval "$(command pyenv init -)"
   fi
+  command pyenv "$@"
 }
-
-rbenv()  { _load_rbenv; rbenv "$@"; }
-ruby()   { _load_rbenv; ruby "$@"; }
-gem()    { _load_rbenv; gem "$@"; }
-bundle() { _load_rbenv; bundle "$@"; }
-rails()  { _load_rbenv; rails "$@"; }
-rake()   { _load_rbenv; rake "$@"; }
-rspec()  { _load_rbenv; rspec "$@"; }
