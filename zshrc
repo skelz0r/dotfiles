@@ -6,16 +6,33 @@ export LANG=en_US.UTF-8
 autoload -U colors && colors
 export CLICOLOR=1
 
-# Fast git branch (cached per directory change)
-_git_branch_cache=""
-_git_branch_pwd=""
+# Fast prompt info (cached per directory change)
+_prompt_pwd=""
+_prompt_git=""
+_prompt_ruby=""
+_prompt_node=""
+
+_refresh_prompt_cache() {
+  [[ "$PWD" == "$_prompt_pwd" ]] && return
+  _prompt_pwd="$PWD"
+  _prompt_git=$(git symbolic-ref --short HEAD 2>/dev/null)
+  _prompt_ruby=$([[ -f .ruby-version ]] && cat .ruby-version || rbenv version-name 2>/dev/null)
+  _prompt_node=$([[ -f .nvmrc ]] && cat .nvmrc || [[ -f .node-version ]] && cat .node-version)
+}
 
 git_prompt_info() {
-  [[ "$PWD" != "$_git_branch_pwd" ]] && {
-    _git_branch_pwd="$PWD"
-    _git_branch_cache=$(git symbolic-ref --short HEAD 2>/dev/null)
-  }
-  [[ -n "$_git_branch_cache" ]] && echo "[%{$fg_bold[green]%}$_git_branch_cache%{$reset_color%}]"
+  _refresh_prompt_cache
+  [[ -n "$_prompt_git" ]] && echo "[%{$fg_bold[green]%}$_prompt_git%{$reset_color%}]"
+}
+
+rbenv_prompt_info() {
+  _refresh_prompt_cache
+  [[ -n "$_prompt_ruby" ]] && echo "[%{$fg_bold[red]%}${_prompt_ruby#ruby-}%{$reset_color%}]"
+}
+
+nvm_prompt_info() {
+  _refresh_prompt_cache
+  [[ -n "$_prompt_node" ]] && echo "[%{$fg_bold[yellow]%}$_prompt_node%{$reset_color%}]"
 }
 
 # Prompt
@@ -37,7 +54,7 @@ else
   PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "
 fi
 
-RPS1='$(git_prompt_info)'
+RPS1='$(git_prompt_info)$(rbenv_prompt_info)$(nvm_prompt_info)'
 
 # History
 setopt histignoredups
