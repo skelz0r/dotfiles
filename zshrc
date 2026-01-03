@@ -2,111 +2,106 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 
 export LANG=en_US.UTF-8
 
-# adds the current branch name in green
-git_prompt_info() {
-  ref=$(git symbolic-ref HEAD 2> /dev/null)
-  if [[ -n $ref ]]; then
-    echo "[%{$fg_bold[green]%}${ref#refs/heads/}%{$reset_color%}]"
-  fi
-}
-
-# makes color constants available
-autoload -U colors
-colors
-
-# enable colored output from ls, etc
+# Colors
+autoload -U colors && colors
 export CLICOLOR=1
 
-# expand functions in the prompt
+# Fast git branch (cached per directory change)
+_git_branch_cache=""
+_git_branch_pwd=""
+
+git_prompt_info() {
+  [[ "$PWD" != "$_git_branch_pwd" ]] && {
+    _git_branch_pwd="$PWD"
+    _git_branch_cache=$(git symbolic-ref --short HEAD 2>/dev/null)
+  }
+  [[ -n "$_git_branch_cache" ]] && echo "[%{$fg_bold[green]%}$_git_branch_cache%{$reset_color%}]"
+}
+
+# Prompt
 setopt prompt_subst
 
-# load our own completion functions
-fpath=(~/.zsh/completion $fpath)
-
-# aliases
-if [ -e "$HOME/.aliases" ]; then
-  source "$HOME/.aliases"
+if [ "$(id -u)" -eq 0 ]; then
+  PS1="%B%{$fg[yellow]%}%T%{$reset_color%}%b "
+  PS1+="%B%{$fg[red]%}%n%{$reset_color%}%b"
+  PS1+="%B%{$fg[yellow]%}@%{$reset_color%}%b"
+  PS1+="%B%{$fg[green]%}%m%{$reset_color%}%b "
+  PS1+="%B%{$fg[green]%}%~%{$reset_color%}%b"
+  PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "
+else
+  PS1="%B%{$fg[yellow]%}%T%{$reset_color%}%b "
+  PS1+="%B%{$fg[green]%}%n%{$reset_color%}%b"
+  PS1+="%B%{$fg[yellow]%}@%{$reset_color%}%b"
+  PS1+="%B%{$fg[red]%}%m%{$reset_color%}%b "
+  PS1+="%B%{$fg[green]%}%~%{$reset_color%}%b"
+  PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "
 fi
 
-# completion
-autoload -U compinit
-compinit
+RPS1='$(git_prompt_info)'
 
-for function in ~/.zsh/functions/*; do
-  source $function
-done
+# History
+setopt histignoredups
+setopt SHARE_HISTORY
+HISTSIZE=10000
+SAVEHIST=10000
+HISTFILE=~/.zsh_history
 
-# expand functions in the prompt
-setopt prompt_subst
+# Options
+setopt CORRECT
+setopt EXTENDED_GLOB
 
-# use vim as the visual editor
+# Editor
 export VISUAL=vim
 export EDITOR=$VISUAL
 
-# use incremental search
+# Key bindings
 bindkey "^R" history-incremental-search-backward
 
-# ignore duplicate history entries
-setopt histignoredups
-
-# keep TONS of history
-export HISTSIZE=4096
-
-# Try to correct command line spelling
-setopt CORRECT
-
-# Enable extended globbing
-setopt EXTENDED_GLOB
-
-# prompt
-export RPS1='$(git_prompt_info)$(rbenv_prompt_info)$(nvm_prompt_info)'
-
-# for root
-# use http://www.nparikh.org/unix/prompt.php#zsh for moar config
-if [ "`id -u`" -eq 0 ]; then
-  export PS1="%B%{$fg[yellow]%}%T%{$reset_color%}%b " # hour in bold yellow + space
-  PS1+="%B%{$fg[red]%}%n%{$reset_color%}%b"           # user in bold red
-  PS1+="%B%{$fg[yellow]%}@%{$reset_color%}%b"         # @ in bold yellow
-  PS1+="%B%{$fg[green]%}%m%{$reset_color%}%b "        # short hostname in bold green
-  PS1+="%B%{$fg[green]%}%~%{$reset_color%}%b"         # pwd in bold green
-  PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "       # prompt delimitor in bold yellow + space
+# Completion (cached for speed)
+autoload -Uz compinit
+if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
+  compinit
 else
-  export PS1="%B%{$fg[yellow]%}%T%{$reset_color%}%b " # hour in bold yellow + space
-  PS1+="%B%{$fg[green]%}%n%{$reset_color%}%b"         # user in bold green
-  PS1+="%B%{$fg[yellow]%}@%{$reset_color%}%b"         # @ in bold yellow
-  PS1+="%B%{$fg[red]%}%m%{$reset_color%}%b "          # short hostname in bold red
-  PS1+="%B%{$fg[green]%}%~%{$reset_color%}%b"         # pwd in bold green
-  PS1+="%B%{$fg[yellow]%}%#%{$reset_color%}%b "       # prompt delimitor in bold yellow + space
+  compinit -C
 fi
 
+# Load custom completions
+fpath=(~/.zsh/completion $fpath)
 
-# locales customs
-if [ -e "$HOME/.zshrc.local" ]; then
-  source "$HOME/.zshrc.local"
-fi
+# Aliases
+[[ -f "$HOME/.aliases" ]] && source "$HOME/.aliases"
 
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+# Functions (lazy-load, etc.)
+for f in ~/.zsh/functions/*; do
+  source "$f"
+done
 
-# Lazy loading for nvm/pyenv/rbenv (see ~/.zsh/functions/lazy-load)
-# Commands like node, python, ruby are wrapped to load on first use
+# Local config
+[[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+# iTerm2 integration (lazy)
+[[ -f "${HOME}/.iterm2_shell_integration.zsh" ]] && source "${HOME}/.iterm2_shell_integration.zsh"
+
+# Environment
 export NVM_DIR="$HOME/.nvm"
 export PYENV_ROOT="$HOME/.pyenv"
-
-export PATH="$HOME/bin:$HOME/.bin:./bin:$PATH"
-export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$PYENV_ROOT/bin:$PATH"
-
-# Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
-
-# opencode
-export PATH=/Users/skelz0r/.opencode/bin:$PATH
-
-# bun completions
-[ -s "/Users/skelz0r/.bun/_bun" ] && source "/Users/skelz0r/.bun/_bun"
-
-# bun
 export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
+
+# PATH (consolidated)
+typeset -U path  # Unique entries only
+path=(
+  $HOME/bin
+  $HOME/.bin
+  $HOME/.local/bin
+  ./bin
+  $PYENV_ROOT/bin
+  $BUN_INSTALL/bin
+  $HOME/.yarn/bin
+  /opt/homebrew/opt/libpq/bin
+  $HOME/.lmstudio/bin
+  $HOME/.opencode/bin
+  $path
+)
+
+# Bun completions (lazy)
+[[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
