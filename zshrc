@@ -16,8 +16,22 @@ _refresh_prompt_cache() {
   [[ "$PWD" == "$_prompt_pwd" ]] && return
   _prompt_pwd="$PWD"
   _prompt_git=$(git symbolic-ref --short HEAD 2>/dev/null)
-  _prompt_ruby=$([[ -f .ruby-version ]] && cat .ruby-version || rbenv version-name 2>/dev/null)
-  _prompt_node=$([[ -f .nvmrc ]] && cat .nvmrc || [[ -f .node-version ]] && cat .node-version)
+
+  # Ruby version
+  if [[ -f .ruby-version ]]; then
+    _prompt_ruby=$(cat .ruby-version)
+  else
+    _prompt_ruby=$(rbenv version-name 2>/dev/null)
+  fi
+
+  # Node version
+  if [[ -f .nvmrc ]]; then
+    _prompt_node=$(cat .nvmrc)
+  elif [[ -f .node-version ]]; then
+    _prompt_node=$(cat .node-version)
+  else
+    _prompt_node=""
+  fi
 }
 
 git_prompt_info() {
