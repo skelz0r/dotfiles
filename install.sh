@@ -164,9 +164,11 @@ fi
 
 # Step 7: Claude config
 mkdir -p "$HOME/.claude"
-if ! dry "copy Claude settings"; then
+if ! dry "copy Claude config"; then
   cp -n claude/settings.json "$HOME/.claude/settings.json" 2>/dev/null || log "Claude settings exists"
   cp claude/statusline-command.sh "$HOME/.claude/statusline-command.sh"
+  cp claude/CLAUDE.md "$HOME/.claude/CLAUDE.md"
+  success "Claude config installed"
 fi
 
 echo ""
