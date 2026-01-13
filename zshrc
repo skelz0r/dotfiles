@@ -136,3 +136,8 @@ path=(
 
 # Bun completions (lazy)
 [[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
+# End of LM Studio CLI section
+
