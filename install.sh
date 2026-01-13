@@ -29,7 +29,7 @@ The installer will:
   1. Create symlinks for dotfiles
   2. Install Ruby version and ruby-lsp
   3. Install vim plugins
-  4. Setup config files
+  4. Setup config files (SSH, Claude, GPG)
 EOF
   exit 0
 }
@@ -167,6 +167,12 @@ if ! dry "copy Claude config"; then
   cp claude/CLAUDE.md "$HOME/.claude/CLAUDE.md"
   success "Claude config installed"
 fi
+
+# Step 7: GPG config
+mkdir -p "$HOME/.gnupg"
+chmod 700 "$HOME/.gnupg"
+safe_symlink "$DOTFILES_DIR/gnupg/gpg-agent.conf" "$HOME/.gnupg/gpg-agent.conf"
+gpgconf --kill gpg-agent 2>/dev/null || true
 
 echo ""
 success "Installation complete!"

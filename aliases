@@ -62,3 +62,5 @@ alias ssh-id='eval `ssh-agent -s` && ssh-add ~/.ssh/id_rsa'
 alias curltime="curl -w \"@$HOME/.curl-format.txt\" -o NUL -s "
 
 alias python="python3"
+
+alias gpg2="gpg"

@@ -17,11 +17,11 @@ _refresh_prompt_cache() {
   _prompt_pwd="$PWD"
   _prompt_git=$(git symbolic-ref --short HEAD 2>/dev/null)
 
-  # Ruby version
+  # Ruby version (only from file, avoid slow rbenv call)
   if [[ -f .ruby-version ]]; then
     _prompt_ruby=$(cat .ruby-version)
   else
-    _prompt_ruby=$(rbenv version-name 2>/dev/null)
+    _prompt_ruby=""
   fi
 
   # Node version
