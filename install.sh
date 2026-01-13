@@ -28,7 +28,7 @@ Options:
 The installer will:
   1. Create symlinks for dotfiles
   2. Install Ruby version and ruby-lsp
-  3. Install tmux and vim plugins
+  3. Install vim plugins
   4. Setup config files
 EOF
   exit 0
@@ -138,21 +138,18 @@ else
   warn "rbenv not found, skipping Ruby setup"
 fi
 
-# Step 3: Tmux plugins
-safe_clone "https://github.com/tmux-plugins/tpm" "$HOME/.tmux/plugins/tpm"
-
-# Step 4: Vim plugins
+# Step 3: Vim plugins
 safe_clone "https://github.com/gmarik/vundle.git" "$HOME/.vim/bundle/vundle"
 
 if ! dry "install vim plugins"; then
   nvim -u ~/.vimrc.bundles +BundleInstall +qa 2>/dev/null || true
 fi
 
-# Step 5: Neovim config
+# Step 4: Neovim config
 mkdir -p "$HOME/.config/nvim"
 safe_symlink "$DOTFILES_DIR/config/coc-settings.json" "$HOME/.config/nvim/coc-settings.json"
 
-# Step 6: SSH config
+# Step 5: SSH config
 mkdir -p "$HOME/.ssh/sockets"
 chmod 700 "$HOME/.ssh"
 chmod 700 "$HOME/.ssh/sockets"
@@ -162,7 +159,7 @@ else
   log "SSH config exists, skipping (manual merge may be needed)"
 fi
 
-# Step 7: Claude config
+# Step 6: Claude config
 mkdir -p "$HOME/.claude"
 if ! dry "copy Claude config"; then
   cp -n claude/settings.json "$HOME/.claude/settings.json" 2>/dev/null || log "Claude settings exists"
