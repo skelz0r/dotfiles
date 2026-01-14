@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <project>
+
+SSH to remote desktop and run tat on project (auto-detects local/remote).
+
+Arguments:
+  project    Project path (e.g., dinum/siade)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0") dinum/siade
+  $(basename "$0") perso/dotfiles
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+if [[ -z "${1:-}" ]]; then
+  echo "Error: project argument required" >&2
+  usage
+fi
+
+PROJECT="$1"
+
+if ssh -o ConnectTimeout=2 -o BatchMode=yes lch405 true 2>/dev/null; then
+  HOST="lch405"
+else
+  HOST="rch405"
+fi
+
+PROJECT_NAME=$(basename "$PROJECT")
+echo -ne "\033]0;r $PROJECT_NAME\007"
+ssh -t "$HOST" "cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"
