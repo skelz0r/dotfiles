@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [port]
+
+Create SSH tunnel to remote desktop (auto-detects local/remote).
+
+Arguments:
+  port    Port to forward (default: 3000)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") 3035
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+PORT="${1:-3000}"
+
+if ssh -o ConnectTimeout=2 -o BatchMode=yes lch405 true 2>/dev/null; then
+  HOST="lch405"
+else
+  HOST="rch405"
+fi
+
+while true; do
+  echo "Connecting to $HOST, forwarding port $PORT..."
+  ssh -N -L "$PORT:localhost:$PORT" "$HOST" || true
+  echo "Connection lost, reconnecting in 1s..."
+  sleep 1
+done
