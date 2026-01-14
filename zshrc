@@ -141,3 +141,6 @@ path=(
 export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
 # End of LM Studio CLI section
 
+
+# bun completions
+[ -s "/Users/skelz0r/.bun/_bun" ] && source "/Users/skelz0r/.bun/_bun"
