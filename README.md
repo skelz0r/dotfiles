@@ -35,6 +35,33 @@ The installer:
 
 **Backups**: Existing files are saved to `~/.dotfiles_backup/YYYYMMDD_HHMMSS/`
 
+## What's Included
+
+### Shell (zsh)
+- Git branch in prompt
+- **Lazy loading** for nvm/rbenv/pyenv (faster startup)
+- Common aliases: `g`, `b`, `v`, `mcd`, `tat`
+
+### Vim/Neovim
+- [vim-rails](https://github.com/tpope/vim-rails) - Rails navigation
+- [coc.nvim](https://github.com/neoclide/coc.nvim) - LSP support
+- [copilot.vim](https://github.com/github/copilot.vim) - GitHub Copilot
+- 40+ plugins via [Vundle](https://github.com/gmarik/vundle)
+
+### Tmux
+- Prefix: `Ctrl+a`
+- [TPM](https://github.com/tmux-plugins/tpm) for plugins
+- Battery indicator in status bar
+
+### Git
+- Useful aliases (`lg`, `tree`, `pod`, `pf`)
+- GPG signing ready
+
+### SSH
+- Secure defaults (ed25519, strong ciphers)
+- Connection multiplexing
+- Pre-configured for GitHub/GitLab
+
 ## Customization
 
 Add your customizations **above** the line `DO NOT EDIT BELOW THIS LINE`.
@@ -55,38 +82,6 @@ Local overrides (not synced):
 - `~/.vimrc.local` - Vim customizations
 - `~/.aliases` - Custom aliases
 
-## What's Included
-
-### Shell (zsh)
-
-- Git branch in prompt
-- **Lazy loading** for nvm/rbenv/pyenv (faster startup)
-- Common aliases: `g`, `b`, `v`, `mcd`, `tat`
-
-### Vim/Neovim
-
-- [vim-rails](https://github.com/tpope/vim-rails) - Rails navigation
-- [coc.nvim](https://github.com/neoclide/coc.nvim) - LSP support
-- [copilot.vim](https://github.com/github/copilot.vim) - GitHub Copilot
-- 40+ plugins via [Vundle](https://github.com/gmarik/vundle)
-
-### Tmux
-
-- Prefix: `Ctrl+a`
-- [TPM](https://github.com/tmux-plugins/tpm) for plugins
-- Battery indicator in status bar
-
-### Git
-
-- Useful aliases (`lg`, `tree`, `pod`, `pf`)
-- GPG signing ready
-
-### SSH
-
-- Secure defaults (ed25519, strong ciphers)
-- Connection multiplexing
-- Pre-configured for GitHub/GitLab
-
 ## Utility Scripts
 
 | Script | Description |
@@ -100,6 +95,8 @@ Local overrides (not synced):
 | `encrypt_folder <dir>` | GPG encrypt a folder |
 | `flushdns` | Flush DNS cache (macOS/Linux) |
 | `battery` | Show battery level for tmux |
+| `stunnel [port]` | SSH tunnel to Mac Studio (default: 3000) |
+| `stunnel-ss [port]` | Screen Sharing tunnel (default: 5900) |
 
 ### Migration Script
 
