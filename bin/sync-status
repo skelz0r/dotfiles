@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Show Syncthing sync status.
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0")
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+if ! command -v syncthing &> /dev/null; then
+  echo -e "${RED}Syncthing not installed${NC}"
+  echo "Run: sync-setup"
+  exit 1
+fi
+
+if ! brew services list | grep syncthing | grep started &> /dev/null; then
+  echo -e "${RED}Syncthing not running${NC}"
+  echo "Run: brew services start syncthing"
+  exit 1
+fi
+
+CONFIG_DIR="$HOME/Library/Application Support/Syncthing"
+if [[ ! -f "$CONFIG_DIR/config.xml" ]]; then
+  echo -e "${RED}Syncthing not configured${NC}"
+  exit 1
+fi
+
+API_KEY=$(grep '<apikey>' "$CONFIG_DIR/config.xml" | sed 's/.*<apikey>\(.*\)<\/apikey>.*/\1/')
+DEVICE_ID=$(grep '<device id=' "$CONFIG_DIR/config.xml" | head -1 | sed 's/.*id="\([^"]*\)".*/\1/')
+
+echo -e "${BLUE}=== Syncthing Status ===${NC}"
+echo ""
+echo -e "${GREEN}✓${NC} Service running"
+echo -e "${BLUE}Device ID:${NC} $DEVICE_ID"
+echo -e "${BLUE}Web UI:${NC} http://127.0.0.1:8384"
+echo ""
+
+FOLDERS=$(curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:8384/rest/config/folders)
+FOLDER_COUNT=$(echo "$FOLDERS" | python3 -c "import sys, json; print(len(json.load(sys.stdin)))")
+
+echo -e "${BLUE}Folders ($FOLDER_COUNT):${NC}"
+echo "$FOLDERS" | python3 -c "
+import sys, json
+for f in json.load(sys.stdin):
+    print(f'  {f[\"label\"]} ({f[\"id\"]}): {f[\"path\"]}')
+" || echo "  None"
+
+echo ""
+
+CONNECTIONS=$(curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:8384/rest/system/connections)
+CONNECTED=$(echo "$CONNECTIONS" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+connected = [d for d, info in data.get('connections', {}).items() if info.get('connected')]
+print(len(connected))
+" 2>/dev/null || echo "0")
+
+if [[ "$CONNECTED" -gt 0 ]]; then
+  echo -e "${GREEN}✓${NC} Connected devices: $CONNECTED"
+  echo "$CONNECTIONS" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for device_id, info in data.get('connections', {}).items():
+    if info.get('connected'):
+        addr = info.get('address', 'unknown')
+        print(f'  {device_id[:7]}... ({addr})')
+" 2>/dev/null || true
+else
+  echo -e "${YELLOW}No connected devices${NC}"
+fi
+
+echo ""
+
+COMPLETION=$(curl -s -H "X-API-Key: $API_KEY" "http://127.0.0.1:8384/rest/db/completion" 2>/dev/null || echo "{}")
+SYNC_STATUS=$(echo "$COMPLETION" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    completion = data.get('completion', 100)
+    if completion == 100:
+        print('synced')
+    else:
+        print(f'syncing ({completion}%)')
+except:
+    print('unknown')
+" 2>/dev/null || echo "unknown")
+
+if [[ "$SYNC_STATUS" == "synced" ]]; then
+  echo -e "${GREEN}✓${NC} All folders synced"
+else
+  echo -e "${YELLOW}⟳${NC} $SYNC_STATUS"
+fi

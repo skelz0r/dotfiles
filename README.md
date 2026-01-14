@@ -32,6 +32,7 @@ The installer:
 2. Installs Ruby via rbenv + ruby-lsp
 3. Clones tmux/vim plugin managers
 4. Sets up SSH and Claude configs
+5. Optionally installs Syncthing for folder sync
 
 **Backups**: Existing files are saved to `~/.dotfiles_backup/YYYYMMDD_HHMMSS/`
 
@@ -95,8 +96,47 @@ Local overrides (not synced):
 | `encrypt_folder <dir>` | GPG encrypt a folder |
 | `flushdns` | Flush DNS cache (macOS/Linux) |
 | `battery` | Show battery level for tmux |
-| `stunnel [port]` | SSH tunnel to Mac Studio (default: 3000) |
+| `stunnel [port]` | SSH tunnel to remote machine (default: 3000) |
 | `stunnel-ss [port]` | Screen Sharing tunnel (default: 5900) |
+| `sync-setup` | Setup Syncthing with ~/share folder |
+| `sync-status` | Show Syncthing sync status |
+
+### Syncthing (File Sync)
+
+Real-time folder sync between machines (local and remote):
+
+```sh
+# First machine
+sync-setup
+# Note the Device ID
+
+# Second machine
+sync-setup --device-id <DEVICE_ID_FROM_FIRST_MACHINE>
+
+# Accept pairing in Web UI: http://127.0.0.1:8384
+```
+
+**Usage:**
+```sh
+# Add file on first machine
+echo "test" > ~/share/file.txt
+
+# Instantly available on second machine
+cat ~/share/file.txt
+```
+
+**Check status:**
+```sh
+sync-status              # Show sync status and connected devices
+open http://127.0.0.1:8384   # Open Web UI
+```
+
+Features:
+- Real-time sync (< 1s detection)
+- Works on local network and remote
+- Encrypted P2P
+- Built-in versioning
+- Automatic conflict resolution
 
 ### Migration Script
 

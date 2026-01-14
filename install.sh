@@ -31,6 +31,7 @@ The installer will:
   3. Install vim plugins and compile coc.nvim
   4. Setup neovim config
   5. Setup config files (SSH, Claude, GPG)
+  6. Optionally install Syncthing for folder sync
 EOF
   exit 0
 }
@@ -205,6 +206,19 @@ mkdir -p "$HOME/.gnupg"
 chmod 700 "$HOME/.gnupg"
 safe_symlink "$DOTFILES_DIR/gnupg/gpg-agent.conf" "$HOME/.gnupg/gpg-agent.conf"
 gpgconf --kill gpg-agent 2>/dev/null || true
+
+# Step 8: Syncthing (optional)
+if ! $DRY_RUN && ! command -v syncthing &> /dev/null; then
+  echo ""
+  read -p "Install Syncthing for folder sync? (y/N) " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    log "Installing Syncthing..."
+    brew install syncthing
+    brew services start syncthing
+    success "Syncthing installed. Run 'sync-setup' to configure."
+  fi
+fi
 
 echo ""
 success "Installation complete!"
