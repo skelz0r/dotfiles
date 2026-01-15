@@ -3,6 +3,10 @@
     "type": "command",
     "command": "~/.claude/statusline-command.sh"
   },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "deny": [
       "Read(**.env)",
