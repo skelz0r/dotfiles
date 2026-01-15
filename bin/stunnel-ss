@@ -29,6 +29,9 @@ EOF
 PORT="${1:-5900}"
 HOST=$(detect_host)
 
+echo "Finder: Cmd+K → vnc://localhost:$PORT"
+echo ""
+
 while true; do
   echo "Connecting to $HOST, forwarding VNC port $PORT..."
   ssh -N -L "$PORT:localhost:$PORT" "$HOST" || true
