@@ -199,6 +199,12 @@ while IFS= read -r file; do
     cp "$DOTFILES_DIR/$file" "$target"
   fi
 done < <(git ls-files claude/)
+
+safe_symlink "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
+safe_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
+safe_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+safe_symlink "$DOTFILES_DIR/claude/managed-settings.json" "$HOME/.claude/managed-settings.json"
+
 success "Claude config installed"
 
 # Step 7: GPG config
