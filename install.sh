@@ -28,8 +28,9 @@ Options:
 The installer will:
   1. Create symlinks for dotfiles
   2. Install Ruby version and ruby-lsp
-  3. Install vim plugins
-  4. Setup config files (SSH, Claude, GPG)
+  3. Install vim plugins and compile coc.nvim
+  4. Setup neovim config
+  5. Setup config files (SSH, Claude, GPG)
 EOF
   exit 0
 }
@@ -149,6 +150,33 @@ fi
 mkdir -p "$HOME/.config/nvim"
 safe_symlink "$DOTFILES_DIR/config/coc-settings.json" "$HOME/.config/nvim/coc-settings.json"
 
+# Create init.vim to source vimrc
+NVIM_INIT="$HOME/.config/nvim/init.vim"
+if [[ ! -f "$NVIM_INIT" ]]; then
+  if ! dry "create $NVIM_INIT"; then
+    cat > "$NVIM_INIT" << 'EOF'
+set runtimepath^=~/.vim runtimepath+=~/.vim/after
+let &packpath = &runtimepath
+source ~/.vimrc
+EOF
+    success "Created nvim init.vim"
+  fi
+fi
+
+# Compile coc.nvim
+if [[ -d "$HOME/.vim/bundle/coc.nvim" ]]; then
+  if ! dry "compile coc.nvim"; then
+    cd "$HOME/.vim/bundle/coc.nvim"
+    if command -v npm &> /dev/null; then
+      npm ci &> /dev/null || warn "Failed to compile coc.nvim"
+      success "Compiled coc.nvim"
+    else
+      warn "npm not found, skipping coc.nvim compilation"
+    fi
+    cd "$DOTFILES_DIR"
+  fi
+fi
+
 # Step 5: SSH config
 mkdir -p "$HOME/.ssh/sockets"
 chmod 700 "$HOME/.ssh"
@@ -160,13 +188,17 @@ else
 fi
 
 # Step 6: Claude config
-mkdir -p "$HOME/.claude"
-if ! dry "copy Claude config"; then
-  cp -n claude/settings.json "$HOME/.claude/settings.json" 2>/dev/null || log "Claude settings exists"
-  cp claude/statusline-command.sh "$HOME/.claude/statusline-command.sh"
-  cp claude/CLAUDE.md "$HOME/.claude/CLAUDE.md"
-  success "Claude config installed"
-fi
+log "Installing Claude config files..."
+while IFS= read -r file; do
+  target="$HOME/.${file}"
+  target_dir="$(dirname "$target")"
+
+  if ! dry "copy $file to $target"; then
+    mkdir -p "$target_dir"
+    cp "$DOTFILES_DIR/$file" "$target"
+  fi
+done < <(git ls-files claude/)
+success "Claude config installed"
 
 # Step 7: GPG config
 mkdir -p "$HOME/.gnupg"
