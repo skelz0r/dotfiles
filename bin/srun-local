@@ -46,7 +46,12 @@ case "$TARGET" in
     ;;
 esac
 
-if [[ -z "${SRUN_PORT:-}" ]]; then
+SRUN_PORT="${SRUN_PORT:-}"
+if [[ -z "$SRUN_PORT" && -f ~/.srun-port-active ]]; then
+  SRUN_PORT=$(cat ~/.srun-port-active)
+fi
+
+if [[ -z "$SRUN_PORT" ]]; then
   echo "Error: SRUN_PORT not set" >&2
   echo "Run this from a sproject session" >&2
   exit 1

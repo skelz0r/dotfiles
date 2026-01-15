@@ -62,4 +62,4 @@ if [[ -f ~/.srun-port ]]; then
   SRUN_PORT=$(cat ~/.srun-port)
 fi
 
-ssh -t "$HOST" "export SRUN_PORT=$SRUN_PORT; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"
+ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"
