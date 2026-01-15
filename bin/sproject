@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
 usage() {
   cat << EOF
 Usage: $(basename "$0") <project>
@@ -29,13 +32,7 @@ if [[ -z "${1:-}" ]]; then
 fi
 
 PROJECT="$1"
-
-if ssh -o ConnectTimeout=2 -o BatchMode=yes lch405 true 2>/dev/null; then
-  HOST="lch405"
-else
-  HOST="rch405"
-fi
-
+HOST=$(detect_host)
 PROJECT_NAME=$(basename "$PROJECT")
 echo -ne "\033]0;r $PROJECT_NAME\007"
 ssh -t "$HOST" "cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"

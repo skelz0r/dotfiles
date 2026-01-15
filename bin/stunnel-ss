@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
 usage() {
   cat << EOF
 Usage: $(basename "$0") [port]
@@ -24,12 +27,7 @@ EOF
 [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
 
 PORT="${1:-5900}"
-
-if ssh -o ConnectTimeout=2 -o BatchMode=yes lch405 true 2>/dev/null; then
-  HOST="lch405"
-else
-  HOST="rch405"
-fi
+HOST=$(detect_host)
 
 while true; do
   echo "Connecting to $HOST, forwarding VNC port $PORT..."
