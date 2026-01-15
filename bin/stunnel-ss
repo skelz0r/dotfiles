@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [port]
+
+Create SSH tunnel for VNC (auto-detects local/remote).
+
+Arguments:
+  port    VNC port to forward (default: 5900)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") 5901
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+PORT="${1:-5900}"
+
+if ssh -o ConnectTimeout=2 -o BatchMode=yes lch405 true 2>/dev/null; then
+  HOST="lch405"
+else
+  HOST="rch405"
+fi
+
+while true; do
+  echo "Connecting to $HOST, forwarding VNC port $PORT..."
+  ssh -N -L "$PORT:localhost:$PORT" "$HOST" || true
+  echo "Connection lost, reconnecting in 1s..."
+  sleep 1
+done
