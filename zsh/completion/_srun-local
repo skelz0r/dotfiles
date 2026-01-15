@@ -1,0 +1,16 @@
+#compdef srun-local
+
+_srun-local() {
+  if (( CURRENT == 2 )); then
+    _values 'target' sim phy
+  elif (( CURRENT == 3 )); then
+    local -a projects
+    if [[ -d ~/work ]]; then
+      projects=(${(f)"$(cd ~/work && find . -mindepth 1 -maxdepth 1 -type d -not -path '*/\.*' | sed 's|^\./||')"})
+      projects=(${(o)projects})
+      _describe 'project' projects
+    fi
+  fi
+}
+
+_srun-local "$@"

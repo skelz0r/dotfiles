@@ -1,0 +1,9 @@
+#compdef sync-setup
+
+_sync-setup() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Show help]' \
+    '--dry-run[Preview without making changes]'
+}
+
+_sync-setup "$@"

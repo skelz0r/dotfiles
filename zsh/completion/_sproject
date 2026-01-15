@@ -1,0 +1,25 @@
+#compdef sproject
+
+_sproject() {
+  local -a projects
+  if [[ -d ~/work ]]; then
+    # Depth 1 par défaut, profondeur 2 pour dirs dans SPROJECT_DEEP_DIRS
+    local -a deep_dirs
+    deep_dirs=(${(s:,:)SPROJECT_DEEP_DIRS:-dinum})
+
+    # Projets niveau 1
+    projects=(${(f)"$(cd ~/work && find . -mindepth 1 -maxdepth 1 -type d -not -path '*/\.*' | sed 's|^\./||')"})
+
+    # Sous-projets niveau 2 pour deep_dirs
+    for dir in $deep_dirs; do
+      if [[ -d ~/work/$dir ]]; then
+        projects+=(${(f)"$(cd ~/work/$dir && find . -mindepth 1 -maxdepth 1 -type d -not -path '*/\.*' | sed "s|^\\./|$dir/|")"})
+      fi
+    done
+
+    projects=(${(o)projects})
+    _describe 'project' projects
+  fi
+}
+
+_sproject "$@"

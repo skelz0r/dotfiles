@@ -1,0 +1,8 @@
+#compdef sync-status
+
+_sync-status() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Show help]'
+}
+
+_sync-status "$@"
