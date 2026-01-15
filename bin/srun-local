@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <sim|phy> <project>
+
+Run srun-sim/srun-phy on the local machine via reverse SSH tunnel.
+Use this from a remote session (sproject) to build on remote but
+install/run on your local machine.
+
+Requires: RemoteForward 22222 localhost:22 in SSH config.
+
+Arguments:
+  sim|phy    Target: simulator or physical device
+  project    Project path relative to ~/work
+
+Examples:
+  $(basename "$0") sim local_events
+  $(basename "$0") phy tiny_weather
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+if [[ -z "${1:-}" || -z "${2:-}" ]]; then
+  echo "Error: arguments required" >&2
+  usage
+fi
+
+TARGET="$1"
+PROJECT="$2"
+
+case "$TARGET" in
+  sim)
+    CMD="srun-sim"
+    ;;
+  phy)
+    CMD="srun-phy"
+    ;;
+  *)
+    echo "Error: target must be 'sim' or 'phy'" >&2
+    exit 1
+    ;;
+esac
+
+if ! ssh -p 22222 -o ConnectTimeout=2 -o BatchMode=yes localhost true 2>/dev/null; then
+  echo "Error: reverse tunnel not available on port 22222" >&2
+  echo "Ensure your SSH config has: RemoteForward 22222 localhost:22" >&2
+  exit 1
+fi
+
+echo "Running $CMD $PROJECT on local machine..."
+ssh -p 22222 localhost "$CMD $PROJECT"
