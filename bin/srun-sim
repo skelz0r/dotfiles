@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <project>
+
+Build iOS app on remote and run on local simulator.
+
+Arguments:
+  project    Project path relative to ~/work (e.g., local_events)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0") local_events
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+if [[ -z "${1:-}" ]]; then
+  echo "Error: project argument required" >&2
+  usage
+fi
+
+PROJECT="$1"
+
+BUILD_OUTPUT=$(_srun-build "$PROJECT" simulator)
+BUNDLE_ID=$(echo "$BUILD_OUTPUT" | tail -2 | head -1)
+LOCAL_APP_PATH=$(echo "$BUILD_OUTPUT" | tail -1)
+
+if ! xcrun simctl list devices booted | grep -q "Booted"; then
+  echo "Booting simulator..."
+  SIM_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | grep -oE '[A-F0-9-]{36}')
+  xcrun simctl boot "$SIM_ID"
+  open -a Simulator
+  sleep 3
+fi
+
+echo "Installing on simulator..."
+xcrun simctl install booted "$LOCAL_APP_PATH"
+
+echo "Launching..."
+xcrun simctl launch booted "$BUNDLE_ID"
+
+echo "Done!"

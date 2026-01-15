@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <project> <simulator|device>
+
+Internal helper for srun-sim and srun-phy.
+Builds iOS app on remote and copies to local /tmp.
+
+Outputs:
+  BUNDLE_ID and APP_PATH on success (one per line)
+EOF
+  exit 1
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+[[ -z "${1:-}" || -z "${2:-}" ]] && usage
+
+PROJECT="$1"
+BUILD_TYPE="$2"
+
+if ssh -o ConnectTimeout=2 -o BatchMode=yes lch405 true 2>/dev/null; then
+  HOST="lch405"
+else
+  HOST="rch405"
+fi
+
+echo "Detecting project info on $HOST..." >&2
+
+PBXPROJ="~/work/$PROJECT/ios/*.xcodeproj/project.pbxproj"
+
+BUNDLE_ID=$(ssh "$HOST" "grep -E 'PRODUCT_BUNDLE_IDENTIFIER.*\.dev;' $PBXPROJ | grep -v -E 'widget|Widget|ShareExtension|Tests' | head -1 | sed 's/.*= //' | tr -d ';\" '")
+
+PRODUCT_NAME=$(ssh "$HOST" "grep -A2 'PRODUCT_BUNDLE_IDENTIFIER.*\.dev;' $PBXPROJ | grep PRODUCT_NAME | grep -v TARGET_NAME | head -1 | sed 's/.*= //' | tr -d ';\"'")
+
+if [[ -z "$BUNDLE_ID" ]] || [[ -z "$PRODUCT_NAME" ]]; then
+  echo "Error: Could not detect dev build config" >&2
+  echo "Ensure project has PRODUCT_NAME set for dev config" >&2
+  exit 1
+fi
+
+APP_NAME="${PRODUCT_NAME}.app"
+
+echo "Bundle ID: $BUNDLE_ID" >&2
+echo "App: $APP_NAME" >&2
+
+echo "Building on $HOST..." >&2
+ssh "$HOST" "
+  security list-keychains -d user -s ~/Library/Keychains/ci.keychain-db ~/Library/Keychains/login.keychain-db
+  security unlock-keychain -p ci ~/Library/Keychains/ci.keychain-db
+  cd ~/work/$PROJECT && ./bin/build-ios $BUILD_TYPE
+"
+
+case "$BUILD_TYPE" in
+  simulator)
+    BUILD_DIR="\$HOME/work/$PROJECT/build/ios-simulator/Debug-iphonesimulator"
+    ;;
+  device)
+    BUILD_DIR="\$HOME/work/$PROJECT/build/ios-device/Debug-iphoneos"
+    ;;
+esac
+
+LOCAL_APP_PATH="/tmp/$APP_NAME"
+rm -rf "$LOCAL_APP_PATH"
+
+echo "Copying $APP_NAME to local..." >&2
+ssh "$HOST" "tar -czf - -C $BUILD_DIR '$APP_NAME'" | tar -xzf - -C /tmp
+
+echo "$BUNDLE_ID"
+echo "$LOCAL_APP_PATH"

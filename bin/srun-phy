@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DEVICE_UUID="${IOS_DEVICE_UUID:-00008140-001E65E40C13001C}"
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <project>
+
+Build iOS app on remote and install on physical device.
+
+Arguments:
+  project    Project path relative to ~/work (e.g., local_events)
+
+Environment:
+  IOS_DEVICE_UUID    Device UUID (default: $DEVICE_UUID)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0") local_events
+  IOS_DEVICE_UUID=xxxxx $(basename "$0") local_events
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+if [[ -z "${1:-}" ]]; then
+  echo "Error: project argument required" >&2
+  usage
+fi
+
+PROJECT="$1"
+
+echo "Device: $DEVICE_UUID"
+
+BUILD_OUTPUT=$(_srun-build "$PROJECT" device)
+BUNDLE_ID=$(echo "$BUILD_OUTPUT" | tail -2 | head -1)
+LOCAL_APP_PATH=$(echo "$BUILD_OUTPUT" | tail -1)
+
+echo "Installing on device..."
+xcrun devicectl device install app --device "$DEVICE_UUID" "$LOCAL_APP_PATH"
+
+echo "Launching..."
+xcrun devicectl device process launch --device "$DEVICE_UUID" "$BUNDLE_ID" || \
+  echo "Could not auto-launch, open app manually on device"
+
+echo "Done!"
