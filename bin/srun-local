@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-PORTS=(22222 22223)
-
 usage() {
   cat << EOF
 Usage: $(basename "$0") <sim|phy> <project>
@@ -12,8 +10,7 @@ Run srun-sim/srun-phy on the local machine via reverse SSH tunnel.
 Use this from a remote session (sproject) to build on remote but
 install/run on your local machine.
 
-Setup: Create ~/.srun-port on each local machine with its port number.
-       Configure matching RemoteForward in SSH config.
+Requires: SRUN_PORT env var (set automatically by sproject).
 
 Arguments:
   sim|phy    Target: simulator or physical device
@@ -49,18 +46,11 @@ case "$TARGET" in
     ;;
 esac
 
-for p in "${PORTS[@]}"; do
-  if ssh -p "$p" -o ConnectTimeout=1 -o BatchMode=yes localhost "cat ~/.srun-port" 2>/dev/null | grep -q "^$p$"; then
-    PORT="$p"
-    break
-  fi
-done
-
-if [[ -z "${PORT:-}" ]]; then
-  echo "Error: no matching reverse tunnel found" >&2
-  echo "Ensure ~/.srun-port exists on local machine with port number" >&2
+if [[ -z "${SRUN_PORT:-}" ]]; then
+  echo "Error: SRUN_PORT not set" >&2
+  echo "Run this from a sproject session" >&2
   exit 1
 fi
 
-echo "Running $CMD $PROJECT on local machine (port $PORT)..."
-ssh -p "$PORT" localhost "$CMD $PROJECT"
+echo "Running $CMD $PROJECT on local machine (port $SRUN_PORT)..."
+ssh -p "$SRUN_PORT" localhost "$CMD $PROJECT"

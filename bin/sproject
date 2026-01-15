@@ -56,4 +56,10 @@ fi
 
 PROJECT_NAME=$(basename "$PROJECT")
 echo -ne "\033]0;r $PROJECT_NAME\007"
-ssh -t "$HOST" "cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"
+
+SRUN_PORT=""
+if [[ -f ~/.srun-port ]]; then
+  SRUN_PORT=$(cat ~/.srun-port)
+fi
+
+ssh -t "$HOST" "export SRUN_PORT=$SRUN_PORT; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"
