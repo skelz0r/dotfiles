@@ -1,7 +1,3 @@
 {
-  "model": "opusplan",
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/statusline-command.sh"
-  }
+  "model": "opusplan"
 }
