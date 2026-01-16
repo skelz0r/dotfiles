@@ -48,8 +48,32 @@ battery_charge() {
   esac
 }
 
+battery_info() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    pmset -g batt | grep InternalBattery
+  fi
+}
+
 BATTERY_STATUS=$(battery_charge)
 [ -z "$BATTERY_STATUS" ] && exit 1
+
+BATT_INFO=$(battery_info)
+
+# Determine charging status
+if echo "$BATT_INFO" | grep -q "discharging"; then
+  STATUS_ICON="🔋"
+else
+  STATUS_ICON="⚡"
+fi
+
+# Extract time remaining
+if echo "$BATT_INFO" | grep -q "remaining"; then
+  TIME=$(echo "$BATT_INFO" | grep -Eo "[0-9]+:[0-9]+ remaining" | awk '{print $1}')
+elif echo "$BATT_INFO" | grep -q "until full"; then
+  TIME=$(echo "$BATT_INFO" | grep -Eo "[0-9]+:[0-9]+ until full" | awk '{print $1}')
+else
+  TIME="🤷"
+fi
 
 if [ "$BATTERY_STATUS" -lt 25 ]; then
   fg=colour210
@@ -62,4 +86,4 @@ else
   bg=colour234
 fi
 
-printf "#[fg=${fg},bg=${bg}] %2d%%" "$BATTERY_STATUS"
+printf "#[fg=${fg},bg=${bg}] %s %2d%% %s" "$STATUS_ICON" "$BATTERY_STATUS" "$TIME"
