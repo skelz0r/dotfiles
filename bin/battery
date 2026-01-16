@@ -75,15 +75,21 @@ else
   TIME="🤷"
 fi
 
-if [ "$BATTERY_STATUS" -lt 25 ]; then
-  fg=colour210
-  bg=colour88
-elif [ "$BATTERY_STATUS" -lt 75 ]; then
-  fg=colour228
-  bg=colour94
+if [ "$BATTERY_STATUS" -ge 75 ]; then
+  fg=colour0
+  bg=colour2
+elif [ "$BATTERY_STATUS" -ge 50 ]; then
+  fg=colour0
+  bg=colour22
+elif [ "$BATTERY_STATUS" -ge 25 ]; then
+  fg=colour0
+  bg=colour226
+elif [ "$BATTERY_STATUS" -ge 10 ]; then
+  fg=colour0
+  bg=colour202
 else
-  fg=colour8
-  bg=colour234
+  fg=colour15
+  bg=colour88
 fi
 
 printf "#[fg=${fg},bg=${bg}] %s %2d%% %s" "$STATUS_ICON" "$BATTERY_STATUS" "$TIME"
