@@ -5,7 +5,7 @@ _sproject() {
   if [[ -d ~/work ]]; then
     # Depth 1 par défaut, profondeur 2 pour dirs dans SPROJECT_DEEP_DIRS
     local -a deep_dirs
-    deep_dirs=(${(s:,:)SPROJECT_DEEP_DIRS:-dinum})
+    deep_dirs=(${(s:,:)SPROJECT_DEEP_DIRS:-dinum,superdocu})
 
     # Projets niveau 1
     projects=(${(f)"$(cd ~/work && find . -mindepth 1 -maxdepth 1 -type d -not -path '*/\.*' | sed 's|^\./||')"})
