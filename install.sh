@@ -31,7 +31,8 @@ The installer will:
   3. Install vim plugins and compile coc.nvim
   4. Setup neovim config
   5. Setup config files (SSH, Claude, GPG)
-  6. Optionally install Syncthing for folder sync
+  6. Install Claude managed-settings to system location
+  7. Optionally install Syncthing for folder sync
 EOF
   exit 0
 }
@@ -203,6 +204,12 @@ done < <(git ls-files claude/)
 safe_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 safe_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 safe_symlink "$DOTFILES_DIR/claude/managed-settings.json" "$HOME/.claude/managed-settings.json"
+
+# Install managed-settings.json to system location
+if ! dry "install managed-settings.json to /Library/Application Support/ClaudeCode/"; then
+  sudo mkdir -p "/Library/Application Support/ClaudeCode"
+  sudo ln -sf "$DOTFILES_DIR/claude/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.json"
+fi
 
 success "Claude config installed"
 
