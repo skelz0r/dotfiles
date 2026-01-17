@@ -1,0 +1,129 @@
+#!/usr/bin/env node
+
+process.env.NODE_PATH = '/opt/homebrew/lib/node_modules';
+require('module').Module._initPaths();
+
+const WebSocket = require('ws');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const OUTPUT_DIR = path.join(process.env.HOME, 'share/screencasts');
+const PID_FILE = '/tmp/agent-screencast.pid';
+const PORT = process.env.AGENT_BROWSER_STREAM_PORT || 9223;
+
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+const usage = `agent-screencast - Record agent-browser sessions to video
+
+Usage:
+  agent-screencast start [output.mp4]   Start recording
+  agent-screencast stop                 Stop recording
+  agent-screencast -h, --help           Show this help
+
+Requires: AGENT_BROWSER_STREAM_PORT=9223 agent-browser open <url>
+
+Output saved to: ${OUTPUT_DIR}/
+`;
+
+const cmd = process.argv[2];
+
+if (!cmd || cmd === '-h' || cmd === '--help') {
+  console.log(usage);
+  process.exit(0);
+}
+
+if (cmd === 'start') {
+  if (fs.existsSync(PID_FILE)) {
+    console.error('Recording already in progress. Run "agent-screencast stop" first.');
+    process.exit(1);
+  }
+
+  const output = process.argv[3] || `screencast-${Date.now()}.mp4`;
+  const outputPath = path.isAbsolute(output) ? output : path.join(OUTPUT_DIR, output);
+
+  const ws = new WebSocket(`ws://localhost:${PORT}`);
+
+  let ffmpeg;
+  let started = false;
+
+  ws.on('error', (err) => {
+    console.error(`Cannot connect to ws://localhost:${PORT}`);
+    console.error('Make sure agent-browser is running with AGENT_BROWSER_STREAM_PORT=' + PORT);
+    process.exit(1);
+  });
+
+  ws.on('open', () => {
+    console.log('Connected to stream');
+    fs.writeFileSync(PID_FILE, String(process.pid));
+  });
+
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'frame' && msg.data) {
+        const frame = Buffer.from(msg.data, 'base64');
+
+        if (!started) {
+          ffmpeg = spawn('ffmpeg', [
+            '-y',
+            '-f', 'image2pipe',
+            '-framerate', '10',
+            '-i', '-',
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            '-preset', 'fast',
+            outputPath
+          ], { stdio: ['pipe', 'inherit', 'inherit'] });
+
+          ffmpeg.on('close', () => {
+            console.log(`Saved: ${outputPath}`);
+            cleanup();
+          });
+
+          started = true;
+          console.log(`Recording to ${outputPath}...`);
+        }
+
+        ffmpeg.stdin.write(frame);
+      }
+    } catch (e) {}
+  });
+
+  ws.on('close', () => {
+    if (ffmpeg) ffmpeg.stdin.end();
+  });
+
+  const cleanup = () => {
+    try { fs.unlinkSync(PID_FILE); } catch (e) {}
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => {
+    ws.close();
+    if (ffmpeg) ffmpeg.stdin.end();
+  });
+  process.on('SIGTERM', () => {
+    ws.close();
+    if (ffmpeg) ffmpeg.stdin.end();
+  });
+
+} else if (cmd === 'stop') {
+  if (!fs.existsSync(PID_FILE)) {
+    console.error('No recording in progress');
+    process.exit(1);
+  }
+
+  const pid = parseInt(fs.readFileSync(PID_FILE, 'utf8'));
+  try {
+    process.kill(pid, 'SIGINT');
+    console.log('Stopping recording...');
+  } catch (e) {
+    fs.unlinkSync(PID_FILE);
+    console.error('Process not found, cleaned up');
+  }
+
+} else {
+  console.log(usage);
+  process.exit(1);
+}
