@@ -211,6 +211,13 @@ if ! dry "install managed-settings.json to /Library/Application Support/ClaudeCo
   sudo ln -sf "$DOTFILES_DIR/claude/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.json"
 fi
 
+mkdir -p "$HOME/.claude/skills"
+for skill_dir in "$DOTFILES_DIR"/claude/skills/*/; do
+  [[ -d "$skill_dir" ]] || continue
+  skill_name=$(basename "$skill_dir")
+  safe_symlink "$skill_dir" "$HOME/.claude/skills/$skill_name"
+done
+
 success "Claude config installed"
 
 # Step 7: GPG config
