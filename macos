@@ -71,8 +71,28 @@ defaults write NSGlobalDomain AppleICUForce24HourTime -bool true
 ###############################################################################
 
 # Require password immediately after sleep or screen saver begins
-defaults write com.apple.screensaver askForPassword -int 1
-defaults write com.apple.screensaver askForPasswordDelay -int 0
+sysadminctl -screenLock immediate -password -
+
+# Enable Touch ID for sudo (survives macOS updates)
+if [[ -f /usr/lib/pam/pam_tid.so ]]; then
+  SUDO_LOCAL="/etc/pam.d/sudo_local"
+  PAM_REATTACH="/opt/homebrew/lib/pam/pam_reattach.so"
+
+  sudo tee "$SUDO_LOCAL" > /dev/null << 'EOF'
+# Touch ID for sudo
+EOF
+
+  # pam_reattach for tmux/screen support
+  if [[ -f "$PAM_REATTACH" ]]; then
+    echo "auth       optional       $PAM_REATTACH" | sudo tee -a "$SUDO_LOCAL" > /dev/null
+  fi
+
+  echo "auth       sufficient     pam_tid.so" | sudo tee -a "$SUDO_LOCAL" > /dev/null
+  success "Touch ID for sudo enabled"
+fi
+
+# iTerm: allow Touch ID in sudo
+defaults write com.googlecode.iterm2 BootstrapDaemon -bool false
 
 ###############################################################################
 # Energy saving                                                               #
