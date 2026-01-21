@@ -88,6 +88,9 @@ export EDITOR=$VISUAL
 # Key bindings
 bindkey "^R" history-incremental-search-backward
 
+# Load custom completions before compinit
+fpath=(~/.zsh/completion $fpath)
+
 # Completion (cached for speed)
 autoload -Uz compinit
 if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
@@ -95,9 +98,6 @@ if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
 else
   compinit -C
 fi
-
-# Load custom completions
-fpath=(~/.zsh/completion $fpath)
 
 # Aliases
 [[ -f "$HOME/.aliases" ]] && source "$HOME/.aliases"
