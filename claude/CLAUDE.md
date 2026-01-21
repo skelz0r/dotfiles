@@ -22,3 +22,8 @@ Be extremely concise. Sacrifice grammar for concision.
 - Run only relevant tests, not full suite
 - Ensure tests pass before moving on
 - Use TDD where possible
+
+## Screenshots / screencasts
+
+* When referencing, located within ~/share/screenshots/
+  or ~/share/screencasts/
