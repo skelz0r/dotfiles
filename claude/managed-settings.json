@@ -12,7 +12,8 @@
     "frontend-design@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "dsfr-skill@dsfr-skill": true,
-    "agent-browser@agent-browser": true
+    "agent-browser@agent-browser": true,
+    "marketing-skills@marketingskills": true
   },
   "extraKnownMarketplaces": {
     "dsfr-skill": {
