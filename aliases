@@ -58,6 +58,7 @@ alias gpod="g pull origin develop"
 alias horn="afplay ~/siren.wav"
 
 alias ssh-id='eval `ssh-agent -s` && ssh-add ~/.ssh/id_rsa'
+ssh-clean() { ssh -O exit "$1" 2>/dev/null; ssh "$@"; }
 
 alias curltime="curl -w \"@$HOME/.curl-format.txt\" -o NUL -s "
 
