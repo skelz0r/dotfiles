@@ -1,5 +1,11 @@
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+if [ -z "$SSH_AUTH_SOCK" ]; then
+  eval "$(ssh-agent -s)"
+  ssh-add ~/.ssh/id_hetzner
+  ssh-add ~/.ssh/id_ed25519
+fi
+
 export LANG=en_US.UTF-8
 
 # Colors
