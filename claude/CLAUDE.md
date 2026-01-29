@@ -17,6 +17,7 @@ Be extremely concise. Sacrifice grammar for concision.
 - All files end with newline
 - No trailing whitespace
 - No comments - use meaningful names instead
+- Never commit files you didn't write nor edit: there is other agent's work
 
 ## Testing
 
