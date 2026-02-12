@@ -17,8 +17,10 @@
   },
   "extraKnownMarketplaces": {
     "dsfr-skill": {
-      "source": "github",
-      "repo": "numerique-gouv/dsfr-skill"
+      "source": {
+        "source": "github",
+        "repo": "numerique-gouv/dsfr-skill"
+      }
     }
   },
   "permissions": {
