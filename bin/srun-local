@@ -58,4 +58,11 @@ if [[ -z "$SRUN_PORT" ]]; then
 fi
 
 echo "Running $CMD $PROJECT on local machine (port $SRUN_PORT)..."
-ssh -p "$SRUN_PORT" localhost "$CMD $PROJECT"
+
+# Propage IOS_DEVICE_UUID si défini
+if [[ -n "${IOS_DEVICE_UUID:-}" ]]; then
+  echo "Device UUID: $IOS_DEVICE_UUID"
+  ssh -p "$SRUN_PORT" localhost "IOS_DEVICE_UUID=$IOS_DEVICE_UUID $CMD $PROJECT"
+else
+  ssh -p "$SRUN_PORT" localhost "$CMD $PROJECT"
+fi
