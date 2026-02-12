@@ -150,3 +150,6 @@ export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
 
 # bun completions
 [ -s "/Users/skelz0r/.bun/_bun" ] && source "/Users/skelz0r/.bun/_bun"
+
+# Entire CLI shell completion
+autoload -Uz compinit && compinit && source <(entire completion zsh)
