@@ -21,6 +21,10 @@ Be extremely concise. Sacrifice grammar for concision.
 - Commit messages should be explicit and detailed enough to understand the
     change without context. Don't hesitate to make them longer.
 
+## Ruby
+
+- Ban `is_a?` and `respond_to?` — prefer duck typing (e.g. `[*values] == values` instead of `values.is_a?(Array)`)
+
 ## Testing
 
 - Run only relevant tests, not full suite
