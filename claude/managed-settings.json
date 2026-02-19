@@ -157,12 +157,10 @@
     "deny": [
       "Read(**.env)",
       "Read(**.env.*)",
-      "Read(**/*token*)",
+      "Read(**/*_token)",
       "Read(**/*TOKEN*)",
-      "Read(**master.key)",
-      "Read(**sandbox.key)",
-      "Read(**staging.key)",
-      "Read(**production.key)"
+      "Read(**/*.pem)",
+      "Read(**/*.key)"
     ]
   }
 }
