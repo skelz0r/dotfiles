@@ -157,8 +157,8 @@
     "deny": [
       "Read(**.env)",
       "Read(**.env.*)",
-      "Read(**/*_token)",
-      "Read(**/*TOKEN*)",
+      "Read(**/.*_token)",
+      "Read(**/.*TOKEN*)",
       "Read(**/*.pem)",
       "Read(**/*.key)"
     ]
