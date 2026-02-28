@@ -12,7 +12,7 @@
     "frontend-design@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "dsfr-skill@dsfr-skill": true,
-    "agent-browser@agent-browser": true,
+    "agent-browser@vercel-labs": true,
     "marketing-skills@marketingskills": true
   },
   "extraKnownMarketplaces": {
@@ -20,6 +20,12 @@
       "source": {
         "source": "github",
         "repo": "numerique-gouv/dsfr-skill"
+      }
+    },
+    "vercel-labs": {
+      "source": {
+        "source": "github",
+        "repo": "vercel-labs/agent-browser"
       }
     }
   },
@@ -152,6 +158,19 @@
   "env": {
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-6[1m]",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6[1m]"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
+      }
+    ]
   },
   "permissions": {
     "deny": [

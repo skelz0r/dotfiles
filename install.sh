@@ -203,7 +203,10 @@ done < <(git ls-files claude/)
 
 safe_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 safe_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+safe_symlink "$DOTFILES_DIR/claude/RTK.md" "$HOME/.claude/RTK.md"
 safe_symlink "$DOTFILES_DIR/claude/managed-settings.json" "$HOME/.claude/managed-settings.json"
+mkdir -p "$HOME/.claude/hooks"
+safe_symlink "$DOTFILES_DIR/claude/hooks/rtk-rewrite.sh" "$HOME/.claude/hooks/rtk-rewrite.sh"
 
 # Install managed-settings.json to system location
 if ! dry "install managed-settings.json to /Library/Application Support/ClaudeCode/"; then
