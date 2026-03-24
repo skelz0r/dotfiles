@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# kill-dns - Flush DNS cache
+#
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0")
+
+Flush the local DNS cache.
+
+Supports macOS and Linux.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  sudo dscacheutil -flushcache
+  sudo killall -HUP mDNSResponder
+  echo -e "${GREEN}DNS cache flushed (macOS).${NC}"
+elif [[ -f /etc/os-release ]]; then
+  if command -v systemd-resolve &>/dev/null; then
+    sudo systemd-resolve --flush-caches
+  elif command -v resolvectl &>/dev/null; then
+    sudo resolvectl flush-caches
+  else
+    echo -e "${RED}No supported DNS resolver found.${NC}"
+    exit 1
+  fi
+  echo -e "${GREEN}DNS cache flushed (Linux).${NC}"
+else
+  echo -e "${RED}Unsupported OS.${NC}"
+  exit 1
+fi
