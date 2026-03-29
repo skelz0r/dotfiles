@@ -57,4 +57,3 @@ Output saved to `~/share/screencasts/`.
 - `agent-screencast start` blocks until `stop` is called (WebSocket + ffmpeg pipe)
 - Uses WebSocket stream + ffmpeg
 - Default resolution: 1280x720
-- Script: `bin/agent-screencast`
