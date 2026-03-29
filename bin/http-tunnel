@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [port]
+
+Expose a local HTTP server to the internet via Cloudflare Tunnel.
+
+Arguments:
+  port    Local port to expose (default: 3000)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") 8080
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+PORT="${1:-3000}"
+
+if ! command -v cloudflared &>/dev/null; then
+  echo "Error: cloudflared not found. Install with: brew install cloudflared" >&2
+  exit 1
+fi
+
+echo "Exposing localhost:$PORT via Cloudflare Tunnel..."
+cloudflared tunnel --url "http://localhost:$PORT"
