@@ -31,6 +31,17 @@ Be extremely concise. Sacrifice grammar for concision.
 - Ensure tests pass before moving on
 - Use TDD where possible
 
+## Secrets
+
+- Never read files under any `secrets/` directory (any depth), regardless of
+  extension or how the read is performed (Read tool, `cat`, `grep`, `xxd`,
+  piping, shell expansion, `find -exec`, etc.). Treat their contents as
+  unknown.
+- Never run `git-crypt unlock`, `git-crypt export-key`, or any command that
+  would reveal the git-crypt key.
+- Writing new files under `secrets/` is allowed (scaffolding with
+  placeholders), but never read them back.
+
 ## Screenshots / screencasts
 
 * When referencing, located within ~/share/screenshots/

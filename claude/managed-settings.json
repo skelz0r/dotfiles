@@ -175,7 +175,10 @@
       "Read(**/.*_token)",
       "Read(**/.*TOKEN*)",
       "Read(**/*.pem)",
-      "Read(**/*.key)"
+      "Read(**/*.key)",
+      "Read(**/secrets/**)",
+      "Bash(git-crypt:export-key*)",
+      "Bash(git-crypt:unlock*)"
     ]
   }
 }
