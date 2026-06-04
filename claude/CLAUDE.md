@@ -20,6 +20,7 @@ Be extremely concise. Sacrifice grammar for concision.
 - Never commit files you didn't write nor edit: there is other agent's work
 - Commit messages should be explicit and detailed enough to understand the
     change without context. Don't hesitate to make them longer.
+- When rebasing, double check of you did not drop anything
 
 ## Ruby
 
