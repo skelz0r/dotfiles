@@ -171,6 +171,7 @@
   "permissions": {
     "deny": [
       "Read(**.env)",
+      "Read(**.pgpass)",
       "Read(**.env.*)",
       "Read(**/.*_token)",
       "Read(**/.*TOKEN*)",
