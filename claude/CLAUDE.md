@@ -16,11 +16,13 @@ Be extremely concise. Sacrifice grammar for concision.
 - Use `git mv` to preserve history
 - All files end with newline
 - No trailing whitespace
-- No comments - use meaningful names instead
+- No comments - use meaningful names for variables/methods and commits messages instead
 - Never commit files you didn't write nor edit: there is other agent's work
 - Commit messages should be explicit and detailed enough to understand the
     change without context. Don't hesitate to make them longer.
 - When rebasing, double check of you did not drop anything
+- When code is unclear/illogical, read its commit messages to understand
+    context (title first, then description if needed)
 
 ## Ruby
 
