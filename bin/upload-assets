@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#
+# upload-assets - Upload files to the assets site (assets.delmai.re)
+#
+# Files are pushed to /var/www/assets on the `apps` server and served as-is
+# over https (no directory index). Use -d/--dest to drop them in a
+# subdirectory; otherwise they land at the assets root.
+#
+
+set -euo pipefail
+
+REMOTE_HOST="apps"
+REMOTE_USER="deploy"
+REMOTE_ROOT="/var/www/assets"
+BASE_URL="https://assets.delmai.re"
+
+usage() {
+  cat << 'EOF'
+Usage:
+  upload-assets [options] FILE [FILE...]
+
+Arguments:
+  FILE   One or more local files or directories to upload.
+
+Options:
+  -d, --dest DEST   Destination subdirectory under the assets root
+                    (e.g. images/2026). Defaults to the root.
+  -n, --dry-run     Print what would be uploaded, do nothing.
+  -h, --help        Show this help.
+
+Examples:
+  upload-assets logo.png                  -> https://assets.delmai.re/logo.png
+  upload-assets a.png b.png               -> https://assets.delmai.re/{a,b}.png
+  upload-assets -d images/2026 photo.jpg  -> https://assets.delmai.re/images/2026/photo.jpg
+EOF
+}
+
+dest=""
+dry_run=0
+positional=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -d|--dest) dest="${2:-}"; shift 2 ;;
+    -n|--dry-run) dry_run=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; while [ $# -gt 0 ]; do positional+=("$1"); shift; done ;;
+    -*) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+    *) positional+=("$1"); shift ;;
+  esac
+done
+
+if [ "${#positional[@]}" -eq 0 ]; then
+  echo "Error: no files to upload." >&2
+  usage >&2
+  exit 2
+fi
+
+missing=0
+for f in "${positional[@]}"; do
+  if [ ! -e "$f" ]; then
+    echo "Error: no such file or directory: $f" >&2
+    missing=1
+  fi
+done
+[ "$missing" -eq 0 ] || exit 2
+
+# Normalize dest (strip surrounding slashes) and build remote dir + URL base.
+dest="${dest#/}"
+dest="${dest%/}"
+remote_dir="$REMOTE_ROOT${dest:+/$dest}"
+url_base="$BASE_URL${dest:+/$dest}"
+
+echo "Uploading ${#positional[@]} item(s) to $REMOTE_USER@$REMOTE_HOST:$remote_dir"
+
+if [ "$dry_run" -eq 1 ]; then
+  for f in "${positional[@]}"; do
+    echo "  would upload: $f -> $url_base/$(basename "${f%/}")"
+  done
+  exit 0
+fi
+
+ssh "$REMOTE_USER@$REMOTE_HOST" "mkdir -p '$remote_dir'"
+# --no-perms: let the remote umask (022) decide, so files land 644 / dirs 755
+# and stay readable by nginx, regardless of the local files' modes.
+rsync -rlt --no-perms -e ssh "${positional[@]}" "$REMOTE_USER@$REMOTE_HOST:$remote_dir/"
+
+echo
+echo "Done. URLs:"
+for f in "${positional[@]}"; do
+  echo "  $url_base/$(basename "${f%/}")"
+done
