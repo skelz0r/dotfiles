@@ -154,3 +154,4 @@ export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
 # Entire CLI shell completion
 autoload -Uz compinit && compinit && source <(entire completion zsh)
 source /Users/skelz0r/tools/agent-vm/agent-vm.sh
+source /opt/homebrew/share/google-cloud-sdk/path.zsh.inc
