@@ -46,6 +46,8 @@ if (cmd === 'start') {
 
   let ffmpeg;
   let started = false;
+  let lastFrame = null;
+  let heartbeat = null;
 
   ws.on('error', (err) => {
     console.error(`Cannot connect to ws://localhost:${PORT}`);
@@ -68,8 +70,16 @@ if (cmd === 'start') {
           ffmpeg = spawn('ffmpeg', [
             '-y',
             '-f', 'image2pipe',
-            '-framerate', '10',
+            // Stamp each frame with its real arrival time instead of assuming a
+            // fixed input rate, so the video runs at wall-clock speed: a busy
+            // 60fps animation no longer stretches and a near-static page no
+            // longer collapses to a fraction of a second.
+            '-use_wallclock_as_timestamps', '1',
             '-i', '-',
+            // Resample the irregular, change-driven CDP frames to a constant
+            // 30fps, holding the last frame through idle gaps. Keeps real
+            // timing while staying playable everywhere (CFR).
+            '-vf', 'fps=30',
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
             '-preset', 'fast',
@@ -83,18 +93,32 @@ if (cmd === 'start') {
 
           started = true;
           console.log(`Recording to ${outputPath}...`);
+
+          // CDP only emits a frame when the page repaints, so a static or
+          // low-motion page would otherwise yield almost no frames (a
+          // near-empty clip). Re-emit the most recent frame on a steady
+          // heartbeat so idle stretches are captured at wall-clock speed,
+          // with no page-side animation or pulse needed.
+          heartbeat = setInterval(() => {
+            if (lastFrame && ffmpeg && ffmpeg.stdin.writable) {
+              ffmpeg.stdin.write(lastFrame);
+            }
+          }, 100);
         }
 
+        lastFrame = frame;
         ffmpeg.stdin.write(frame);
       }
     } catch (e) {}
   });
 
   ws.on('close', () => {
+    if (heartbeat) clearInterval(heartbeat);
     if (ffmpeg) ffmpeg.stdin.end();
   });
 
   const cleanup = () => {
+    if (heartbeat) clearInterval(heartbeat);
     try { fs.unlinkSync(PID_FILE); } catch (e) {}
     process.exit(0);
   };
