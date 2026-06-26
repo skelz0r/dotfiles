@@ -49,5 +49,3 @@ Be extremely concise. Sacrifice grammar for concision.
 
 * When referencing, located within ~/share/screenshots/
   or ~/share/screencasts/
-
-@RTK.md
