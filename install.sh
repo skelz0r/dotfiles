@@ -30,7 +30,7 @@ The installer will:
   2. Install Ruby version and ruby-lsp
   3. Install vim plugins and compile coc.nvim
   4. Setup neovim config
-  5. Setup config files (SSH, Claude, GPG)
+  5. Setup config files (SSH, Claude, Codex, GPG)
   6. Install Claude managed-settings to system location
   7. Optionally install Syncthing for folder sync
 EOF
@@ -213,7 +213,13 @@ fi
 
 success "Claude config installed"
 
-# Step 6b: Agents skills
+# Step 6b: Codex config
+log "Installing Codex config files..."
+mkdir -p "$HOME/.codex"
+safe_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"
+success "Codex config installed"
+
+# Step 6c: Agents skills
 log "Installing agents skills..."
 mkdir -p "$HOME/.agents/skills"
 for skill_dir in "$DOTFILES_DIR"/agents/skills/*/; do
