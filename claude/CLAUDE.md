@@ -13,16 +13,27 @@ Be extremely concise. Sacrifice grammar for concision.
 ## Code Style
 
 - Atomic commits with clear messages, prefer the why than the what
+- Follow standard Git commit message formatting: imperative subject limited to
+  50 characters, blank line before the body, body wrapped at 72 characters
 - Use `git mv` to preserve history
 - All files end with newline
 - No trailing whitespace
 - No comments - use meaningful names for variables/methods and commits messages instead
 - Never commit files you didn't write nor edit: there is other agent's work
-- Commit messages should be explicit and detailed enough to understand the
-    change without context. Don't hesitate to make them longer.
+- Commit bodies should be explicit and detailed enough to understand the
+  change without context. Don't hesitate to make them longer.
 - When rebasing, double check of you did not drop anything
 - When code is unclear/illogical, read its commit messages to understand
     context (title first, then description if needed)
+- Never mention my name in commits: describe the change, not who asked for it
+
+## Pull Requests
+
+- Single-commit PR: reuse the commit message as the description, verbatim
+- Otherwise, PR description = compact summary of the commits, not a
+  re-explanation of each
+- Bullet points only when the branch holds distinct logical groups of commits
+  (e.g. an unrelated doc commit alongside the feature); otherwise prose
 
 ## Ruby
 
