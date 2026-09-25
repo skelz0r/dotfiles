@@ -10,6 +10,13 @@ Be extremely concise. Sacrifice grammar for concision.
 - No unnecessary praise or filler
 - Direct answers, skip preambles
 
+## Tickets / issues comments
+
+- Comments on Linear/GitHub issues follow the same style as commits and PR
+  descriptions: short prose paragraphs, conclusions first, only the key
+  facts (ids, volumes, link to the PR)
+- No headings, tables, bold or checklists: must not look AI-generated
+
 ## Code Style
 
 - All files end with newline
@@ -61,7 +68,18 @@ Be extremely concise. Sacrifice grammar for concision.
 - Writing new files under `secrets/` is allowed (scaffolding with
   placeholders), but never read them back.
 
+## tmux
+
+- "Tab" means tmux window, not pane
+- Rename it with `tmux rename-window -t "$TMUX_PANE" <name>`: always
+  target `$TMUX_PANE`, otherwise the window displayed by the client is
+  renamed instead of the one Claude runs in
+
 ## Screenshots / screencasts
 
 * When referencing, located within ~/share/screenshots/
   or ~/share/screencasts/
+* To attach images to a GitHub issue or PR, upload them with the
+  `upload-assets` skill into the `gh` folder, named
+  `<project>-{issue,pr}-<id>-<name>.png` (e.g.
+  `superdocu-pr-1990-portal.png`), then embed the resulting URLs
