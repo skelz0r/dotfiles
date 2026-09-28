@@ -31,7 +31,8 @@ Be extremely concise. Sacrifice grammar for concision.
 - Standard Git commit message formatting: imperative subject limited to
   50 characters, blank line before the body, body wrapped at 72 characters
 - Commit bodies should be explicit and detailed enough to understand the
-  change without context. Don't hesitate to make them longer.
+  change without context, but stay short when the change is simple: go
+  into detail only when the why is complicated or not visible in the code
 - Never mention my name in commits: describe the change, not who asked for it
 - Never commit files you didn't write nor edit: there is other agent's work
 - Use `git mv` to preserve history
