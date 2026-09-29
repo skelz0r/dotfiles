@@ -47,15 +47,12 @@ The UDID (different from CoreDevice UUID) is visible in Xcode > Window > Devices
 
 ## Code Signing & Keychain
 
-ch405 uses a dedicated CI keychain:
-```bash
-security unlock-keychain -p ci ~/Library/Keychains/ci.keychain-db
-```
+ch405 uses a dedicated CI keychain (`ci.keychain-db`). `_srun-build` unlocks it automatically.
 
-`_srun-build` handles this automatically. For manual builds via SSH:
+For manual builds via SSH, unlock it first (ask user for password):
 ```bash
 security list-keychains -d user -s ~/Library/Keychains/ci.keychain-db ~/Library/Keychains/login.keychain-db
-security unlock-keychain -p ci ~/Library/Keychains/ci.keychain-db
+security unlock-keychain -p <password> ~/Library/Keychains/ci.keychain-db
 ```
 
 Without unlocking the keychain, codesign fails with `errSecInternalComponent`.
@@ -76,7 +73,7 @@ Profiles are cached in `~/Library/Developer/Xcode/UserData/Provisioning Profiles
 5. Clean and rebuild:
    ```bash
    rm -rf ~/Library/Developer/Xcode/DerivedData/Morris-*
-   security unlock-keychain -p ci ~/Library/Keychains/ci.keychain-db
+   security unlock-keychain -p <password> ~/Library/Keychains/ci.keychain-db
    xcodebuild -project ios/Morris.xcodeproj -scheme Morris -allowProvisioningUpdates \
      -destination "generic/platform=iOS" -configuration Debug CODE_SIGN_STYLE=Automatic build
    ```
