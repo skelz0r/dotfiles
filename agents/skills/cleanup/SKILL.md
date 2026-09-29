@@ -60,7 +60,29 @@ cleanup.
    `git branch -D <branch>`, and tell the user that servers and databases
    specific to the worktree may be left behind.
 
-6. Always close the tmux tab of the worktree if it exists, whichever way
+6. Look for leftover Postgres databases of the project: those of the
+   removed worktree, and those of older worktrees removed by hand.
+
+   ```bash
+   psql -d postgres -XAtc "select datname from pg_database where not datistemplate order by 1"
+   ```
+
+   Derive the project's naming scheme from `config/database.yml` and the
+   worktree setup script (prefix, `DATABASE_SUFFIX`, `-` turned into
+   `_`, parallel test suffixes like `_2`…`_16` or `_0`…`_31`). Map every
+   suffix to a worktree still listed by `git worktree list` (read each
+   worktree's `.env.local` or equivalent for its suffix): the removed
+   worktree's databases and those whose suffix matches no worktree are
+   orphans. Beware that a branch may use an older naming scheme (read the
+   `database.yml` of the worktree itself), and that the primary checkout
+   also owns parallel test databases.
+
+   Show the orphans with the worktree they belonged to, drop them with
+   `dropdb`, one per line (`while read -r db`: zsh does not word-split
+   `for db in $list`). Never drop `*_production` nor backup databases,
+   and ask before dropping anything that does not follow the scheme.
+
+7. Always close the tmux tab of the worktree if it exists, whichever way
    step 5 went:
 
    ```bash
@@ -78,4 +100,4 @@ cleanup.
 ## Report
 
 One line per step: PR state, worktree removed, branch deleted, databases
-dropped, tab closed (or why each one was skipped).
+dropped, orphan databases dropped, tab closed (or why each one was skipped).
