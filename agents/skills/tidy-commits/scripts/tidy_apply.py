@@ -10,6 +10,7 @@ Usage:
   tidy_apply.py --continue           Resume after resolving a conflict / split
   tidy_apply.py --abort              Discard work, return to the original branch
   tidy_apply.py --status             Show current operation state
+  tidy_apply.py --backups            List tidy-backup/* branches and whether they are stale
 
 Plan schema (plan.json):
 {
@@ -196,6 +197,7 @@ def cmd_start(plan_path):
     stamp = time.strftime("%Y%m%d-%H%M%S")
     backup = f"tidy-backup/{branch.replace('/', '-')}-{stamp}"
     git("branch", backup, orig)
+    git("config", f"branch.{backup}.tidySource", branch)
 
     state = {
         "plan_path": os.path.abspath(plan_path),
@@ -339,6 +341,47 @@ def cmd_status():
     }, indent=2))
 
 
+BACKUP_PREFIX = "tidy-backup/"
+
+
+def backup_source(backup, local_branches):
+    res = git("config", "--get", f"branch.{backup}.tidySource", check=False)
+    if res.returncode == 0 and res.stdout.strip():
+        return res.stdout.strip()
+
+    stem = backup[len(BACKUP_PREFIX):].rsplit("-", 2)[0]
+    return next((b for b in local_branches if b.replace("/", "-") == stem), None)
+
+
+def backup_rows():
+    refs = out("for-each-ref", "--format=%(refname:short)", "refs/heads/").splitlines()
+    backups = [r for r in refs if r.startswith(BACKUP_PREFIX)]
+    local_branches = [r for r in refs if not r.startswith(BACKUP_PREFIX)]
+    current = git("symbolic-ref", "--quiet", "--short", "HEAD", check=False).stdout.strip()
+
+    rows = []
+    for backup in backups:
+        source = backup_source(backup, local_branches)
+        if source is None or source not in local_branches:
+            status = "stale: source branch gone"
+        elif source == current:
+            status = "previous run on the current branch"
+        else:
+            status = f"source branch {source} still exists"
+        rows.append((backup, out("log", "-1", "--format=%cs", backup), status))
+    return rows
+
+
+def cmd_backups():
+    rows = backup_rows()
+    if not rows:
+        info("no tidy-backup branch")
+        return
+
+    for backup, date, status in rows:
+        print(f"{backup}  {date}  {status}")
+
+
 def main():
     ap = argparse.ArgumentParser(add_help=True)
     g = ap.add_mutually_exclusive_group(required=True)
@@ -346,6 +389,7 @@ def main():
     g.add_argument("--continue", dest="cont", action="store_true")
     g.add_argument("--abort", action="store_true")
     g.add_argument("--status", action="store_true")
+    g.add_argument("--backups", action="store_true")
     args = ap.parse_args()
 
     if args.plan:
@@ -356,6 +400,8 @@ def main():
         cmd_abort()
     elif args.status:
         cmd_status()
+    elif args.backups:
+        cmd_backups()
 
 
 if __name__ == "__main__":

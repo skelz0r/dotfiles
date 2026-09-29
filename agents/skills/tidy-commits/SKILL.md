@@ -26,6 +26,16 @@ or drop one — without losing work.
 
 ### Phase 1 — Analyze and propose a plan (no mutation)
 
+0. **Check for leftover backups**:
+   ```bash
+   python3 scripts/tidy_apply.py --backups
+   ```
+   Backups whose source branch is gone (typically merged and cleaned up) or
+   that come from a previous run on the current branch are leftovers. If any
+   are listed, include them in the plan summary and propose deleting them
+   (`git branch -D <backup>`) as part of the approval: never delete a backup
+   without the user's go, and never touch one whose source branch still exists
+   and is not the current one.
 1. **Find the base** (commits unique to the branch). See
    [references/recipes.md](references/recipes.md#choosing-the-base):
    merge-base with the PR's target branch (or the repo default branch). A later
@@ -63,6 +73,10 @@ or drop one — without losing work.
    - Prints the `range-diff` (old → new) for review.
    - **Pass** → moves the branch onto the tidied history, deletes the backup,
      reminds you to `git push --force-with-lease`.
+   - Do not pass `--keep-backup` by habit: the invariant already proves the
+     new history carries the same content. Keep it only when the user wants the
+     pre-tidy tip at hand until the push, and then delete it right after the
+     push (`--backups` lists it as a previous run on the current branch).
    - **Exit 4** (can't auto-prove, e.g. a dropped commit is entangled) → inspect
      the diff; if intended, re-run with `--force`; else abort.
    - **Exit 1** (invariant failed, content would change) → do not keep; abort.
@@ -75,7 +89,9 @@ or drop one — without losing work.
 
 - `scripts/tidy_apply.py` — preconditions, backup, accounting check, detached
   rebuild via cherry-pick, conflict/split resume (`--continue`), `--abort`,
-  `--status`.
+  `--status`, and `--backups` to list leftover `tidy-backup/*` branches with
+  whether their source branch still exists (recorded in
+  `branch.<backup>.tidySource`, guessed from the name for older backups).
 - `scripts/tidy_finalize.py` — tree-invariant verification, `range-diff`, branch
   swap or refusal. Flags: `--keep-backup`, `--force`.
 
