@@ -213,6 +213,7 @@ brew "sl"
 brew "sox"
 brew "spark"
 brew "ssh-copy-id", link: true
+brew "sshuttle"
 brew "talisman"
 brew "tcl-tk"
 brew "telnet"

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [host]
+
+Route all traffic (TCP + DNS) through a remote server via sshuttle.
+
+Arguments:
+  host    SSH host alias (default: apps)
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") other-server
+EOF
+  exit 0
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+HOST="${1:-apps}"
+
+if ! command -v sshuttle &>/dev/null; then
+  echo "Error: sshuttle not found. Install with: brew install sshuttle" >&2
+  exit 1
+fi
+
+SERVER_IP=$(ssh -G "$HOST" | awk '/^hostname /{print $2}')
+
+echo "Routing all traffic through $HOST ($SERVER_IP), Ctrl+C to stop..."
+sshuttle --dns -r "$HOST" 0/0 -x "$SERVER_IP"
