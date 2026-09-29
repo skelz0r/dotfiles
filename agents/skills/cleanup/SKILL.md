@@ -53,22 +53,27 @@ cleanup.
    proved the branch is published and merged: delete it with
    `git -C "$PRIMARY_ROOT" branch -D <branch>`.
 
-   Without a removal script, fall back to
+   Without a removal script, follow the manual teardown documented in the
+   project's `CLAUDE.md` (servers, simulators, worktree, branch,
+   databases). With no such procedure either, fall back to
    `git -C "$PRIMARY_ROOT" worktree remove <path>` then
    `git branch -D <branch>`, and tell the user that servers and databases
    specific to the worktree may be left behind.
 
-6. Close the tmux tab if it is named after the worktree:
+6. Always close the tmux tab of the worktree if it exists, whichever way
+   step 5 went:
 
    ```bash
    tmux list-windows -a -F '#{window_id} #{window_name}'
+   tmux display-message -p -t "$TMUX_PANE" '#{window_id}'
    ```
 
-   Kill only windows whose name matches the worktree name (or the feature
-   slug it was renamed to). If the match is the window Claude runs in
-   (`tmux display-message -p -t "$TMUX_PANE" '#{window_id}'`), report the
-   outcome to the user first, then kill it as the very last action, since
-   it ends the session. Never kill a window whose name does not match.
+   The tab to close is the one named after the worktree (or the feature
+   slug it was renamed to), and the window Claude runs in when this
+   session worked on that worktree, even if its name differs. If it is
+   the window Claude runs in, report the outcome to the user first, then
+   kill it as the very last action, since it ends the session. Never kill
+   another session's window whose name does not match.
 
 ## Report
 
