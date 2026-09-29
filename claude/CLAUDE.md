@@ -75,6 +75,9 @@ Be extremely concise. Sacrifice grammar for concision.
 - Rename it with `tmux rename-window -t "$TMUX_PANE" <name>`: always
   target `$TMUX_PANE`, otherwise the window displayed by the client is
   renamed instead of the one Claude runs in
+- Every new development topic goes through `/start`: dedicated worktree,
+  tmux tab and fresh session; never work in the main checkout nor in the
+  current session
 
 ## Screenshots / screencasts
 
