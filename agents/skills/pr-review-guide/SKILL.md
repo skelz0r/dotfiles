@@ -69,8 +69,11 @@ Fill the front matter (`repo`, full `sha`, `pr`, `checkout` pointing at the
 local clone so links are verified), then the intro and the five tabs of the
 skeleton. Link with the schemes `build.py` resolves at the pinned commit:
 `gh:path#L10-L20`, `tree:path`, `commit:<sha>`, `pr:`. Components:
-`::: callout` (`.info`, `.good`, `.warning`), `[503]{.status}`, tables,
-fenced code with a language (`ruby`, `json`, `yaml`, `http`, `bash`).
+`::: callout` (`.info`, `.good`, `.warning`; a first paragraph made only of
+bold text becomes its title), `[503]{.status}` badges (cells of a table
+column headed "Statut", "Status" or "HTTP" get one too), tables, fenced code
+with a language (`ruby`, `json`, `yaml`, `http`, `bash`). Links and comments
+inside code are left alone: `build.py` works on pandoc's syntax tree.
 
 ### 6. Build and check
 
@@ -78,10 +81,11 @@ fenced code with a language (`ruby`, `json`, `yaml`, `http`, `bash`).
 cd ~/share/<slug> && python3 build.py
 ```
 
-Zero warnings: every `gh:` path exists at the pinned commit, anchors are
-within the file, commits belong to the branch, no GitHub link is pinned to
-a branch name, no table row is split by a stray `|`, no reference link is
-left unresolved, every image exists.
+Zero warnings: every `gh:` path exists at the pinned commit with the right
+type (file or directory), line anchors are within the file, commits belong
+to the branch, no GitHub link is pinned to a branch name, no table row is
+split by a stray `|`, no link is left unresolved, every `#anchor` exists,
+no id is duplicated, every image exists.
 
 Then look at the page through a local server (`python3 -m http.server`,
 `file://` is rejected by agent-browser), every tab, at desktop width and at
