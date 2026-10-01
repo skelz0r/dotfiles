@@ -25,6 +25,8 @@ Then ensure `.metabase` is in `.gitignore`. Add it if missing.
 
 All scripts source `.metabase` from the repo root (`$(git rev-parse --show-toplevel)/.metabase`).
 
+`METABASE_URL`, `METABASE_API_KEY` and `METABASE_DATABASE_ID` set in the environment take precedence over `.metabase`, which only provides defaults. Without either, `METABASE_DATABASE_ID` falls back to `1`.
+
 ### List databases
 
 ```bash
