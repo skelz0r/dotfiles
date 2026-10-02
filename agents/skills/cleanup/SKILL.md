@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close the tmux tab named after it. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged.
 ---
 
 # Cleanup
@@ -86,13 +86,15 @@ cleanup.
    step 5 went:
 
    ```bash
-   tmux list-windows -a -F '#{window_id} #{window_name}'
+   tmux list-windows -a -F '#{window_id} #{@worktree} #{window_name}'
    tmux display-message -p -t "$TMUX_PANE" '#{window_id}'
    ```
 
-   The tab to close is the one named after the worktree (or the feature
-   slug it was renamed to), and the window Claude runs in when this
-   session worked on that worktree, even if its name differs. If it is
+   The tab to close is the one whose `@worktree` option is the worktree
+   name (set by `/start`); for tabs opened before that, the one named
+   after the worktree or after the readable slug of its topic; and the
+   window Claude runs in when this session worked on that worktree, even
+   if its name differs. If it is
    the window Claude runs in, report the outcome to the user first, then
    kill it as the very last action, since it ends the session. Never kill
    another session's window whose name does not match.
