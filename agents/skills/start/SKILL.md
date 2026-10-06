@@ -44,6 +44,11 @@ This skill only writes the brief and orchestrates tmux.
    holding a different topic (`git worktree list`). An existing worktree
    for the same topic is fine: setup scripts are idempotent.
 
+   Then bring the default branch up to date, since setup scripts branch
+   from it: `git -C "$PRIMARY_ROOT" fetch -q origin`, and fast-forward
+   the primary checkout (`git -C "$PRIMARY_ROOT" merge -q --ff-only
+   "origin/<default>"`) when it sits clean on the default branch.
+
 3. Write the brief. The new session starts with no context, so the brief
    must stand on its own, in the user's language:
    - the problem and why it matters (the user's report, ticket id);
@@ -53,6 +58,8 @@ This skill only writes the brief and orchestrates tmux.
    - the points left to the new session's judgment, stated as such;
    - constraints from the project's CLAUDE.md that are easy to miss
      (e.g. SDK regeneration, generated files not to edit by hand);
+   - a first step: update the branch onto `origin/<default>` (fetch, then
+     rebase when a reused branch lags behind) before any change;
    - the expected outcome: TDD, atomic commits, PR against the base
      branch — unless the user asked for something else.
 
