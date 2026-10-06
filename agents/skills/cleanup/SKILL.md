@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up.
 ---
 
 # Cleanup
@@ -29,18 +29,33 @@ cleanup.
    Known examples: `bin/remove_worktree.sh <name>`,
    `bin/worktree-remove <name>`.
 
-2. Resolve the PR: `gh pr view <number|branch> --json state,mergedAt,headRefName,headRefOid,baseRefName`.
+2. Resolve the PR: `gh pr view <number|branch> --json state,mergedAt,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup`.
    Map it to its worktree with `git worktree list --porcelain`: the entry
    whose `branch refs/heads/<headRefName>`. This covers both the project
    worktrees directory and Claude Code ones (`.claude/worktrees/`).
 
-3. Stop unless the PR is `MERGED`. Report its state (open, closed without
-   merge, checks pending) and do nothing else: an unmerged worktree holds
-   work that would be lost.
+3. Land the PR when it is still `OPEN`, then go on with the cleanup:
+   - behind its base or `CONFLICTING`: from the worktree, fetch and
+     rebase onto `origin/<baseRefName>`, resolve the conflicts by reading
+     both sides (and the commits that introduced them), run the tests
+     covering the touched files, then
+     `git push --force-with-lease`. Ask the user when a conflict needs a
+     functional decision rather than a mechanical merge;
+   - wait for the checks the push triggered (`gh pr checks --watch`);
+   - merge once `mergeStateStatus` is `CLEAN` (or `UNSTABLE` for
+     non-required checks only), with the method the repository uses
+     (`git log --merges` on the base branch: merge commits →
+     `gh pr merge --merge`, otherwise `--squash` or `--rebase`).
+
+   Stop and report when GitHub blocks the merge (`BLOCKED`: missing
+   approval, failing required check, draft) or when the PR is closed
+   without merge: never bypass a protection with `--admin`. An unmerged
+   worktree holds work that would be lost.
 
 4. Check nothing unpublished remains in the worktree:
    - `git -C <path> status --short` must be empty;
-   - `git -C <path> rev-parse HEAD` must equal `headRefOid`.
+   - `git -C <path> rev-parse HEAD` must equal `headRefOid` (read it
+     again after a rebase in step 3).
    Otherwise stop and show what would be lost.
 
 5. From the primary checkout (never from inside the worktree being
@@ -101,5 +116,5 @@ cleanup.
 
 ## Report
 
-One line per step: PR state, worktree removed, branch deleted, databases
+One line per step: PR state (and rebase/merge done in step 3), worktree removed, branch deleted, databases
 dropped, orphan databases dropped, tab closed (or why each one was skipped).
