@@ -7,25 +7,34 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 usage() {
   cat << EOF
-Usage: $(basename "$0") <project> [port]
+Usage: $(basename "$0") [--tmux] <project> [port]
 
-SSH to remote desktop and run hat on project (auto-detects local/remote).
+SSH to remote desktop and attach to the project in herdr (hat), or in
+tmux (tat) with --tmux. Auto-detects local/remote.
 
 Arguments:
   project    Project path (e.g., dinum/siade)
   port       Optional port to tunnel in background
 
 Options:
+  --tmux        Attach with tmux instead of herdr
   -h, --help    Show this help message
 
 Examples:
   $(basename "$0") dinum/siade
   $(basename "$0") dinum/siade 3000
+  $(basename "$0") --tmux dinum/siade
 EOF
   exit 0
 }
 
 [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+ATTACH="hat"
+if [[ "${1:-}" == "--tmux" ]]; then
+  ATTACH="tat"
+  shift
+fi
 
 if [[ -z "${1:-}" ]]; then
   echo "Error: project argument required" >&2
@@ -62,4 +71,4 @@ if [[ -f ~/.srun-port ]]; then
   SRUN_PORT=$(cat ~/.srun-port)
 fi
 
-ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/hat"
+ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/$ATTACH"

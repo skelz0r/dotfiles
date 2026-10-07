@@ -1,6 +1,11 @@
 #compdef sproject
 
 _sproject() {
+  if [[ $PREFIX == -* ]]; then
+    compadd -- --tmux
+    return
+  fi
+
   local -a projects
   if [[ -d ~/work ]]; then
     # Depth 1 par défaut, profondeur 2 pour dirs dans SPROJECT_DEEP_DIRS
