@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# hat - Attach to herdr workspace named after current directory
+#
+
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Attach to herdr, focused on the workspace named after the current
+directory (created if missing). Starts the herdr server when needed.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
+name=$(basename "$PWD" | tr . -)
+
+server_running() {
+  herdr status server 2>/dev/null | grep -q '^status: running'
+}
+
+ensure_server() {
+  server_running && return
+
+  nohup herdr server > /dev/null 2>&1 &
+  for _ in {1..50}; do
+    server_running && return
+    sleep 0.1
+  done
+
+  echo "herdr server did not start" >&2
+  exit 1
+}
+
+workspace_id() {
+  herdr workspace list | jq -r --arg name "$name" \
+    '.result.workspaces[] | select(.label == $name) | .workspace_id' | head -1
+}
+
+ensure_server
+
+id=$(workspace_id)
+if [[ -n "$id" ]]; then
+  herdr workspace focus "$id" > /dev/null
+else
+  herdr workspace create --cwd "$PWD" --label "$name" --focus > /dev/null
+fi
+
+exec herdr

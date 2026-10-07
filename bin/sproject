@@ -9,7 +9,7 @@ usage() {
   cat << EOF
 Usage: $(basename "$0") <project> [port]
 
-SSH to remote desktop and run tat on project (auto-detects local/remote).
+SSH to remote desktop and run hat on project (auto-detects local/remote).
 
 Arguments:
   project    Project path (e.g., dinum/siade)
@@ -62,4 +62,4 @@ if [[ -f ~/.srun-port ]]; then
   SRUN_PORT=$(cat ~/.srun-port)
 fi
 
-ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/tat"
+ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/hat"

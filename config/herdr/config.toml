@@ -1,0 +1,51 @@
+onboarding = false
+
+[theme]
+name = "catppuccin"
+auto_switch = false
+
+[keys]
+prefix = "ctrl+a"
+
+detach = "prefix+d"
+settings = "prefix+shift+s"
+open_notification_target = "prefix+shift+o"
+
+workspace_picker = "prefix+s"
+rename_workspace = "prefix+$"
+previous_workspace = "prefix+("
+next_workspace = "prefix+)"
+
+new_tab = "prefix+c"
+rename_tab = "prefix+comma"
+close_tab = "prefix+ampersand"
+previous_tab = "prefix+p"
+next_tab = "prefix+n"
+switch_tab = "prefix+1..9"
+
+split_vertical = "prefix+percent"
+split_horizontal = "prefix+double_quote"
+close_pane = "prefix+x"
+zoom = "prefix+z"
+cycle_pane_next = "prefix+o"
+last_pane = "prefix+semicolon"
+
+focus_pane_left = "prefix+left"
+focus_pane_down = "prefix+down"
+focus_pane_up = "prefix+up"
+focus_pane_right = "prefix+right"
+
+resize_pane_left = "prefix+h"
+resize_pane_down = "prefix+j"
+resize_pane_up = "prefix+k"
+resize_pane_right = "prefix+l"
+
+[ui]
+prompt_new_tab_name = false
+tab_bar_right = [
+  { type = "command", command = "$HOME/dotfiles/bin/battery", interval_seconds = 60, timeout_seconds = 2 },
+  { type = "datetime", format = "%H:%M %d/%m" },
+]
+
+[ui.sound]
+enabled = false

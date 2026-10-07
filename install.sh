@@ -152,6 +152,10 @@ fi
 mkdir -p "$HOME/.config/nvim"
 safe_symlink "$DOTFILES_DIR/config/coc-settings.json" "$HOME/.config/nvim/coc-settings.json"
 
+# Herdr config
+mkdir -p "$HOME/.config/herdr"
+safe_symlink "$DOTFILES_DIR/config/herdr/config.toml" "$HOME/.config/herdr/config.toml"
+
 # Create init.vim to source vimrc
 NVIM_INIT="$HOME/.config/nvim/init.vim"
 if [[ ! -f "$NVIM_INIT" ]]; then

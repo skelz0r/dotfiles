@@ -84,6 +84,7 @@ check_cmd git "brew install git"
 check_cmd zsh "brew install zsh"
 check_cmd nvim "brew install neovim"
 check_cmd tmux "brew install tmux"
+check_cmd herdr "brew install herdr"
 check_cmd curl "brew install curl"
 
 # Development tools
@@ -133,6 +134,7 @@ section "Config Directories"
 check_file "$HOME/.vim/bundle/vundle" "Vundle"
 check_file "$HOME/.tmux/plugins/tpm" "TPM (tmux plugins)"
 check_file "$HOME/.config/nvim/coc-settings.json" "coc-settings.json"
+check_symlink "$HOME/.config/herdr/config.toml" "config/herdr/config.toml"
 
 # SSH
 section "SSH Configuration"
