@@ -105,3 +105,24 @@ git stash push <changed files> -q && <test command>; git stash pop -q
 
 Then re-run the project's own checks. A Codex review is not a substitute for the test suite; it did
 not run it.
+
+### 6. Commit each fix where it belongs
+
+One commit per finding, never one "address review" commit for all of them. Make it a fixup of the
+commit that introduced the defect, found with `git log -L` or `git blame` on the lines you changed:
+
+```bash
+git add <files of this finding>
+git commit --fixup=<sha that introduced the defect>
+```
+
+The branch history then folds itself back into clean commits with
+`git rebase -i --autosquash <base>` (or the `tidy-commits` skill), each fix landing in the commit
+that wrote the bug, so the reviewer reads the right code once instead of a defect and its patch. A
+single commit mixing fixes for code written in several commits cannot be redistributed without
+splitting it by hand, file by file and hunk by hunk.
+
+When a finding spans several origin commits, split the fix along them. When it does not belong to
+any branch commit (a pre-existing problem you chose to fix anyway), give it its own commit with a
+message that explains the defect. A test hardened because Codex showed it was vacuous is a fixup of
+the commit that added the test.
