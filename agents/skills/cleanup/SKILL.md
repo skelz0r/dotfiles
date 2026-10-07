@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up.
 ---
 
 # Cleanup
@@ -11,7 +11,7 @@ or a PR number. Without argument, use the worktree of the current session.
 
 Every project isolates its worktrees differently (ports, Postgres, Redis,
 env files), so the teardown itself is delegated to the project's removal
-script. This skill only adds the safety checks around it and the tmux
+script. This skill only adds the safety checks around it and the tab
 cleanup.
 
 ## Steps
@@ -97,22 +97,32 @@ cleanup.
    `for db in $list`). Never drop `*_production` nor backup databases,
    and ask before dropping anything that does not follow the scheme.
 
-7. Always close the tmux tab of the worktree if it exists, whichever way
-   step 5 went:
+7. Always close the tab of the worktree if it exists, whichever way
+   step 5 went. Detect the multiplexer like `/start`: herdr when
+   `HERDR_ENV=1`, else tmux when `$TMUX` is set, else there is no tab
+   to close.
+
+   ```bash
+   herdr pane list | jq -r '.result.panes[] | "\(.tab_id) \(.label // "-")"'
+   herdr tab list | jq -r '.result.tabs[] | "\(.tab_id) \(.label)"'
+   echo "$HERDR_TAB_ID"
+   ```
 
    ```bash
    tmux list-windows -a -F '#{window_id} #{@worktree} #{window_name}'
    tmux display-message -p -t "$TMUX_PANE" '#{window_id}'
    ```
 
-   The tab to close is the one whose `@worktree` option is the worktree
-   name (set by `/start`); for tabs opened before that, the one named
-   after the worktree or after the readable slug of its topic; and the
-   window Claude runs in when this session worked on that worktree, even
-   if its name differs. If it is
-   the window Claude runs in, report the outcome to the user first, then
-   kill it as the very last action, since it ends the session. Never kill
-   another session's window whose name does not match.
+   The tab to close is the one marked with the worktree name by `/start`
+   (herdr: a pane labelled with it; tmux: the `@worktree` window
+   option); for tabs opened before that, the one named after the
+   worktree or after the readable slug of its topic; and the tab Claude
+   runs in when this session worked on that worktree, even if its name
+   differs. Close it with `herdr tab close <tab_id>` or
+   `tmux kill-window -t <window_id>`. If it is the tab Claude runs in,
+   report the outcome to the user first, then close it as the very last
+   action, since it ends the session. Never close another session's tab
+   whose name does not match.
 
 ## Report
 

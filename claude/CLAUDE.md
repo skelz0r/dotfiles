@@ -69,14 +69,15 @@ Be extremely concise. Sacrifice grammar for concision.
 - Writing new files under `secrets/` is allowed (scaffolding with
   placeholders), but never read them back.
 
-## tmux
+## herdr / tmux
 
-- "Tab" means tmux window, not pane
-- Rename it with `tmux rename-window -t "$TMUX_PANE" <name>`: always
-  target `$TMUX_PANE`, otherwise the window displayed by the client is
-  renamed instead of the one Claude runs in
+- "Tab" means herdr tab or tmux window, not pane; herdr when
+  `HERDR_ENV=1`, else tmux when `$TMUX` is set
+- Rename the one Claude runs in, never the one the client displays:
+  `herdr tab rename "$HERDR_TAB_ID" <name>` or
+  `tmux rename-window -t "$TMUX_PANE" <name>`
 - Every new development topic goes through `/start`: dedicated worktree,
-  tmux tab and fresh session; never work in the main checkout nor in the
+  tab and fresh session; never work in the main checkout nor in the
   current session
 
 ## Screenshots / screencasts

@@ -1,12 +1,12 @@
 ---
 name: start
-description: Hand a development topic off to a fresh Claude session running in its own worktree and tmux tab — create the worktree with the project's own setup script, write a self-contained brief from the current conversation, open a tmux tab with a readable name for the topic and launch dclaude on that brief. Use when the user runs /start, asks to "lance ça dans un worktree", "fais un nouveau tab et worktree", "délègue à une autre session", or wants the topic just discussed to be implemented in parallel.
+description: Hand a development topic off to a fresh Claude session running in its own worktree and herdr or tmux tab — create the worktree with the project's own setup script, write a self-contained brief from the current conversation, open a herdr or tmux tab with a readable name for the topic and launch dclaude on that brief. Use when the user runs /start, asks to "lance ça dans un worktree", "fais un nouveau tab et worktree", "délègue à une autre session", or wants the topic just discussed to be implemented in parallel.
 ---
 
 # Start
 
 Counterpart of `/cleanup`: spins up a worktree for a topic and hands it to
-a new Claude session in a dedicated tmux tab. Argument: the worktree name
+a new Claude session in a dedicated tab. Argument: the worktree name
 (ticket like `API-7345` or slug like `cnav-nir`), optionally followed by
 extra instructions. Without a name, derive a short kebab-case slug from
 the topic (2-4 words).
@@ -18,7 +18,20 @@ slug, reuse it; when it is a ticket, derive the slug from the topic.
 
 Every project isolates its worktrees differently (ports, Postgres, Redis,
 env files), so the setup itself is delegated to the project's script.
-This skill only writes the brief and orchestrates tmux.
+This skill only writes the brief and orchestrates the tab.
+
+## Multiplexer
+
+Detect where this session runs, in this order (a multiplexer started
+inside the other inherits its variable, so herdr is checked first):
+
+- `HERDR_ENV=1`: herdr. The tab opens in the caller's workspace
+  (`$HERDR_WORKSPACE_ID`).
+- `$TMUX` set: tmux. The tab is a window of the caller's session.
+- neither: no tab can be opened. Run the setup script from this session,
+  then hand the user the command to launch the new session themselves
+  (`cd <worktree path> && dclaude "$(cat <brief file>)"`), and skip
+  step 5.
 
 ## Steps
 
@@ -39,10 +52,11 @@ This skill only writes the brief and orchestrates tmux.
    `git worktree add worktrees/<name> -b feature/<name> origin/develop`
    (adapt the base branch) and tell the user nothing else is isolated.
 
-2. Check the names are free: no existing tmux window with the tab name
-   (`tmux list-windows -a -F '#{window_name}'`) and no worktree already
-   holding a different topic (`git worktree list`). An existing worktree
-   for the same topic is fine: setup scripts are idempotent.
+2. Check the names are free: no existing tab with that name (herdr:
+   `herdr tab list --workspace "$HERDR_WORKSPACE_ID"`, field `label`;
+   tmux: `tmux list-windows -a -F '#{window_name}'`) and no worktree
+   already holding a different topic (`git worktree list`). An existing
+   worktree for the same topic is fine: setup scripts are idempotent.
 
    Then bring the default branch up to date, since setup scripts branch
    from it: `git -C "$PRIMARY_ROOT" fetch -q origin`, and fast-forward
@@ -68,16 +82,32 @@ This skill only writes the brief and orchestrates tmux.
    otherwise `mktemp -t start-<name>`. Never inside the repository.
 
 4. Open the tab and launch everything in it, so the user can follow the
-   setup output:
+   setup output. The command to run in it, passed as a single quoted
+   argument below:
+
+   ```bash
+   <setup script> <name> && cd "$(git worktree list --porcelain | awk '/^worktree /{print $2}' | grep -i '/<name>$')" && dclaude "$(cat <brief file>)"
+   ```
+
+   herdr:
+
+   ```bash
+   P=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --label <tab name> --cwd "$PRIMARY_ROOT" --no-focus | jq -r .result.root_pane.pane_id)
+   herdr pane rename "$P" <name>
+   herdr pane run "$P" "<command>"
+   ```
+
+   tmux:
 
    ```bash
    W=$(tmux new-window -d -P -F '#{window_id}' -n <tab name> -c "$PRIMARY_ROOT")
    tmux set-option -w -t "$W" @worktree <name>
-   tmux send-keys -t "$W" "<setup script> <name> && cd \"\$(git worktree list --porcelain | awk '/^worktree /{print \$2}' | grep -i '/<name>\$')\" && dclaude \"\$(cat <brief file>)\"" Enter
+   tmux send-keys -t "$W" "<command>" Enter
    ```
 
-   The `@worktree` window option carries the worktree name, so `/cleanup`
-   finds the tab whatever it is called, even after a rename.
+   The pane label (herdr) or `@worktree` window option (tmux) carries the
+   worktree name, so `/cleanup` finds the tab whatever it is called, even
+   after a rename.
    The `git worktree list` lookup copes with scripts that lowercase or
    otherwise normalize the name. Always launch Claude with `dclaude`,
    never `claude` directly.
@@ -87,6 +117,7 @@ This skill only writes the brief and orchestrates tmux.
    gems, packages, databases):
 
    ```bash
+   herdr pane read "$P" --source recent-unwrapped --lines 25
    tmux capture-pane -p -t "$W" | tail -25
    ```
 
