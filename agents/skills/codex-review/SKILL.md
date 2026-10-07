@@ -116,6 +116,17 @@ git add <files of this finding>
 git commit --fixup=<sha that introduced the defect>
 ```
 
+When the fix carries a reason worth keeping (the failing scenario Codex found, a trade-off, why
+the obvious patch was wrong), use `--squash` instead and write that reason in the body:
+
+```bash
+git commit --squash=<sha> -m "<subject>" -m "<why: the scenario and the choice made>"
+```
+
+At autosquash, a fixup's message is discarded while a squash's message is offered merged with the
+target's: edit the combined message so the reason ends up as a paragraph of the origin commit, and
+the history keeps why the code is shaped that way without keeping the detour.
+
 The branch history then folds itself back into clean commits with
 `git rebase -i --autosquash <base>` (or the `tidy-commits` skill), each fix landing in the commit
 that wrote the bug, so the reviewer reads the right code once instead of a defect and its patch. A
