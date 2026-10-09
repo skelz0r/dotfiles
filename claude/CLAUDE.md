@@ -56,7 +56,31 @@ Be extremely concise. Sacrifice grammar for concision.
 
 - Run only relevant tests, not full suite
 - Ensure tests pass before moving on
-- Use TDD where possible
+- Do not write tests by default: a test written from your own reading
+  of the intent is no more trustworthy than the code it checks
+- Write a test only when it encodes intent from outside the code:
+  - a reproduced bug, from the report, before the fix
+  - an end-to-end user flow
+  - a public contract (API, CLI, file format) consumed by others
+  - cases I gave in the ticket, the plan or the conversation
+- When a bug would be costly or irreversible (money, access, data
+  loss or exposure, outbound actions) or would go unnoticed (background
+  jobs, concurrency, time and expiry, limits, state transitions),
+  cover it and make the chosen cases reviewable:
+  - test descriptions are business statements, readable as a spec
+  - the commit body lists covered cases and those deliberately left
+    untested, with why
+  - the final summary flags them as needing my validation
+- Test behaviour through the public boundary (use case, endpoint,
+  CLI command, public API of a module), never internal steps: a test
+  must survive refactoring the internals
+- Mock only what crosses the system boundary (network, third-party
+  services, clock), never internal collaborators
+- When an existing test breaks without any intended behaviour change,
+  tell me whether the test or the code is wrong, never silently adapt
+  the test
+- Do not repair a breaking test that only mirrors the implementation:
+  propose deleting it
 
 ## Secrets
 
