@@ -112,7 +112,5 @@ Be extremely concise. Sacrifice grammar for concision.
 
 * When referencing, located within ~/share/screenshots/
   or ~/share/screencasts/
-* To attach images to a GitHub issue or PR, upload them with the
-  `upload-assets` skill into the `gh` folder, named
-  `<project>-{issue,pr}-<id>-<name>.png` (e.g.
-  `superdocu-pr-1990-portal.png`), then embed the resulting URLs
+* To attach images or videos to a GitHub issue, PR or comment, use
+  the `gh-image` skill (native `gh --attach`), not `upload-assets`
