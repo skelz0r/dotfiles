@@ -12,7 +12,8 @@ guessable.
 
 Wraps `upload-assets` (dotfiles `bin/upload-assets`) with a staging step that
 strips image metadata and detects overwrites. Scripts below live in this
-skill's base directory.
+skill's base directory. Skills that build a static page to publish here
+share `references/static-pages.md`.
 
 ## Workflow
 

@@ -136,6 +136,7 @@ def document(*, title, strip, actor, body, notes, narrow, single=False):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <title>{title}</title>
 <link rel="stylesheet" href="{"style.css" if single else "../style.css"}">
 </head>
