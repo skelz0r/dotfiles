@@ -82,9 +82,14 @@ unless the user picks another one:
 
 - **Exclude the sources**: `--except` the source file, `build.py` and any
   notes file, so only what the page needs goes online.
+- **Access**: ask whether the page is public or behind a password, unless
+  the user already said. Recommend the password when the page holds
+  anything internal (unreleased features, another team's plans, real
+  names); a public page is fine for material meant to be shared widely.
+  Republishing to a protected folder keeps its password.
 - **Last check before the upload**: no personal data, token, internal URL
   or real identity left in the page.
-- Give the URL, then offer the next step of the skill (e.g. link it from
-  the PR description).
+- Give the URL (with the credentials when protected), then offer the next
+  step of the skill (e.g. link it from the PR description).
 
 To iterate, edit the source, rebuild and republish to the same folder.

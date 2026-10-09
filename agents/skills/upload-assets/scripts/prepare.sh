@@ -5,28 +5,46 @@ shopt -s nocasematch
 source "$(dirname "$0")/common.sh"
 
 IMAGE_EXTENSIONS=(jpg jpeg png gif webp heic heif avif tif tiff)
-USAGE="usage: prepare.sh [-o|--only PATTERN]... [-x|--except PATTERN]... FOLDER SOURCE [SOURCE...]"
+USAGE="usage: prepare.sh [-o|--only PATTERN]... [-x|--except PATTERN]... [--protect [--user NAME] | --public] FOLDER [SOURCE...]\n(sources are optional only with --protect or --public, to change the access alone)"
 
 only_patterns=()
 except_patterns=()
+access="keep"
+user="guest"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     -o|--only) [ $# -ge 2 ] || die "$1 needs a pattern"; only_patterns+=("$2"); shift 2 ;;
     -x|--except) [ $# -ge 2 ] || die "$1 needs a pattern"; except_patterns+=("$2"); shift 2 ;;
+    --protect) [ "$access" = "keep" ] || die "--protect and --public are exclusive"; access="protect"; shift ;;
+    --public) [ "$access" = "keep" ] || die "--protect and --public are exclusive"; access="public"; shift ;;
+    --user) [ $# -ge 2 ] || die "$1 needs a name"; user="$2"; shift 2 ;;
     --) shift; break ;;
     -*) die "unknown option: $1\n$USAGE" ;;
     *) break ;;
   esac
 done
 
-[ $# -ge 2 ] || die "$USAGE"
+[ $# -ge 1 ] || die "$USAGE"
+[ $# -ge 2 ] || [ "$access" != "keep" ] || die "$USAGE"
 
 folder=$(normalize_folder "$1")
 shift
 validate_folder "$folder"
 
 command -v exiftool > /dev/null || die "exiftool is missing: brew install exiftool"
+
+if [ "$access" = "protect" ]; then
+  depth=$(printf '%s' "$folder" | tr -cd / | wc -c)
+  [ "$((depth + 1))" -le "$MAX_PROTECTED_DEPTH" ] ||
+    die "cannot protect '$folder': the server only honours a $HTPASSWD down to $MAX_PROTECTED_DEPTH folder levels"
+  [[ "$user" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid user '$user': allowed characters are A-Z a-z 0-9 . _ -"
+fi
+
+protected_by=$(remote_protection "$folder")
+if [ "$access" = "public" ] && [ -n "$protected_by" ] && [ "$protected_by" != "$folder" ]; then
+  die "cannot make '$folder' public: it inherits the password of '$protected_by'"
+fi
 
 for source_path in "$@"; do
   [ -e "$source_path" ] || die "no such file or directory: $source_path"
@@ -85,7 +103,7 @@ for source_path in "$@"; do
   fi
 done
 
-[ "${#copy_to[@]}" -gt 0 ] || die "nothing to upload: no file matches the selection"
+[ "${#copy_to[@]}" -gt 0 ] || [ $# -eq 0 ] || die "nothing to upload: no file matches the selection"
 
 unmatched_patterns=""
 for pattern in "${only_patterns[@]}"; do
@@ -126,11 +144,39 @@ remaining_gps=$(exiftool -r -q -q -if '$GPSLatitude or $GPSPosition' -p '$Direct
   "${extension_args[@]}" "$stage" 2>/dev/null || true)
 [ -z "$remaining_gps" ] || die "GPS metadata still present, staging dir kept at $stage:\n$remaining_gps"
 
-remote_files=$(ssh "$REMOTE" "cd '$REMOTE_ROOT/$folder' 2>/dev/null && find . -type f | sed 's|^\./||' | sort" || true)
+remote_files=$(ssh "$REMOTE" "cd '$REMOTE_ROOT/$folder' 2>/dev/null && find . -type f ! -path '*/.*' | sed 's|^\./||' | sort" || true)
 overwrites=$(comm -12 <(printf '%s\n' "$local_files") <(printf '%s\n' "$remote_files"))
 untouched=$(comm -13 <(printf '%s\n' "$local_files") <(printf '%s\n' "$remote_files"))
 hidden=$(for source_path in "$@"; do list_hidden_entries "$source_path"; done)
 broken_links=$(printf '%s\n' "$remote_files" | "$(dirname "$0")/find_broken_links.py" "$folder" "$stage")
+
+password=""
+password_hash=""
+if [ "$access" = "protect" ]; then
+  password="${ASSETS_PASSWORD:-$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | cut -c1-20)}"
+  if command -v htpasswd > /dev/null; then
+    password_hash=$(printf '%s' "$password" | htpasswd -niB "$user")
+  else
+    password_hash="$user:$(openssl passwd -apr1 "$password")"
+  fi
+fi
+
+{
+  echo "access=$access"
+  echo "protected_by=$protected_by"
+  echo "user=$user"
+  echo "password=$password"
+  echo "hash=$password_hash"
+} > "$stage/$ACCESS_FILE"
+chmod 600 "$stage/$ACCESS_FILE"
+
+case "$access:$protected_by" in
+  protect:"$folder") access_summary="protected, password replaced (user $user)" ;;
+  protect:*) access_summary="protected by a new password (user $user)" ;;
+  public:"$folder") access_summary="public, password removed" ;;
+  *:) access_summary="public" ;;
+  *) access_summary="protected by the existing password of '$protected_by', unchanged" ;;
+esac
 
 echo "stage: $stage"
 echo "destination: $BASE_URL/$folder/"
@@ -139,6 +185,7 @@ if [ -n "$remote_files" ]; then
 else
   echo "remote folder: new or empty"
 fi
+echo "access: $access_summary"
 echo "metadata stripping:"
 printf '%s\n' "$exif_summary" | grep -v "No writable tags set" | sed 's/^ */  /'
 print_list "files to upload" "$local_files"
