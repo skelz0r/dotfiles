@@ -1,8 +1,7 @@
 # Theming from the project's visual identity
 
-Find the identity as described in the `upload-assets` skill's
-`references/static-pages.md`, then set the tokens at the top of
-`style.css` and the header of each actor.
+Find the identity as described in the `static-page` skill, then set the
+tokens at the top of `style.css` and the header of each actor.
 
 The main layout (`app/views/layouts/*`, `src/components/Header*`) also
 gives the product name and tagline to put in `ACTORS`. The actor that is

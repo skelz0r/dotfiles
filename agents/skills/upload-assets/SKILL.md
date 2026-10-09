@@ -14,8 +14,8 @@ folder, the nearest one wins, down to 3 folder levels).
 
 Wraps `upload-assets` (dotfiles `bin/upload-assets`) with a staging step that
 strips image metadata and detects overwrites. Scripts below live in this
-skill's base directory. Skills that build a static page to publish here
-share `references/static-pages.md`.
+skill's base directory. To build an HTML page to publish here, see the
+`static-page` skill.
 
 ## Workflow
 

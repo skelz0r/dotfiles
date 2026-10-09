@@ -1,9 +1,9 @@
 # Theming from the project's visual identity
 
-Find the identity as described in the `upload-assets` skill's
-`references/static-pages.md`, then set the tokens at the top of
-`style.css`. The components (tabs, tables, callouts, badges) are drawn by
-`style.css` itself, after the project's design system.
+Find the identity as described in the `static-page` skill, then set the
+tokens at the top of `style.css`. The components (tabs, tables, callouts,
+badges) are drawn by `style.css` itself, after the project's design
+system.
 
 ## Tokens
 

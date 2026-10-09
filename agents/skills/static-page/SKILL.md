@@ -1,9 +1,23 @@
-# Static pages published on assets
+---
+name: static-page
+description: Build a self-contained static HTML page (or a small set of pages) styled with a project's visual identity, check it in a browser and publish it on assets.delmai.re, public or behind a password. Base rules shared by the skills that generate pages (pr-review-guide, decision-mockups), and the workflow to follow directly for any other page. Use when the user asks for "une page html", "une page à partager", "un doc html", "une page statique qui explique X", a one-off report, explainer or comparison meant to be read in a browser and shared by link.
+---
 
-Shared by the skills that generate a static HTML page from a source file
-and a build script, then publish it here (`pr-review-guide`,
-`decision-mockups`). Each skill keeps its own content rules, components and
-token roles; what follows is the same for all of them.
+# Static page
+
+How to build, check and publish a static HTML page. Skills that generate a
+specific kind of page (`pr-review-guide`, `decision-mockups`) follow these
+rules and add their own content rules, components and token roles. For any
+other page, follow this skill directly:
+
+1. Frame with the user: what the page is for, who reads it, its language,
+   the slug.
+2. Create the files where described below: a source (markdown rendered by
+   a small `build.py`, or `build.py` alone for generated pages) and a
+   `style.css` with the tokens of the project's identity. A single short
+   page may be a hand-written `index.html` instead: then it is the source.
+3. Build, look at the result, fix until zero warning and nothing looks off.
+4. Publish, then iterate in the source.
 
 ## Principles
 
@@ -27,7 +41,7 @@ token roles; what follows is the same for all of them.
 
 ```bash
 mkdir -p ~/share/<slug>
-cp <skill>/assets/<files> ~/share/<slug>/
+cp <skill>/assets/<files> ~/share/<slug>/   # when a page skill provides them
 ln -s ~/share/<slug> <working-dir>/<gitignored-dir>/<name>
 ```
 
@@ -42,7 +56,7 @@ Look, in this order, and stop at the first conclusive source:
 1. **DSFR (French government)**: `@gouvfr/dsfr` in `package.json`,
    `dsfr-view-components` or `dsfr-form_builder` in a `Gemfile`, `fr-`
    prefixed classes in views, a `.gouv.fr` domain in the config or README.
-   Use the skill's DSFR preset.
+   Use the DSFR preset (the page skill's, or the one below).
 2. **Tailwind**: `tailwind.config.*` (`theme.extend.colors`) or a CSS file
    with `@theme { --color-* }`.
 3. **CSS custom properties**:
@@ -52,12 +66,22 @@ Look, in this order, and stop at the first conclusive source:
 4. **SCSS variables**: `$primary`, `$brand-*`, `$color-*`.
 
 Nothing conclusive: ask the user for a primary color, or keep the neutral
-defaults of the skill's `style.css`. Then set the tokens at the top of
-`style.css` following the skill's own token table, keep the semantic
+defaults of the page skill's `style.css`. Then set the tokens at the top
+of `style.css` following the page skill's token table, keep the semantic
 colors (info, good, warning) unless they clash with the primary so they
 read the same across projects, and check the contrast of text on the
 primary (WCAG AA, 4.5:1). Marianne and other project fonts are not
 embedded: the fallback stack is enough.
+
+For a page without a page skill, declare the tokens on `:root` and use
+them everywhere (`--font`, `--text`, `--muted`, `--border`, `--surface`,
+`--primary`, `--primary-light`, `--info`, `--good`, `--warning`). DSFR:
+
+```css
+--font: Marianne, "Segoe UI", system-ui, -apple-system, sans-serif;
+--primary: #000091;
+--primary-light: #e3e3fd;
+```
 
 ## Looking at the result
 
