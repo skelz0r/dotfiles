@@ -5,12 +5,11 @@ shopt -s nocasematch
 source "$(dirname "$0")/common.sh"
 
 IMAGE_EXTENSIONS=(jpg jpeg png gif webp heic heif avif tif tiff)
-USAGE="usage: prepare.sh [-o|--only PATTERN]... [-x|--except PATTERN]... [--protect [--user NAME] | --public] FOLDER [SOURCE...]\n(sources are optional only with --protect or --public, to change the access alone)"
+USAGE="usage: prepare.sh [-o|--only PATTERN]... [-x|--except PATTERN]... [--protect | --public] FOLDER [SOURCE...]\n(sources are optional only with --protect or --public, to change the access alone)"
 
 only_patterns=()
 except_patterns=()
 access="keep"
-user="guest"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -18,7 +17,6 @@ while [ $# -gt 0 ]; do
     -x|--except) [ $# -ge 2 ] || die "$1 needs a pattern"; except_patterns+=("$2"); shift 2 ;;
     --protect) [ "$access" = "keep" ] || die "--protect and --public are exclusive"; access="protect"; shift ;;
     --public) [ "$access" = "keep" ] || die "--protect and --public are exclusive"; access="public"; shift ;;
-    --user) [ $# -ge 2 ] || die "$1 needs a name"; user="$2"; shift 2 ;;
     --) shift; break ;;
     -*) die "unknown option: $1\n$USAGE" ;;
     *) break ;;
@@ -37,8 +35,7 @@ command -v exiftool > /dev/null || die "exiftool is missing: brew install exifto
 if [ "$access" = "protect" ]; then
   depth=$(printf '%s' "$folder" | tr -cd / | wc -c)
   [ "$((depth + 1))" -le "$MAX_PROTECTED_DEPTH" ] ||
-    die "cannot protect '$folder': the server only honours a $HTPASSWD down to $MAX_PROTECTED_DEPTH folder levels"
-  [[ "$user" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid user '$user': allowed characters are A-Z a-z 0-9 . _ -"
+    die "cannot protect '$folder': the server only honours a $KEYS_DIR down to $MAX_PROTECTED_DEPTH folder levels"
 fi
 
 protected_by=$(remote_protection "$folder")
@@ -151,28 +148,23 @@ hidden=$(for source_path in "$@"; do list_hidden_entries "$source_path"; done)
 broken_links=$(printf '%s\n' "$remote_files" | "$(dirname "$0")/find_broken_links.py" "$folder" "$stage")
 
 password=""
-password_hash=""
+key=""
 if [ "$access" = "protect" ]; then
   password="${ASSETS_PASSWORD:-$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | cut -c1-20)}"
-  if command -v htpasswd > /dev/null; then
-    password_hash=$(printf '%s' "$password" | htpasswd -niB "$user")
-  else
-    password_hash="$user:$(openssl passwd -apr1 "$password")"
-  fi
+  key=$(printf '%s' "$password" | openssl dgst -sha256 -r | cut -d' ' -f1)
 fi
 
 {
   echo "access=$access"
   echo "protected_by=$protected_by"
-  echo "user=$user"
   echo "password=$password"
-  echo "hash=$password_hash"
+  echo "key=$key"
 } > "$stage/$ACCESS_FILE"
 chmod 600 "$stage/$ACCESS_FILE"
 
 case "$access:$protected_by" in
-  protect:"$folder") access_summary="protected, password replaced (user $user)" ;;
-  protect:*) access_summary="protected by a new password (user $user)" ;;
+  protect:"$folder") access_summary="protected, password replaced" ;;
+  protect:*) access_summary="protected by a new password" ;;
   public:"$folder") access_summary="public, password removed" ;;
   *:) access_summary="public" ;;
   *) access_summary="protected by the existing password of '$protected_by', unchanged" ;;

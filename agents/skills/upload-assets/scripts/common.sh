@@ -4,7 +4,7 @@ BASE_URL="https://assets.delmai.re"
 STAGE_PREFIX="upload-assets"
 LIST_LIMIT=50
 ACCESS_FILE=".access"
-HTPASSWD=".htpasswd"
+KEYS_DIR=".keys"
 MAX_PROTECTED_DEPTH=3
 
 die() {
@@ -42,7 +42,7 @@ print_list() {
 
 remote_protection() {
   local folder="$1"
-  local candidates=("$HTPASSWD")
+  local candidates=("$KEYS_DIR")
   local prefix=""
   local segment
   local depth=0
@@ -52,9 +52,9 @@ remote_protection() {
   for segment in "${segments[@]}"; do
     [ "$depth" -lt "$MAX_PROTECTED_DEPTH" ] || break
     prefix="${prefix:+$prefix/}$segment"
-    candidates=("$prefix/$HTPASSWD" "${candidates[@]}")
+    candidates=("$prefix/$KEYS_DIR" "${candidates[@]}")
     depth=$((depth + 1))
   done
 
-  ssh "$REMOTE" "cd '$REMOTE_ROOT' && for f in ${candidates[*]}; do [ -f \"\$f\" ] && { dirname \"\$f\"; exit 0; }; done; true"
+  ssh "$REMOTE" "cd '$REMOTE_ROOT' && for f in ${candidates[*]}; do [ -d \"\$f\" ] && { dirname \"\$f\"; exit 0; }; done; true"
 }

@@ -8,9 +8,12 @@ description: Upload local files or folders to the static site assets.delmai.re (
 Publish local files to `https://assets.delmai.re/<folder>/...`.
 
 Folders are **public** unless protected by a password: no directory listing,
-but URLs are guessable. A protected folder asks for Basic auth on everything
-below it, subfolders included (nginx honours a `.htpasswd` dropped in the
-folder, the nearest one wins, down to 3 folder levels).
+but URLs are guessable. A protected folder shows a page with a single
+password field for everything below it, subfolders included; once typed,
+a cookie keeps it unlocked for 30 days. A direct link ending in
+`#k=<password>` unlocks it without typing. On the server, the folder holds
+`.keys/<sha256 of the password>`; the nearest `.keys` wins, down to 3
+folder levels.
 
 Wraps `upload-assets` (dotfiles `bin/upload-assets`) with a staging step that
 strips image metadata and detects overwrites. Scripts below live in this
@@ -73,8 +76,7 @@ Rules applied by the scripts, mention them only when relevant:
 
 ### Access
 
-- `--protect`: put a password on the folder, user `guest` unless
-  `--user NAME`. The password is the one the user gave, passed through the
+- `--protect`: put a password on the folder. The password is the one the user gave, passed through the
   `ASSETS_PASSWORD` environment variable (never on the command line),
   otherwise a random one is generated. On a protected folder, it replaces
   the password.
@@ -87,14 +89,15 @@ To change the access of a folder already online, run both scripts with
 `--protect` or `--public` and no source: nothing is uploaded.
 
 The folder must be at most 3 levels deep to be protected
-(`clients/acme/2026`). The `.htpasswd` lands on the server before the
-files, so they are never public in between.
+(`clients/acme/2026`). The key lands on the server before the files, so
+they are never public in between. Replacing a password invalidates the
+old one at once.
 
 ### 2. Prepare
 
 ```bash
 [ASSETS_PASSWORD=...] scripts/prepare.sh [--only PATTERN]... [--except PATTERN]... \
-  [--protect [--user NAME] | --public] <folder> <source> [<source>...]
+  [--protect | --public] <folder> <source> [<source>...]
 ```
 
 Copies the selected files into a temporary staging dir (originals untouched),
@@ -130,15 +133,15 @@ scripts/publish.sh <folder> <stage>
 ```
 
 Sets or removes the password, uploads with `upload-assets`, checks every
-URL answers HTTP 200 (and 401 without credentials when protected), deletes
-the staging dir on success and keeps it on failure for a retry. Prints the
-access, with the user and password when it set one.
+URL answers HTTP 200 (and 401 without the key when protected), deletes the
+staging dir on success and keeps it on failure for a retry. Prints the
+access, with the password and the direct link when it set one.
 
 ### 5. Report
 
-Give the URLs, and the user and password when the folder was just
-protected (an existing password is never shown: it is not stored anywhere
-readable). For a static site with an `index.html` at the folder root, lead
+Give the URLs, and the password and the direct link when the folder was
+just protected (an existing password cannot be shown: only its hash is
+stored). For a static site with an `index.html` at the folder root, lead
 with `https://assets.delmai.re/<folder>/`: nginx serves the `index.html` there
 (and redirects `/<folder>` to it). Other pages are linked by full path. Many
 files: entry points plus a count.
@@ -146,7 +149,8 @@ files: entry points plus a count.
 ## Limits
 
 - A password is shared by everyone who gets it: to revoke it, re-run with
-  `--protect` to replace it.
+  `--protect` to replace it. The hash is unsalted: prefer the generated
+  password to a short one chosen by hand.
 - Upload never deletes: remote files absent locally stay on the server.
   Remove them only when explicitly asked:
   `ssh deploy@apps 'rm /var/www/assets/<folder>/<file>'`.
@@ -154,5 +158,5 @@ files: entry points plus a count.
 - The link check only reads `href`/`src` attributes in HTML: CSS `url()`,
   `srcset` and links built by JavaScript are not checked. Absolute links
   outside `/<folder>/` are ignored.
-- Requires `exiftool`, `jq`, `python3` and `openssl` (`htpasswd` is used
-  when present for bcrypt hashes), and SSH access to `deploy@apps`.
+- Requires `exiftool`, `jq`, `python3` and `openssl`, and SSH access to
+  `deploy@apps`.

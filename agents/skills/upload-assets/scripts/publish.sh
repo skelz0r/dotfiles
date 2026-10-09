@@ -24,8 +24,8 @@ read_access() {
 
 access=$(read_access access)
 protected_by=$(read_access protected_by)
-user=$(read_access user)
 password=$(read_access password)
+key=$(read_access key)
 
 entries=()
 while IFS= read -r entry; do
@@ -36,10 +36,11 @@ done < <(find "$stage" -mindepth 1 -maxdepth 1 ! -name '.*')
 remote_dir="$REMOTE_ROOT/$folder"
 case "$access" in
   protect)
-    read_access hash | ssh "$REMOTE" "umask 022 && mkdir -p '$remote_dir' && cat > '$remote_dir/$HTPASSWD.tmp' && mv '$remote_dir/$HTPASSWD.tmp' '$remote_dir/$HTPASSWD'"
+    [[ "$key" =~ ^[0-9a-f]{64}$ ]] || die "invalid key in $stage/$ACCESS_FILE: re-run prepare.sh"
+    ssh "$REMOTE" "umask 022 && mkdir -p '$remote_dir/$KEYS_DIR' && touch '$remote_dir/$KEYS_DIR/$key' && find '$remote_dir/$KEYS_DIR' -type f ! -name '$key' -delete"
     ;;
   public)
-    ssh "$REMOTE" "rm -f '$remote_dir/$HTPASSWD'"
+    ssh "$REMOTE" "rm -rf '$remote_dir/$KEYS_DIR'"
     protected_by=""
     ;;
 esac
@@ -64,7 +65,7 @@ while IFS= read -r encoded_path; do
     fi
   fi
   if [ -n "$password" ]; then
-    status=$(http_status -u "$user:$password" "$url")
+    status=$(http_status -b "assets_key=$key" "$url")
   elif [ -n "$protected_by" ]; then
     urls+=("$url")
     continue
@@ -98,7 +99,8 @@ fi
 rm -rf "$stage"
 [ "${#urls[@]}" -eq 0 ] || print_list "published" "$(printf '%s\n' "${urls[@]}")"
 if [ -n "$password" ]; then
-  echo "access: protected, user $user, password $password"
+  echo "access: protected, password $password"
+  echo "direct link: $BASE_URL/$folder/#k=$(printf '%s' "$password" | jq -sRr @uri)"
 elif [ -n "$protected_by" ]; then
   echo "access: protected by the existing password of '$protected_by'"
 else

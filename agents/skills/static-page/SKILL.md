@@ -113,7 +113,8 @@ unless the user picks another one:
   Republishing to a protected folder keeps its password.
 - **Last check before the upload**: no personal data, token, internal URL
   or real identity left in the page.
-- Give the URL (with the credentials when protected), then offer the next
-  step of the skill (e.g. link it from the PR description).
+- Give the URL (with the password and the direct link when protected),
+  then offer the next step of the skill (e.g. link it from the PR
+  description).
 
 To iterate, edit the source, rebuild and republish to the same folder.
