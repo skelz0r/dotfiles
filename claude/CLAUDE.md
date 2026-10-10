@@ -42,6 +42,10 @@ Be extremely concise. Sacrifice grammar for concision.
 
 ## Pull Requests
 
+- Internal tooling (skills, commands, CLAUDE.md, agent config, personal
+  dotfiles scripts), never code shipped to clients: once verified it
+  works, rebase on the default branch and push directly, without PR nor
+  review
 - Single-commit PR: reuse the commit message as the description, verbatim
 - Otherwise, PR description = compact summary of the commits, not a
   re-explanation of each
