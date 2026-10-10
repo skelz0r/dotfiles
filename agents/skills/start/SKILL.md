@@ -76,8 +76,9 @@ inside the other inherits its variable, so herdr is checked first):
      rebase when a reused branch lags behind) before any change;
    - the cases the user gave to cover, listed as cases to test; no other
      testing instruction, the global CLAUDE.md sets the policy;
-   - the expected outcome: atomic commits, PR against the base branch —
-     unless the user asked for something else.
+   - the expected outcome: atomic commits, PR against the base branch,
+     or direct push for internal tooling as the global CLAUDE.md
+     allows — unless the user asked for something else.
 
    No code, no step-by-step implementation: describe the target, not
    the diff. Save it to the scratchpad directory when one is listed,
