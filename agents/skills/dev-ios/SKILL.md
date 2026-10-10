@@ -1,9 +1,13 @@
 ---
 name: dev-ios
-description: iOS development workflow for building, signing, and deploying to physical devices. Covers remote builds on ch405, provisioning profiles, keychain, and srun tooling. Use when dealing with iOS builds, device deployment, code signing, or provisioning issues.
+description: iOS build machinery shared by the apps — remote builds on ch405 driven from another Mac, srun tooling, CI keychain, provisioning profiles and device registration. Use when dealing with remote iOS builds, code signing, keychain or provisioning issues. To put a dev build on the iPhone (devicectl or over the air through Tailscale), use the ios-device-install skill.
 ---
 
 # iOS Development Workflow
+
+Installing a built `.app` on the iPhone, including away from home when
+devicectl cannot see it, is the `ios-device-install` skill. This one covers
+building and signing.
 
 ## Architecture
 
@@ -95,5 +99,9 @@ security cms -D -i "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles
 ```bash
 ./bin/build-ios              # Build for simulator
 ./bin/build-ios device       # Build for physical device
-./bin/run-ios-device         # Build + install + run on device (device must be local)
+./bin/run-ios-device         # Build + install + run on device
 ```
+
+When the iPhone is not reachable by devicectl (`unavailable` in
+`xcrun devicectl list devices`), install the built `.app` with the
+`ios-device-install` skill.
