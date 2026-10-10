@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+SERVE_ROOT="${IOS_OTA_DIR:-$HOME/share/ios-ota}"
+SERVE_PATH="/ios-ota"
+HTTP_PORT="${IOS_OTA_PORT:-8791}"
+KEPT_IPAS=2
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [options] <path/to/App.app>
+
+Install a signed iOS device build (Debug-iphoneos) on an iPhone:
+devicectl when the iPhone is reachable (USB or same LAN), otherwise
+over the air through Tailscale (itms-services page served on the
+tailnet). Prints the install page URL on stdout in OTA mode.
+
+Options:
+  -d, --device <id>  CoreDevice identifier, UDID or name
+                     (default: \$IOS_DEVICE_UUID, else the only paired iPhone)
+      --ota          Publish over the air even if devicectl can reach it
+      --no-launch    Install only, do not launch (devicectl mode)
+  -h, --help         Show this help
+
+Environment:
+  IOS_OTA_DIR   Served directory (default: \$HOME/share/ios-ota)
+  IOS_OTA_PORT  Local http.server port behind tailscale serve (default: 8791)
+EOF
+}
+
+info() { printf "${BLUE}%s${NC}\n" "$*" >&2; }
+success() { printf "${GREEN}%s${NC}\n" "$*" >&2; }
+warn() { printf "${YELLOW}%s${NC}\n" "$*" >&2; }
+die() {
+  printf "${RED}Error: %s${NC}\n" "$*" >&2
+  exit 1
+}
+
+DEVICE="${IOS_DEVICE_UUID:-}"
+FORCE_OTA=false
+LAUNCH=true
+APP=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -d|--device) DEVICE="${2:?--device needs a value}"; shift 2 ;;
+    --ota) FORCE_OTA=true; shift ;;
+    --no-launch) LAUNCH=false; shift ;;
+    -h|--help) usage; exit 0 ;;
+    -*) usage >&2; exit 1 ;;
+    *) [[ -z "$APP" ]] || { usage >&2; exit 1; }; APP="$1"; shift ;;
+  esac
+done
+
+[[ -n "$APP" ]] || { usage >&2; exit 1; }
+[[ -f "$APP/Info.plist" ]] || die "$APP is not an app bundle"
+APP="$(cd "$APP" && pwd)"
+
+for tool in xcrun python3 tailscale; do
+  command -v "$tool" >/dev/null || die "$tool not found"
+done
+
+plist_value() {
+  /usr/libexec/PlistBuddy -c "Print :$1" "$APP/Info.plist" 2>/dev/null
+}
+
+BUNDLE_ID="$(plist_value CFBundleIdentifier)"
+DISPLAY_NAME="$(plist_value CFBundleDisplayName || plist_value CFBundleName)"
+VERSION="$(plist_value CFBundleShortVersionString || echo 1.0)"
+
+plist_value CFBundleSupportedPlatforms | grep -q iPhoneOS ||
+  die "$APP is not a device build (simulator build?): build with -destination generic/platform=iOS"
+[[ -f "$APP/embedded.mobileprovision" ]] ||
+  die "$APP has no embedded provisioning profile: it was not signed for a device"
+
+DEVICES_JSON="$(mktemp)"
+STAGING="$(mktemp -d)"
+trap 'rm -rf "$DEVICES_JSON" "$STAGING"' EXIT
+
+xcrun devicectl list devices --json-output "$DEVICES_JSON" -q >/dev/null 2>&1 ||
+  die "xcrun devicectl list devices failed"
+
+IFS=$'\t' read -r DEVICE_ID DEVICE_UDID DEVICE_NAME TUNNEL_STATE < <(
+  python3 - "$DEVICES_JSON" "$DEVICE" <<'PY'
+import json, sys
+
+wanted = sys.argv[2]
+devices = [
+    d for d in json.load(open(sys.argv[1]))["result"]["devices"]
+    if d["hardwareProperties"].get("platform") == "iOS"
+    and d["hardwareProperties"].get("deviceType") == "iPhone"
+    and d["connectionProperties"].get("pairingState") == "paired"
+]
+if wanted:
+    devices = [
+        d for d in devices
+        if wanted in (d["identifier"], d["hardwareProperties"].get("udid"), d["deviceProperties"].get("name"))
+    ]
+if len(devices) != 1:
+    sys.exit(f"{len(devices)} paired iPhone(s) match '{wanted or 'any'}': pass --device <identifier>")
+d = devices[0]
+print("\t".join([
+    d["identifier"],
+    d["hardwareProperties"].get("udid", ""),
+    d["deviceProperties"].get("name", ""),
+    d["connectionProperties"].get("tunnelState", "unavailable"),
+]))
+PY
+) || die "no target iPhone (see xcrun devicectl list devices)"
+
+info "$DISPLAY_NAME ($BUNDLE_ID) -> $DEVICE_NAME ($DEVICE_ID, tunnel $TUNNEL_STATE)"
+
+install_with_devicectl() {
+  info "Installing with devicectl..."
+  xcrun devicectl device install app --device "$DEVICE_ID" "$APP" || return 1
+  success "Installed on $DEVICE_NAME"
+  if [[ "$LAUNCH" == true ]]; then
+    xcrun devicectl device process launch --terminate-existing --device "$DEVICE_ID" "$BUNDLE_ID" ||
+      warn "Could not launch (iPhone locked?): open the app by hand"
+  fi
+}
+
+check_profile_lists_device() {
+  local profile="$STAGING/profile.plist"
+  security cms -D -i "$APP/embedded.mobileprovision" > "$profile" 2>/dev/null ||
+    die "cannot decode the embedded provisioning profile"
+  if /usr/libexec/PlistBuddy -c "Print :ProvisionsAllDevices" "$profile" 2>/dev/null | grep -q true; then
+    return
+  fi
+  /usr/libexec/PlistBuddy -c "Print :ProvisionedDevices" "$profile" 2>/dev/null | grep -q "$DEVICE_UDID" ||
+    die "the embedded profile does not list $DEVICE_NAME ($DEVICE_UDID): iOS would refuse the OTA install"
+}
+
+serve_root_listener_cwd() {
+  local pid
+  pid="$(lsof -nP -t -iTCP:"$HTTP_PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+  [[ -n "$pid" ]] || return 1
+  lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'
+}
+
+publish_over_the_air() {
+  check_profile_lists_device
+
+  local host base_url slug ipa_name stamp built_at manifest_url install_url cwd tailscale_ip
+  host="$(tailscale status --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
+  [[ -n "$host" ]] || die "Tailscale is not connected on this Mac"
+  slug="$(echo "$BUNDLE_ID" | tr -c 'A-Za-z0-9.\n' '-')"
+  base_url="https://${host}${SERVE_PATH}/${slug}"
+  stamp="$(date '+%Y%m%d%H%M%S')"
+  built_at="$(date '+%Y-%m-%d %H:%M')"
+  ipa_name="app-${stamp}.ipa"
+
+  info "Packaging $ipa_name..."
+  mkdir -p "$STAGING/Payload" "$SERVE_ROOT/$slug"
+  ditto "$APP" "$STAGING/Payload/$(basename "$APP")"
+  (cd "$STAGING" && zip -qry app.ipa Payload)
+  mv "$STAGING/app.ipa" "$SERVE_ROOT/$slug/$ipa_name"
+  (cd "$SERVE_ROOT/$slug" && ls -t app-*.ipa | tail -n +$((KEPT_IPAS + 1)) | xargs rm -f)
+
+  cat > "$STAGING/manifest.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>items</key>
+  <array>
+    <dict>
+      <key>assets</key>
+      <array>
+        <dict>
+          <key>kind</key>
+          <string>software-package</string>
+          <key>url</key>
+          <string>${base_url}/${ipa_name}</string>
+        </dict>
+      </array>
+      <key>metadata</key>
+      <dict>
+        <key>bundle-identifier</key>
+        <string>${BUNDLE_ID}</string>
+        <key>bundle-version</key>
+        <string>${VERSION}</string>
+        <key>kind</key>
+        <string>software</string>
+        <key>title</key>
+        <string>${DISPLAY_NAME}</string>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>
+PLIST
+
+  manifest_url="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "${base_url}/manifest.plist")"
+  install_url="itms-services://?action=download-manifest&amp;url=${manifest_url}"
+
+  cat > "$STAGING/index.html" <<HTML
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${DISPLAY_NAME}</title>
+<style>
+body { font: 17px -apple-system, sans-serif; margin: 2em 1em; text-align: center; }
+a { display: inline-block; margin-top: 1em; padding: .8em 1.6em; border-radius: 12px; background: #007aff; color: #fff; text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>${DISPLAY_NAME}</h1>
+<p>${BUNDLE_ID}<br>Build du ${built_at}</p>
+<a href="${install_url}">Installer</a>
+</body>
+</html>
+HTML
+
+  cp "$STAGING/manifest.plist" "$SERVE_ROOT/$slug/manifest.plist.tmp"
+  mv "$SERVE_ROOT/$slug/manifest.plist.tmp" "$SERVE_ROOT/$slug/manifest.plist"
+  mv "$STAGING/index.html" "$SERVE_ROOT/$slug/index.html"
+
+  if cwd="$(serve_root_listener_cwd)"; then
+    [[ "$cwd" == "$(cd "$SERVE_ROOT" && pwd -P)" ]] ||
+      die "port $HTTP_PORT already serves $cwd: set IOS_OTA_PORT to a free port"
+  else
+    info "Starting http.server on 127.0.0.1:$HTTP_PORT..."
+    (cd "$SERVE_ROOT" && exec perl -MPOSIX=setsid -e 'setsid(); exec @ARGV' \
+      python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1 \
+      </dev/null >/dev/null 2>&1 &)
+    sleep 1
+  fi
+
+  if ! tailscale serve status 2>/dev/null | grep -Eq "${SERVE_PATH} +proxy http://127.0.0.1:${HTTP_PORT}"; then
+    info "Exposing $SERVE_PATH on the tailnet..."
+    timeout 20 tailscale serve --bg --set-path "$SERVE_PATH" "http://127.0.0.1:${HTTP_PORT}" </dev/null >&2 ||
+      die "tailscale serve failed or waits for Serve to be enabled on the tailnet (see the login.tailscale.com link above)"
+  fi
+
+  tailscale_ip="$(tailscale ip -4)"
+  local curl_cmd=(curl -fsS -m 60 --resolve "${host}:443:${tailscale_ip}")
+  "${curl_cmd[@]}" "${base_url}/manifest.plist" | cmp -s - "$STAGING/manifest.plist" ||
+    die "${base_url}/manifest.plist is not this build: replaced by a later publication, or the proxy points elsewhere"
+  "${curl_cmd[@]}" -I -o /dev/null "${base_url}/${ipa_name}" ||
+    die "${base_url}/${ipa_name} is not reachable"
+
+  success "Published over the air"
+  echo "${base_url}/"
+}
+
+if [[ "$FORCE_OTA" == false && "$TUNNEL_STATE" != "unavailable" ]]; then
+  install_with_devicectl && exit 0
+  warn "devicectl install failed, falling back to OTA"
+else
+  info "devicectl cannot reach $DEVICE_NAME, publishing over the air"
+fi
+
+publish_over_the_air
