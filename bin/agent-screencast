@@ -3,7 +3,6 @@
 process.env.NODE_PATH = '/opt/homebrew/lib/node_modules';
 require('module').Module._initPaths();
 
-const WebSocket = require('ws');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -11,8 +10,6 @@ const path = require('path');
 const OUTPUT_DIR = path.join(process.env.HOME, 'share/screencasts');
 const PID_FILE = '/tmp/agent-screencast.pid';
 const PORT = process.env.AGENT_BROWSER_STREAM_PORT || 9223;
-
-fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 const usage = `agent-screencast - Record agent-browser sessions to video
 
@@ -32,6 +29,9 @@ if (!cmd || cmd === '-h' || cmd === '--help') {
   console.log(usage);
   process.exit(0);
 }
+
+const WebSocket = require('ws');
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 if (cmd === 'start') {
   if (fs.existsSync(PID_FILE)) {
