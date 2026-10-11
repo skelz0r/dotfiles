@@ -1,4 +1,6 @@
-[[ -x /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
+if [[ -x /opt/homebrew/bin/brew ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
 
 if [ -z "$SSH_AUTH_SOCK" ]; then
   eval "$(ssh-agent -s)"
@@ -106,7 +108,9 @@ else
 fi
 
 # Aliases
-[[ -f "$HOME/.aliases" ]] && source "$HOME/.aliases"
+if [[ -f "$HOME/.aliases" ]]; then
+  source "$HOME/.aliases"
+fi
 
 # Functions (lazy-load, etc.)
 for f in ~/.zsh/functions/*; do
@@ -114,10 +118,14 @@ for f in ~/.zsh/functions/*; do
 done
 
 # Local config
-[[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+if [[ -f "$HOME/.zshrc.local" ]]; then
+  source "$HOME/.zshrc.local"
+fi
 
 # iTerm2 integration (lazy)
-[[ -f "${HOME}/.iterm2_shell_integration.zsh" ]] && source "${HOME}/.iterm2_shell_integration.zsh"
+if [[ -f "${HOME}/.iterm2_shell_integration.zsh" ]]; then
+  source "${HOME}/.iterm2_shell_integration.zsh"
+fi
 
 # Environment
 export NVM_DIR="$HOME/.nvm"
@@ -141,11 +149,19 @@ path=(
 )
 
 # Bun completions (lazy)
-[[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
+if [[ -s "$HOME/.bun/_bun" ]]; then
+  source "$HOME/.bun/_bun"
+fi
 
 # Entire CLI shell completion
-command -v entire > /dev/null && source <(entire completion zsh)
+if command -v entire > /dev/null; then
+  source <(entire completion zsh)
+fi
 
 # Optional local tools
-[[ -f "$HOME/tools/agent-vm/agent-vm.sh" ]] && source "$HOME/tools/agent-vm/agent-vm.sh"
-[[ -f /opt/homebrew/share/google-cloud-sdk/path.zsh.inc ]] && source /opt/homebrew/share/google-cloud-sdk/path.zsh.inc
+if [[ -f "$HOME/tools/agent-vm/agent-vm.sh" ]]; then
+  source "$HOME/tools/agent-vm/agent-vm.sh"
+fi
+if [[ -f /opt/homebrew/share/google-cloud-sdk/path.zsh.inc ]]; then
+  source /opt/homebrew/share/google-cloud-sdk/path.zsh.inc
+fi
