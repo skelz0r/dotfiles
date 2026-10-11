@@ -6,7 +6,7 @@
 set -euo pipefail
 
 CUT_STRING="DO NOT EDIT BELOW THIS LINE"
-SKIPPED_NAMES=(install.sh symlink.sh README.md CLAUDE.md config test brew.list brew-cask.list brew.sh)
+SKIPPED_NAMES=(install.sh symlink.sh README.md CLAUDE.md config test agents claude gnupg brew.list brew-cask.list brew.sh)
 DRY_RUN=false
 
 usage() {
@@ -15,7 +15,8 @@ Usage: $(basename "$0") [OPTIONS]
 
 Link every top-level file of the dotfiles directory to \$HOME/.<name>.
 Files holding "$CUT_STRING" are copied instead, and an existing target
-holding that line is updated below it.
+holding that line is updated below it. Directories whose content is
+installed file by file by install.sh (agents, claude, gnupg) are skipped.
 
 Options:
   -n, --dry-run    Show what would be done without making changes
