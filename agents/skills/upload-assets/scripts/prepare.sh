@@ -71,7 +71,7 @@ is_selected() {
   if [ "${#only_patterns[@]}" -gt 0 ] && ! matches_any "$path" "${only_patterns[@]}"; then
     return 1
   fi
-  ! matches_any "$path" "${except_patterns[@]}"
+  ! matches_any "$path" ${except_patterns[@]+"${except_patterns[@]}"}
 }
 
 list_directory_files() {
@@ -104,9 +104,9 @@ done
 [ "${#copy_to[@]}" -gt 0 ] || [ $# -eq 0 ] || die "nothing to upload: no file matches the selection"
 
 unmatched_patterns=""
-for pattern in "${only_patterns[@]}"; do
+for pattern in ${only_patterns[@]+"${only_patterns[@]}"}; do
   matches_any_file=0
-  for destination in "${copy_to[@]}"; do
+  for destination in ${copy_to[@]+"${copy_to[@]}"}; do
     if matches_pattern "$destination" "$pattern"; then
       matches_any_file=1
       break
@@ -116,13 +116,13 @@ for pattern in "${only_patterns[@]}"; do
 done
 [ -z "$unmatched_patterns" ] || die "--only patterns matching no file:\n$unmatched_patterns"
 
-duplicates=$(printf '%s\n' "${copy_to[@]}" | sort | uniq -d)
+duplicates=$(printf '%s\n' ${copy_to[@]+"${copy_to[@]}"} | sort | uniq -d)
 [ -z "$duplicates" ] || die "several sources provide the same paths:\n$duplicates"
 
 temp_root="${TMPDIR:-/tmp}"
 stage=$(mktemp -d "${temp_root%/}/$STAGE_PREFIX.XXXXXX")
 
-for index in "${!copy_from[@]}"; do
+for index in ${copy_from[@]+"${!copy_from[@]}"}; do
   mkdir -p "$stage/$(dirname "${copy_to[$index]}")"
   cp -pL "${copy_from[$index]}" "$stage/${copy_to[$index]}"
 done
