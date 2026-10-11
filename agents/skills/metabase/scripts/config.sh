@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 CONFIG_FILE="$REPO_ROOT/.metabase"
 
@@ -14,6 +15,7 @@ ENV_METABASE_URL="${METABASE_URL-}"
 ENV_METABASE_API_KEY="${METABASE_API_KEY-}"
 ENV_METABASE_DATABASE_ID="${METABASE_DATABASE_ID-}"
 
+# shellcheck source=/dev/null
 source "$CONFIG_FILE"
 
 METABASE_URL="${ENV_METABASE_URL:-${METABASE_URL-}}"

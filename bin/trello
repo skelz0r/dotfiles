@@ -1,24 +1,40 @@
 #!/usr/bin/env bash
 # vim: set syntax=sh:
 #
-# Wrapper for trello api
+# trello - Wrapper for the Trello API
+#
 
-if [ $# -lt 2 ] ; then
-  echo "Usage $0 method endpoint [args]"
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -lt 2 ]]; then
+  cat << EOF
+Usage: $(basename "$0") <method> <endpoint> [query]
+
+Call the Trello REST API and pretty-print the JSON response.
+
+Arguments:
+  method      HTTP method (GET, POST, PUT, DELETE)
+  endpoint    Path under https://api.trello.com/1
+  query       Optional extra query string (key=value&...)
+
+Options:
+  -h, --help    Show this help message
+EOF
+  [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && exit 0
   exit 1
 fi
 
 URL="https://api.trello.com/1"
-METHOD=$1
-ENDPOINT=$2
+METHOD="$1"
+ENDPOINT="$2"
 
 API_KEY="API_KEY"
 API_TOKEN="API_TOKEN"
 
 ARGS="key=$API_KEY&token=$API_TOKEN"
 
-if [ $3 != "" ] ; then
+if [[ -n "${3:-}" ]]; then
   ARGS="$ARGS&$3"
 fi
 
-curl -X $METHOD "$URL/$ENDPOINT?$ARGS" | python -m json.tool
+curl -X "$METHOD" "$URL/$ENDPOINT?$ARGS" | python3 -m json.tool

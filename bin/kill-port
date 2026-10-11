@@ -3,6 +3,8 @@
 # kill_port - Kill processes listening on a specific port
 #
 
+set -euo pipefail
+
 usage() {
   cat << EOF
 Usage: $(basename "$0") <port>
@@ -22,29 +24,26 @@ EOF
   exit 0
 }
 
-[[ "$1" == "-h" || "$1" == "--help" ]] && usage
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
 
-if [ -z "$1" ]; then
+if [[ -z "${1:-}" ]]; then
   echo "Error: Port required. Use --help for usage."
   exit 1
 fi
 
 PORT="$1"
 
-# Validate port is numeric and in valid range
-if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [[ "$PORT" -lt 1 || "$PORT" -gt 65535 ]]; then
   echo "Error: Invalid port '$PORT'. Must be 1-65535."
   exit 1
 fi
 
-# Use TCP listening filter for clarity
-PIDS=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN)
+PIDS=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN || true)
 
-if [ -n "$PIDS" ]; then
+if [[ -n "$PIDS" ]]; then
   echo "Found the following PID(s): $PIDS"
-  kill -9 $PIDS
+  echo "$PIDS" | xargs kill -9
   echo "Killed process(es) $PIDS on port $PORT."
 else
   echo "No processes found listening on port $PORT."
 fi
-

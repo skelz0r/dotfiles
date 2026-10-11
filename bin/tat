@@ -3,7 +3,9 @@
 # tat - Attach to tmux session named after current directory
 #
 
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   cat << EOF
 Usage: $(basename "$0")
 
@@ -17,4 +19,4 @@ fi
 
 name=$(basename "$PWD" | tr . -)
 
-tmux -u attach -t $name || tmux -u new-session -s $name
+tmux -u attach -t "$name" || tmux -u new-session -s "$name"

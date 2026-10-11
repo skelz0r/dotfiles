@@ -51,6 +51,7 @@ matches_pattern() {
   local path="$1"
   local pattern="${2%/}"
 
+  # shellcheck disable=SC2053
   [[ "$path" == $pattern || "$path" == $pattern/* ]]
 }
 

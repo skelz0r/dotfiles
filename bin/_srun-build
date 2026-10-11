@@ -12,11 +12,10 @@ Builds iOS app on remote and copies to local /tmp.
 Outputs:
   BUNDLE_ID and APP_PATH on success (one per line)
 EOF
-  exit 1
 }
 
-[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
-[[ -z "${1:-}" || -z "${2:-}" ]] && usage
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+[[ -z "${1:-}" || -z "${2:-}" ]] && { usage; exit 1; }
 
 PROJECT="$1"
 BUILD_TYPE="$2"
@@ -29,7 +28,7 @@ fi
 
 echo "Detecting project info on $HOST..." >&2
 
-PBXPROJ="~/work/$PROJECT/ios/*.xcodeproj/project.pbxproj"
+PBXPROJ="\$HOME/work/$PROJECT/ios/*.xcodeproj/project.pbxproj"
 
 BUNDLE_ID=$(ssh "$HOST" "grep -E 'PRODUCT_BUNDLE_IDENTIFIER.*\.dev;' $PBXPROJ | grep -v -E 'widget|Widget|ShareExtension|Tests' | head -1 | sed 's/.*= //' | tr -d ';\" '")
 

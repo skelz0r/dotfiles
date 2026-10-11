@@ -4,6 +4,19 @@
 #
 # Supports macOS and Linux
 
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Print the battery level, charging icon and remaining time formatted for
+the tmux status bar. Exits 1 when no battery is found.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
 battery_charge_macos() {
   ioreg -c AppleSmartBattery -w0 | \
     grep -o '"[^"]*" = [^ ]*' | \
@@ -32,8 +45,9 @@ battery_charge_linux() {
   if [[ -f "$bat_path/capacity" ]]; then
     cat "$bat_path/capacity"
   elif [[ -f "$bat_path/energy_now" && -f "$bat_path/energy_full" ]]; then
-    local now=$(cat "$bat_path/energy_now")
-    local full=$(cat "$bat_path/energy_full")
+    local now full
+    now=$(cat "$bat_path/energy_now")
+    full=$(cat "$bat_path/energy_full")
     echo $(( 100 * now / full ))
   else
     return 1

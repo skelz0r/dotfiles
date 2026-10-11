@@ -1,2 +1,21 @@
 #!/usr/bin/env bash
+#
+# dclaude - Run claude without permission prompts
+#
+
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0") [CLAUDE_ARGS...]
+
+Run claude with --dangerously-skip-permissions, forwarding every
+argument.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
 claude --dangerously-skip-permissions "$@"

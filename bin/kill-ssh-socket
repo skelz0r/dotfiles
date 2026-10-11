@@ -1,1 +1,21 @@
+#!/usr/bin/env bash
+#
+# kill-ssh-socket - Close the multiplexed SSH connection to rch405
+#
+
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Stop the SSH control master socket of rch405 so the next connection
+starts fresh.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
 ssh -O stop rch405

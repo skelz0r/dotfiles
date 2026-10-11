@@ -198,7 +198,6 @@ for folder in "${FOLDERS[@]}"; do
     log "[$CURRENT/$TOTAL_FOLDERS] Syncing $folder"
 
     # Determine source and dest
-    FOLDER_NAME=$(basename "$folder")
     FOLDER_PARENT=$(dirname "$folder")
 
     if $LOCAL_MODE; then

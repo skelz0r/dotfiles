@@ -4,6 +4,20 @@
 #
 # Supports macOS and Linux
 
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Flush the system DNS cache (needs sudo).
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
 case "$(uname -s)" in
   Darwin)
     sudo dscacheutil -flushcache

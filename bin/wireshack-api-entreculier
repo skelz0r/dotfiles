@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+#
+# wireshack-api-entreculier - Restart the wgAPI WireGuard tunnel
+#
+
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0")
+
+Bring the wgAPI WireGuard interface down then up again.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
 
 wg-quick down wgAPI
 wg-quick up wgAPI

@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2034
 REMOTE="deploy@apps"
 REMOTE_ROOT="/var/www/assets"
 BASE_URL="https://assets.delmai.re"

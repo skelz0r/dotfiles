@@ -3,7 +3,9 @@
 # git-clean-merged-branches - Delete merged local branches
 #
 
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   cat << EOF
 Usage: $(basename "$0")
 
@@ -17,5 +19,5 @@ EOF
 fi
 
 git branch --merged | \
-  grep -vE '^\*|^\+|^  (main|master|develop|gh-pages)$' | \
+  { grep -vE '^\*|^\+|^  (main|master|develop|gh-pages)$' || true; } | \
   xargs -r git branch -d

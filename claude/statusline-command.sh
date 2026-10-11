@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 # Read Claude Code input data
 input=$(cat)
@@ -10,8 +12,8 @@ if command -v jq >/dev/null 2>&1; then
   model_name=$(echo "$input" | jq -r '.model.display_name')
 else
   # Basic fallback parsing without jq
-  current_dir=$(echo "$input" | grep -o '"current_dir":"[^"]*"' | cut -d'"' -f4)
-  model_name=$(echo "$input" | grep -o '"display_name":"[^"]*"' | cut -d'"' -f4)
+  current_dir=$(echo "$input" | grep -o '"current_dir":"[^"]*"' | cut -d'"' -f4 || true)
+  model_name=$(echo "$input" | grep -o '"display_name":"[^"]*"' | cut -d'"' -f4 || true)
 fi
 
 # Fallback to PWD if current_dir is empty
@@ -47,9 +49,11 @@ format_tokens() {
 }
 
 # Get ccusage information (check if ccusage command exists)
-# Get ccusage information (check if ccusage command exists)
+TODAY_DATA=""
+TOTAL_COST=""
+TOTAL_TOKENS=""
 if command -v ccusage >/dev/null 2>&1; then
-  TODAY_DATA=$(ccusage --json 2>/dev/null | jq --arg today "$(date +%Y-%m-%d)" '.daily[] | select(.date == $today)')
+  TODAY_DATA=$(ccusage --json 2>/dev/null | jq --arg today "$(date +%Y-%m-%d)" '.daily[] | select(.date == $today)' || true)
   if [[ -n "$TODAY_DATA" ]]; then
     TOTAL_COST=$(echo "$TODAY_DATA" | jq -r '.totalCost | . * 100 | round / 100')
     TOTAL_TOKENS=$(echo "$TODAY_DATA" | jq -r '.totalTokens | (. / 1000 | floor | tostring)')

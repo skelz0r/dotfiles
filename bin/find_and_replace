@@ -1,12 +1,29 @@
 #!/usr/bin/env zsh
+#
+# find_and_replace - Replace a regex in the given files with perl
+#
+
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -lt 3 ]]; then
+  cat << EOF
+Usage: $(basename "$0") <from> <to> <file>...
+
+Replace every match of the perl regex <from> with <to> in each file,
+in place.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && exit 0
+  exit 1
+fi
 
 from=$1
 shift
 to=$1
 shift
 
-for file in $*
-do
-  perl -i.bak -p -e "s{$from}{$to}g;" $file
+for file in "$@"; do
+  perl -i -p -e "s{$from}{$to}g;" "$file"
 done
-rm -f **/*.bak

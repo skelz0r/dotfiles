@@ -1,1 +1,21 @@
-codex --dangerously-bypass-approvals-and-sandbox
+#!/usr/bin/env bash
+#
+# dcodex - Run codex without approval prompts nor sandbox
+#
+
+set -euo pipefail
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat << EOF
+Usage: $(basename "$0") [CODEX_ARGS...]
+
+Run codex with --dangerously-bypass-approvals-and-sandbox, forwarding
+every argument.
+
+Options:
+  -h, --help    Show this help message
+EOF
+  exit 0
+fi
+
+codex --dangerously-bypass-approvals-and-sandbox "$@"
