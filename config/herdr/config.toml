@@ -49,3 +49,9 @@ tab_bar_right = [
 
 [ui.sound]
 enabled = false
+
+[[keys.command]]
+key = "prefix+a"
+type = "plugin_action"
+command = "skelz0r.space-agents.toggle"
+description = "toggle space agents"
