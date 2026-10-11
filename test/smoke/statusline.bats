@@ -19,3 +19,12 @@ setup() {
   assert_equal "$status" 0
   [[ -n "$output" ]]
 }
+
+@test "the statusline still prints a line on a detached HEAD" {
+  git init -q "$BATS_TEST_TMPDIR/repo"
+  git -C "$BATS_TEST_TMPDIR/repo" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+  git -C "$BATS_TEST_TMPDIR/repo" checkout -q --detach
+  run bash -c "cd '$BATS_TEST_TMPDIR/repo' && echo '{}' | '$STATUSLINE'"
+  assert_equal "$status" 0
+  [[ -n "$output" ]]
+}

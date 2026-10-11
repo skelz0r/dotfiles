@@ -27,7 +27,7 @@ dir_name=$(basename "$current_dir")
 # Get git branch if available
 git_branch=""
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || true)
   if [[ -n "$branch" ]]; then
     git_branch="${branch}"
   fi
