@@ -108,6 +108,14 @@ Be extremely concise. Sacrifice grammar for concision.
   tab and fresh session; never work in the main checkout nor in the
   current session
 
+## Shared HTML pages
+
+- Any HTML page meant for someone else (PR overview, report, demo,
+  presentation) is built with the `static-page` skill and published
+  with `upload-assets` on assets.delmai.re, never as a claude.ai
+  Artifact: the URL is what gets shared
+- Unreleased feature: publish behind a password
+
 ## Screenshots / screencasts
 
 * When referencing, located within ~/share/screenshots/
