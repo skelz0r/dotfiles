@@ -187,7 +187,7 @@ TOTAL_FOLDERS=${#FOLDERS[@]}
 CURRENT=0
 
 for folder in "${FOLDERS[@]}"; do
-    ((CURRENT++))
+    CURRENT=$((CURRENT + 1))
 
     # Skip non-existent folders in local mode
     if $LOCAL_MODE && [[ ! -d "$folder" ]]; then

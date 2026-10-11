@@ -107,7 +107,7 @@ for name in "${CHECK_FILES[@]}"; do
 
   if [[ ! -e "$local_file" ]]; then
     missing "$name (not installed)"
-    ((MISSING++))
+    MISSING=$((MISSING + 1))
     continue
   fi
 
@@ -116,19 +116,19 @@ for name in "${CHECK_FILES[@]}"; do
     link_target=$(readlink "$local_file")
     if [[ "$link_target" == "$repo_file" ]]; then
       ok "$name (symlinked)"
-      ((SYNCED++))
+      SYNCED=$((SYNCED + 1))
     else
       changed "$name → $link_target (wrong symlink)"
-      ((CHANGED++))
+      CHANGED=$((CHANGED + 1))
     fi
   else
     # Not symlinked - compare content
     if diff -q "$local_file" "$repo_file" &>/dev/null; then
       ok "$name (identical)"
-      ((SYNCED++))
+      SYNCED=$((SYNCED + 1))
     else
       changed "$name (differs)"
-      ((CHANGED++))
+      CHANGED=$((CHANGED + 1))
 
       if $VERBOSE; then
         echo ""
