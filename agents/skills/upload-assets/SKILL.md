@@ -1,6 +1,6 @@
 ---
 name: upload-assets
-description: Upload local files or folders to the static site assets.delmai.re (served from /var/www/assets on the apps server), public or behind a password per folder, and return their URLs. Use when the user wants to upload, host, publish or share files, images, PDFs, slides or a static HTML page on assets.delmai.re, or to put a password on (or remove it from) a folder there. Triggers on "upload assets", "upload sur assets", "mettre en ligne sur assets", "héberger sur assets.delmai.re", "protège par mot de passe", "mets un mdp sur le dossier".
+description: Upload local files or folders to the static site assets.delmai.re (served from /var/www/assets on the apps server), public or behind a password per folder, and return their URLs. Use when the user wants to upload, host, publish or share files, images, PDFs, slides or a static HTML page on assets.delmai.re, or to put a password on (or remove it from) a folder there. Also the publishing step for any page already built and meant for someone else (to build one, use static-page), instead of a claude.ai Artifact. Triggers on "upload assets", "upload sur assets", "mettre en ligne sur assets", "héberger sur assets.delmai.re", "publie la page", "envoie le lien au designer", "partage le rapport", "publish this page", "send the link", "share this report", "protège par mot de passe", "mets un mdp sur le dossier".
 ---
 
 # Upload assets

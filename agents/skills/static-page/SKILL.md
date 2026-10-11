@@ -1,6 +1,6 @@
 ---
 name: static-page
-description: Build a self-contained static HTML page (or a small set of pages) styled with a project's visual identity, check it in a browser and publish it on assets.delmai.re, public or behind a password. Base rules shared by the skills that generate pages (pr-review-guide, decision-mockups), and the workflow to follow directly for any other page. Use when the user asks for "une page html", "une page à partager", "un doc html", "une page statique qui explique X", a one-off report, explainer or comparison meant to be read in a browser and shared by link.
+description: Build a self-contained static HTML page (or a small set of pages) styled with a project's visual identity, check it in a browser and publish it on assets.delmai.re, public or behind a password. Base rules shared by the skills that generate pages (pr-review-guide, decision-mockups), and the workflow to follow directly for any other page. Use instead of a claude.ai Artifact whenever an HTML page is meant for someone else, when the user asks for "une page html", "une page à partager", "un doc html", "une page statique qui explique X", "une overview de PR", "une présentation", "un rapport", "une démo", "an HTML page", "a PR overview", "a presentation", "a report", "a demo page", or any one-off report, explainer or comparison meant to be read in a browser and shared by link.
 ---
 
 # Static page
