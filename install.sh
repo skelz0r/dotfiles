@@ -43,16 +43,44 @@ error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 success() { echo -e "${GREEN}[OK]${NC} $*"; }
 dry() { $DRY_RUN && echo -e "${YELLOW}[DRY]${NC} Would: $*" && return 0 || return 1; }
 
+ensure_dir() {
+  local dir="$1"
+  local mode="${2:-}"
+
+  if [[ ! -d "$dir" ]]; then
+    if dry "create directory $dir"; then
+      return
+    fi
+    mkdir -p "$dir"
+  fi
+  if [[ -n "$mode" ]] && ! dry "chmod $mode $dir"; then
+    chmod "$mode" "$dir"
+  fi
+}
+
 backup_file() {
   local file="$1"
   if [[ -e "$file" && ! -L "$file" ]]; then
-    mkdir -p "$BACKUP_DIR"
-    local backup_path="$BACKUP_DIR/$(basename "$file")"
+    local backup_path
+    backup_path="$BACKUP_DIR/$(basename "$file")"
     if dry "backup $file to $backup_path"; then
       return
     fi
+    mkdir -p "$BACKUP_DIR"
     cp -r "$file" "$backup_path"
     log "Backed up $file"
+  fi
+}
+
+refuse_inside_dotfiles() {
+  local target="$1"
+  local parent
+
+  [[ -e "$target" ]] || return 0
+  parent="$(cd -P "$(dirname "$target")" && pwd)"
+  if [[ "$parent" == "$DOTFILES_DIR" || "$parent" == "$DOTFILES_DIR"/* ]]; then
+    error "Refusing to replace $target: it resolves inside the dotfiles repository ($parent)"
+    exit 1
   fi
 }
 
@@ -60,10 +88,12 @@ safe_symlink() {
   local source="$1"
   local target="$2"
 
-  # Already correct symlink
-  if [[ -L "$target" && "$(readlink "$target")" == "$source" ]]; then
+  # Already correct symlink, or the same file reached through a linked parent
+  if [[ -L "$target" && "$(readlink "$target")" == "$source" ]] || [[ "$target" -ef "$source" ]]; then
     return 0
   fi
+
+  refuse_inside_dotfiles "$target"
 
   # Backup existing file
   backup_file "$target"
@@ -75,6 +105,22 @@ safe_symlink() {
   rm -rf "$target"
   ln -s "$source" "$target"
   success "Linked $target"
+}
+
+copy_file() {
+  local source="$1"
+  local target="$2"
+
+  if [[ "$target" -ef "$source" ]]; then
+    return 0
+  fi
+
+  if dry "copy $source to $target"; then
+    return
+  fi
+
+  mkdir -p "$(dirname "$target")"
+  cp "$source" "$target"
 }
 
 safe_clone() {
@@ -112,7 +158,11 @@ log "Installing dotfiles from $DOTFILES_DIR"
 
 # Step 1: Symlinks
 log "Creating symlinks..."
-./symlink.sh
+if $DRY_RUN; then
+  ./symlink.sh --dry-run
+else
+  ./symlink.sh
+fi
 
 # Step 2: Ruby
 if command -v rbenv &> /dev/null; then
@@ -149,11 +199,11 @@ if ! dry "install vim plugins"; then
 fi
 
 # Step 4: Neovim config
-mkdir -p "$HOME/.config/nvim"
+ensure_dir "$HOME/.config/nvim"
 safe_symlink "$DOTFILES_DIR/config/coc-settings.json" "$HOME/.config/nvim/coc-settings.json"
 
 # Herdr config
-mkdir -p "$HOME/.config/herdr"
+ensure_dir "$HOME/.config/herdr"
 safe_symlink "$DOTFILES_DIR/config/herdr/config.toml" "$HOME/.config/herdr/config.toml"
 
 # Create init.vim to source vimrc
@@ -184,9 +234,8 @@ if [[ -d "$HOME/.vim/bundle/coc.nvim" ]]; then
 fi
 
 # Step 5: SSH config
-mkdir -p "$HOME/.ssh/sockets"
-chmod 700 "$HOME/.ssh"
-chmod 700 "$HOME/.ssh/sockets"
+ensure_dir "$HOME/.ssh" 700
+ensure_dir "$HOME/.ssh/sockets" 700
 if [[ ! -f "$HOME/.ssh/config" ]]; then
   safe_symlink "$DOTFILES_DIR/ssh_config" "$HOME/.ssh/config"
 else
@@ -196,14 +245,8 @@ fi
 # Step 6: Claude config
 log "Installing Claude config files..."
 while IFS= read -r file; do
-  target="$HOME/.${file}"
-  target_dir="$(dirname "$target")"
-
-  if ! dry "copy $file to $target"; then
-    mkdir -p "$target_dir"
-    cp "$DOTFILES_DIR/$file" "$target"
-  fi
-done < <(git ls-files claude/)
+  copy_file "$DOTFILES_DIR/$file" "$HOME/.${file}"
+done < <(git ls-files claude/commands/)
 
 safe_symlink "$DOTFILES_DIR/claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 safe_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
@@ -219,13 +262,13 @@ success "Claude config installed"
 
 # Step 6b: Codex config
 log "Installing Codex config files..."
-mkdir -p "$HOME/.codex"
+ensure_dir "$HOME/.codex"
 safe_symlink "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"
 success "Codex config installed"
 
 # Step 6c: Agents skills
 log "Installing agents skills..."
-mkdir -p "$HOME/.agents/skills"
+ensure_dir "$HOME/.agents/skills"
 for skill_dir in "$DOTFILES_DIR"/agents/skills/*/; do
   [[ -d "$skill_dir" ]] || continue
   skill_name=$(basename "$skill_dir")
@@ -235,10 +278,11 @@ safe_symlink "$HOME/.agents/skills" "$HOME/.claude/skills"
 success "Agents skills installed"
 
 # Step 7: GPG config
-mkdir -p "$HOME/.gnupg"
-chmod 700 "$HOME/.gnupg"
+ensure_dir "$HOME/.gnupg" 700
 safe_symlink "$DOTFILES_DIR/gnupg/gpg-agent.conf" "$HOME/.gnupg/gpg-agent.conf"
-gpgconf --kill gpg-agent 2>/dev/null || true
+if ! dry "restart gpg-agent"; then
+  gpgconf --kill gpg-agent 2>/dev/null || true
+fi
 
 # Step 8: Syncthing (optional)
 if ! $DRY_RUN && ! command -v syncthing &> /dev/null; then
@@ -255,4 +299,6 @@ fi
 
 echo ""
 success "Installation complete!"
-[[ -d "$BACKUP_DIR" ]] && log "Backups saved to: $BACKUP_DIR"
+if [[ -d "$BACKUP_DIR" ]]; then
+  log "Backups saved to: $BACKUP_DIR"
+fi
