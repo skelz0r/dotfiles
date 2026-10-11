@@ -1,4 +1,4 @@
-eval "$(/opt/homebrew/bin/brew shellenv)"
+[[ -x /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
 
 if [ -z "$SSH_AUTH_SOCK" ]; then
   eval "$(ssh-agent -s)"
@@ -143,15 +143,9 @@ path=(
 # Bun completions (lazy)
 [[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
 
-# Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/skelz0r/.lmstudio/bin"
-# End of LM Studio CLI section
-
-
-# bun completions
-[ -s "/Users/skelz0r/.bun/_bun" ] && source "/Users/skelz0r/.bun/_bun"
-
 # Entire CLI shell completion
-autoload -Uz compinit && compinit && source <(entire completion zsh)
-source /Users/skelz0r/tools/agent-vm/agent-vm.sh
-source /opt/homebrew/share/google-cloud-sdk/path.zsh.inc
+command -v entire > /dev/null && source <(entire completion zsh)
+
+# Optional local tools
+[[ -f "$HOME/tools/agent-vm/agent-vm.sh" ]] && source "$HOME/tools/agent-vm/agent-vm.sh"
+[[ -f /opt/homebrew/share/google-cloud-sdk/path.zsh.inc ]] && source /opt/homebrew/share/google-cloud-sdk/path.zsh.inc
