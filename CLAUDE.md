@@ -6,6 +6,7 @@
 - Preview install: `./install.sh --dry-run`
 - Health check: `dotfiles-health`
 - Compare with local: `dotfiles-diff`
+- Tests: `dotfiles-test` (or `dotfiles-test lint|smoke|tests`)
 - Sync to new machine: `migration --local user@host`
 
 ## Code Style
@@ -51,6 +52,13 @@
 ## Testing Changes
 
 Before committing:
-1. Open new terminal to test zsh config
-2. Run `dotfiles-health` to verify dependencies
-3. Run `dotfiles-diff` to review changes
+1. Run `dotfiles-test` (lint, smoke, behaviour tests)
+2. Open new terminal to test zsh config
+3. Run `dotfiles-health` to verify dependencies
+4. Run `dotfiles-diff` to review changes
+
+Behaviour tests exist only where a bug costs data or exposure
+(install.sh, migration, upload-assets prepare, tidy-commits); the other
+scripts are covered by lint and `--help` smoke tests. Tests go through
+the CLI boundary with a sandboxed HOME and stubbed external commands
+(see test/helpers.bash).

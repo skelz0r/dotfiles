@@ -90,6 +90,7 @@ Local overrides (not synced):
 | `migration` | Sync folders between machines (rsync) |
 | `dotfiles-health` | Check dependencies and configuration |
 | `dotfiles-diff` | Compare local vs repo dotfiles |
+| `dotfiles-test` | Lint, smoke and behaviour tests of the repository |
 | `kill_port <port>` | Kill process on port |
 | `tat` | Attach to tmux session (named after directory) |
 | `wt <name>` | Create git worktree with branch |
@@ -170,6 +171,19 @@ dotfiles-health -q     # Errors/warnings only
 ```
 
 Checks: git, zsh, nvim, tmux, rbenv, pyenv, nvm, symlinks, SSH, GPG
+
+### Tests
+
+```sh
+dotfiles-test          # lint + smoke + behaviour tests
+dotfiles-test lint     # shell conventions and shellcheck
+dotfiles-test smoke    # --help, zsh/vim startup, statusline, install dry run
+dotfiles-test tests    # install.sh, migration, upload-assets, tidy-commits
+```
+
+Needs `bats-core` and `shellcheck` (in the Brewfile). Tests run in a
+sandbox (temporary HOME, stubbed ssh/rsync/sudo) and never touch the
+machine nor the repository. The same command runs in GitHub Actions.
 
 ## Directory Structure
 
