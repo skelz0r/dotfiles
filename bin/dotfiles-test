@@ -77,7 +77,7 @@ run_bats() {
   local label="$1"
   shift
   section "$label"
-  if bats "${bats_args[@]}" "$@"; then
+  if bats ${bats_args[@]+"${bats_args[@]}"} "$@"; then
     success "$label"
   else
     FAILED+=("$label")
