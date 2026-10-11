@@ -19,15 +19,20 @@ headless() {
 }
 
 @test "files holding secrets get no undo file" {
-  mkdir -p "$HOME/project/secrets"
-  echo key > "$HOME/project/secrets/db.yml"
-  echo key > "$HOME/project/.env.production"
-  echo key > "$HOME/project/authorized_keys"
+  local secret_files=(
+    secrets/db.yml .env.production authorized_keys .ssh/config
+    config/credentials/production.key 20260122-1234-abc-credentials.yml
+    .pgpass .metabase_token db-passwords.yml
+  )
+  mkdir -p "$HOME/project/secrets" "$HOME/project/.ssh" "$HOME/project/config/credentials"
+  for file in "${secret_files[@]}"; do
+    echo key > "$HOME/project/$file"
+  done
   echo code > "$HOME/project/app.rb"
 
-  for file in secrets/db.yml .env.production authorized_keys; do
+  for file in "${secret_files[@]}"; do
     run headless "$HOME/project/$file" -c 'echo &l:undofile' -c qa
-    assert_equal "$output" "0"
+    assert_equal "$file: $output" "$file: 0"
   done
   run headless "$HOME/project/app.rb" -c 'echo &l:undofile' -c qa
   assert_equal "$output" "1"

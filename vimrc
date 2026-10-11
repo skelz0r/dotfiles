@@ -113,10 +113,15 @@ augroup END
 silent !mkdir ~/.vim/backups > /dev/null 2>&1
 set undodir=~/.vim/backups
 set undofile
-set backupskip+=*/secrets/*,*/.env*,*/authorized_keys
+let s:secret_patterns = [
+  \ '*/secrets/*', '*/credentials/*', '*/tokens/*', '*/.ssh/*', '*/.gnupg/*',
+  \ '.env*', '*credentials*.yml', '*credentials*.txt', '*.key', '*.pem',
+  \ '*password*', '*token', '.pgpass', '.netrc', 'authorized_keys',
+  \ ]
+let &backupskip .= ',' . join(map(copy(s:secret_patterns), 'v:val =~ "/" ? v:val : "*/" . v:val'), ',')
 augroup secrets
   autocmd!
-  autocmd BufNewFile,BufReadPre */secrets/*,.env*,authorized_keys setlocal noundofile noswapfile nobackup nowritebackup
+  execute 'autocmd BufNewFile,BufReadPre ' . join(s:secret_patterns, ',') . ' setlocal noundofile noswapfile nobackup nowritebackup'
 augroup END
 
 " For plugins
