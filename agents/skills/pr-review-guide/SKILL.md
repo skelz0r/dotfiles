@@ -70,7 +70,8 @@ Fill the front matter (`repo`, full `sha`, `pr`, `checkout` pointing at the
 local clone so links are verified), then the intro and the five tabs of the
 skeleton. Link with the schemes `build.py` resolves at the pinned commit:
 `gh:path#L10-L20`, `tree:path`, `commit:<sha>`, `pr:`. Components:
-`::: callout` (`.info`, `.good`, `.warning`; a first paragraph made only of
+`<!-- subtab: Name -->` inside a tab (sub-tabs drawn as a DSFR segmented
+control, for a tab holding several parallel topics), `::: callout` (`.info`, `.good`, `.warning`; a first paragraph made only of
 bold text becomes its title), `[503]{.status}` badges (cells of a table
 column headed "Statut", "Status" or "HTTP" get one too), tables, fenced code
 with a language (`ruby`, `json`, `yaml`, `http`, `bash`). Links and comments

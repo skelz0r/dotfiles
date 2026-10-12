@@ -8,6 +8,8 @@ GUIDE.md syntax, on top of CommonMark:
   front matter       title, repo (owner/name), sha (40 hex), plus optional kicker,
                      lang, pr, checkout (local clone used to verify links), footer
   <!-- tab: Name --> starts a tab; what comes before the first one is the intro
+  <!-- subtab: Name --> inside a tab, starts a sub-tab (DSFR segmented control);
+                     what comes before the first one stays above the switch
   gh:path#L10-L20    file at the pinned sha, verified against the local clone
   tree:path          directory at the pinned sha
   commit:abc1234     commit page, inside the PR when `pr` is set
@@ -42,7 +44,8 @@ LABELS = {
 
 STATUS = r"[1-5]\d\d"
 STATUS_HEADERS = {"statut", "status", "http", "code http"}
-TAB_MARKER = re.compile(r"^<!-- tab: (.+?) -->\s*$")
+TAB_MARKER = re.compile(r"^<!-- (?:sub)?tab: (.+?) -->\s*$")
+SUBTAB_SPLIT = re.compile(r"^<!-- subtab: (.+?) -->\s*$", re.M)
 GITHUB_URL = re.compile(r"^https?://github\.com/([^/]+/[^/]+)/(blob|tree)/([^/]+)/?(.*)$")
 ANCHOR = re.compile(r"^L(\d+)(?:C\d+)?(?:-L(\d+)(?:C\d+)?)?$")
 WARNINGS = []
@@ -346,39 +349,65 @@ def check_urls(page):
 
 SCRIPT = """<script>
 (function () {
-  var tabs = [].slice.call(document.querySelectorAll('.tab'));
-  var panels = [].slice.call(document.querySelectorAll('.panel'));
-  if (!panels.length) return;
+  var lists = [].slice.call(document.querySelectorAll('[role="tablist"]'));
+  if (!lists.length) return;
   document.documentElement.classList.add('js');
-  function select(id, focus) {
-    panels.forEach(function (p) { p.hidden = p.id !== id; });
-    tabs.forEach(function (t) {
-      var on = t.getAttribute('aria-controls') === id;
+  function tabsOf(list) {
+    return [].slice.call(list.children).filter(function (t) { return t.getAttribute('role') === 'tab'; });
+  }
+  function select(tab) {
+    tabsOf(tab.parentNode).forEach(function (t) {
+      var on = t === tab;
       t.setAttribute('aria-selected', on ? 'true' : 'false');
       t.tabIndex = on ? 0 : -1;
-      if (on && focus) t.focus();
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
     });
   }
-  function fromHash() {
-    var target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    var panel = target && target.closest('.panel');
-    select(panel ? panel.id : panels[0].id);
-    if (target && target !== panel) target.scrollIntoView();
+  function reveal(el) {
+    for (var node = el; node && node.getAttribute; node = node.parentNode) {
+      if (node.getAttribute('role') === 'tabpanel') select(document.getElementById('tab-' + node.id));
+    }
   }
-  tabs.forEach(function (tab, i) {
-    tab.addEventListener('click', function () {
-      select(tab.getAttribute('aria-controls'));
-      history.replaceState(null, '', '#' + tab.getAttribute('aria-controls'));
-    });
-    tab.addEventListener('keydown', function (e) {
-      var step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-      if (step) { var next = tabs[(i + step + tabs.length) % tabs.length]; next.click(); next.focus(); }
+  lists.forEach(function (list) {
+    var tabs = tabsOf(list);
+    select(tabs[0]);
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener('click', function () {
+        select(tab);
+        history.replaceState(null, '', '#' + tab.getAttribute('aria-controls'));
+      });
+      tab.addEventListener('keydown', function (e) {
+        var step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (step) { var next = tabs[(i + step + tabs.length) % tabs.length]; next.click(); next.focus(); }
+      });
     });
   });
+  function fromHash() {
+    var target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (!target) return;
+    reveal(target);
+    if (target.getAttribute('role') !== 'tabpanel') target.scrollIntoView();
+  }
   window.addEventListener('hashchange', fromHash);
   fromHash();
 })();
 </script>"""
+
+
+def with_subtabs(content, taken):
+    parts = SUBTAB_SPLIT.split(content)
+    if len(parts) == 1:
+        return content
+    head, subs = parts[0], [(slug(name, taken), name, body) for name, body in zip(parts[1::2], parts[2::2])]
+    buttons = "\n".join(
+        f'      <button type="button" class="subtab" role="tab" id="tab-{key}" aria-controls="{key}" '
+        f'aria-selected="{"true" if i == 0 else "false"}">{html.escape(name)}</button>'
+        for i, (key, name, _) in enumerate(subs))
+    blocks = "\n".join(
+        f'    <section class="subpanel" role="tabpanel" id="{key}" aria-labelledby="tab-{key}" tabindex="0">\n'
+        f'      <h3 class="panel-title">{html.escape(name)}</h3>\n{body}    </section>'
+        for key, name, body in subs)
+    return f'{head}    <div class="subtabs" role="tablist">\n{buttons}\n    </div>\n{blocks}\n'
 
 
 def main():
@@ -398,7 +427,7 @@ def main():
     intro = intro.replace("<p>", '<p class="lede">', 1)
 
     taken = set(re.findall(r'\sid="([^"]+)"', rendered))
-    panels = [(slug(name, taken), name, content) for name, content in tabs]
+    panels = [(slug(name, taken), name, with_subtabs(content, taken)) for name, content in tabs]
     tab_buttons = "\n".join(
         f'    <button type="button" class="tab" role="tab" id="tab-{key}" aria-controls="{key}" '
         f'aria-selected="{"true" if i == 0 else "false"}">{html.escape(name)}</button>'

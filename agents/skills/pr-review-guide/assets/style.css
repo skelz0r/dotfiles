@@ -80,6 +80,27 @@ a > code { background: var(--primary-lighter); color: inherit; }
 .panel-title { display: none; }
 html:not(.js) .panel-title { display: block; }
 html:not(.js) .panel + .panel { margin-top: 2rem; }
+.subtabs {
+  display: inline-flex; flex-wrap: nowrap; margin: 1.5rem 0 0;
+  border-radius: .25rem; box-shadow: inset 0 0 0 1px var(--border);
+}
+.subtab {
+  font: inherit; font-weight: 500; font-size: 1rem; line-height: 1.5rem; cursor: pointer;
+  min-height: 2.5rem; padding: .5rem 1rem; border: 0; border-radius: .25rem;
+  background: transparent; color: var(--text); white-space: nowrap;
+}
+.subtab[aria-selected="false"]:hover { background: var(--surface); }
+.subtab[aria-selected="false"]:active { background: var(--surface-2); }
+.subtab[aria-selected="true"] { box-shadow: inset 0 0 0 1px var(--primary); color: var(--primary); }
+.subtab:focus-visible { outline: 2px solid #0a76f6; outline-offset: 2px; }
+@media (max-width: 52rem) {
+  .subtabs { display: flex; flex-direction: column; }
+  .subtab { text-align: left; white-space: normal; }
+}
+.subpanel { padding-top: 1.5rem; }
+.subpanel:focus:not(:focus-visible) { outline: none; }
+.subpanel > h2:first-of-type { margin-top: 0; }
+html:not(.js) .subpanel + .subpanel { margin-top: 2rem; border-top: 1px solid var(--border); }
 @media (max-width: 40rem) {
   h1 { font-size: 1.75rem; }
   h2 { font-size: 1.5rem; }
