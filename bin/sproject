@@ -7,10 +7,11 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 usage() {
   cat << EOF
-Usage: $(basename "$0") [--tmux] <project> [port]
+Usage: $(basename "$0") [--tmux] [project] [port]
 
 SSH to remote desktop and attach to the project in herdr (hat), or in
-tmux (tat) with --tmux. Auto-detects local/remote.
+tmux (tat) with --tmux. Without project, attach to the herdr server, or
+to tmux session 0 with --tmux. Auto-detects local/remote.
 
 Arguments:
   project    Project path (e.g., dinum/siade)
@@ -21,6 +22,7 @@ Options:
   -h, --help    Show this help message
 
 Examples:
+  $(basename "$0")
   $(basename "$0") dinum/siade
   $(basename "$0") dinum/siade 3000
   $(basename "$0") --tmux dinum/siade
@@ -30,18 +32,13 @@ EOF
 
 [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
 
-ATTACH="hat"
+USE_TMUX=false
 if [[ "${1:-}" == "--tmux" ]]; then
-  ATTACH="tat"
+  USE_TMUX=true
   shift
 fi
 
-if [[ -z "${1:-}" ]]; then
-  echo "Error: project argument required" >&2
-  usage
-fi
-
-PROJECT="$1"
+PROJECT="${1:-}"
 PORT="${2:-}"
 
 HOST=$(detect_host)
@@ -63,12 +60,25 @@ if [[ -n "$PORT" ]]; then
   sleep 1
 fi
 
-PROJECT_NAME=$(basename "$PROJECT")
-echo -ne "\033]0;r $PROJECT_NAME\007"
+if [[ -n "$PROJECT" ]]; then
+  echo -ne "\033]0;r $(basename "$PROJECT")\007"
+fi
 
 SRUN_PORT=""
 if [[ -f ~/.srun-port ]]; then
   SRUN_PORT=$(cat ~/.srun-port)
 fi
 
-ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; cd ~/work/$PROJECT && PATH=\"\$PATH:/opt/homebrew/bin\" ~/.bin/$ATTACH"
+if [[ -n "$PROJECT" ]]; then
+  if [[ "$USE_TMUX" == true ]]; then
+    ATTACH="cd ~/work/$PROJECT && ~/.bin/tat"
+  else
+    ATTACH="cd ~/work/$PROJECT && ~/.bin/hat"
+  fi
+elif [[ "$USE_TMUX" == true ]]; then
+  ATTACH="tmux -u attach -t 0 || tmux -u new-session -s 0"
+else
+  ATTACH="herdr"
+fi
+
+ssh -t "$HOST" "echo '$SRUN_PORT' > ~/.srun-port-active; export PATH=\"\$PATH:/opt/homebrew/bin\"; $ATTACH"
