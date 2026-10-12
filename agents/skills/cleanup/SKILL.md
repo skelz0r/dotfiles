@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge or passes --force.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases), trash the screenshots and screencasts attached to the PR through gh-image, and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge or passes --force.
 ---
 
 # Cleanup
@@ -13,8 +13,8 @@ never bypasses GitHub's own protections.
 
 Every project isolates its worktrees differently (ports, Postgres, Redis,
 env files), so the teardown itself is delegated to the project's removal
-script. This skill only adds the safety checks around it and the tab
-cleanup.
+script. This skill only adds the safety checks around it, the cleanup of the
+PR's media and of the tab.
 
 ## Steps
 
@@ -119,7 +119,21 @@ cleanup.
    `for db in $list`). Never drop `*_production` nor backup databases,
    and ask before dropping anything that does not follow the scheme.
 
-7. Always close the tab of the worktree if it exists, whichever way
+7. Trash the screenshots and screencasts the `gh-image` skill attached
+   to the PR, now that it is merged and its worktree is gone:
+
+   ```bash
+   gh-media-log purge --repo OWNER/REPO --pr <number>
+   ```
+
+   It moves each recorded file to the trash (`/usr/bin/trash`, never
+   `rm`) and drops its lines from the manifest
+   (`~/share/.gh-image-uploads.tsv`); a file already gone only loses its
+   line, a file still recorded for another PR or issue is kept. Files
+   attached before the manifest existed are not tracked: leave them.
+   Never run it when step 3 or 4 stopped the cleanup.
+
+8. Always close the tab of the worktree if it exists, whichever way
    step 5 went. Detect the multiplexer like `/start`: herdr when
    `HERDR_ENV=1`, else tmux when `$TMUX` is set, else there is no tab
    to close.
@@ -148,5 +162,7 @@ cleanup.
 
 ## Report
 
-One line per step: PR state (and rebase/merge done in step 3), worktree removed, branch deleted, databases
-dropped, orphan databases dropped, tab closed (or why each one was skipped).
+One line per step: PR state (and rebase/merge done in step 3), worktree
+removed, branch deleted, databases dropped, orphan databases dropped,
+media trashed (counts from `gh-media-log`), tab closed (or why each one
+was skipped).
