@@ -41,12 +41,16 @@ cleanup.
    A feature is not merged without review: unless the user explicitly
    asked to merge this PR or passed `--force`, stop and report before any rebase when the PR
    is a feature (new behaviour, product change: anything but a bugfix,
-   a refactoring or a technical change without product decision) and
-   either:
+   a minor UI change, a refactoring or a technical change without
+   product decision) and either:
    - it had no review at all: no GitHub review (`reviews`), no review
      comment, and no review (e.g. Codex) run in this conversation;
    - its latest review still raised several findings that were not all
      addressed by later commits.
+
+   A minor UI change (restyling, moving or resizing existing elements,
+   wording, with the same actions and flows) follows the bugfix rule,
+   even when it touches the spec: it is an iteration, not a feature.
 
    The report names what is missing (no review, or the open findings)
    so the user can review, or rerun with `--force` to merge anyway. Bugfixes and
