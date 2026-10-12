@@ -144,3 +144,58 @@ log_cmd() {
 
   assert_equal "$(cat "$MANIFEST")" ""
 }
+
+@test "an attachment on a last line without newline still protects its file" {
+  local shot
+  shot="$(media screenshots/portal-after.png)"
+  log_cmd record --repo acme/app --pr 12 "$shot"
+  printf '2026-10-12T10:00:00+0200\tacme/app\tissue\t7\t%s' "$shot" >> "$MANIFEST"
+
+  run log_cmd purge --repo acme/app --pr 12
+  assert_equal "$status" 0
+
+  assert_exists "$shot"
+  assert_equal "$(cut -f2- "$MANIFEST")" "$(printf 'acme/app\tissue\t7\t%s' "$shot")"
+}
+
+@test "an attachment line with an empty date still protects its file" {
+  local shot
+  shot="$(media screenshots/portal-after.png)"
+  log_cmd record --repo acme/app --pr 12 "$shot"
+  printf '\tacme/app\tissue\t7\t%s\n' "$shot" >> "$MANIFEST"
+
+  run log_cmd purge --repo acme/app --pr 12
+  assert_equal "$status" 0
+
+  assert_exists "$shot"
+  assert_equal "$(cut -f2- "$MANIFEST")" "$(printf 'acme/app\tissue\t7\t%s' "$shot")"
+}
+
+@test "attachment lines ending with CRLF are matched like the others" {
+  local shot cast
+  shot="$(media screenshots/portal-after.png)"
+  cast="$(media screencasts/demo.mp4)"
+  printf '2026-10-12T10:00:00+0200\tacme/app\tpr\t12\t%s\r\n' "$shot" "$cast" > "$MANIFEST"
+  printf '2026-10-12T10:00:00+0200\tacme/app\tissue\t7\t%s\r\n' "$shot" >> "$MANIFEST"
+
+  run log_cmd purge --repo acme/app --pr 12
+  assert_equal "$status" 0
+
+  assert_exists "$shot"
+  assert_missing "$cast"
+  assert_equal "$(cut -f2-4 "$MANIFEST")" "$(printf 'acme/app\tissue\t7')"
+}
+
+@test "a file named with a backslash keeps its line when the trash refuses it" {
+  local shot
+  shot="$(media 'screenshots/before\nafter.png')"
+  log_cmd record --repo acme/app --pr 12 "$shot"
+  log_cmd record --repo acme/app --pr 12 "$shot"
+  assert_equal "$(wc -l < "$MANIFEST" | tr -d ' ')" "1"
+  stub trash 'exit 1'
+
+  run log_cmd purge --repo acme/app --pr 12
+  assert_equal "$status" 1
+
+  assert_equal "$(cut -f5 "$MANIFEST")" "$shot"
+}

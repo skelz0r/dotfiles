@@ -119,6 +119,28 @@ in_media_dirs() {
   return 1
 }
 
+parse_line() {
+  local rest="${1%$'\r'}"
+  LINE_REPO="" LINE_KIND="" LINE_NUMBER="" LINE_PATH=""
+  [[ "$rest" == *$'\t'*$'\t'*$'\t'*$'\t'* ]] || return 1
+  rest="${rest#*$'\t'}"
+  LINE_REPO="${rest%%$'\t'*}"
+  rest="${rest#*$'\t'}"
+  LINE_KIND="${rest%%$'\t'*}"
+  rest="${rest#*$'\t'}"
+  LINE_NUMBER="${rest%%$'\t'*}"
+  LINE_PATH="${rest#*$'\t'}"
+}
+
+already_recorded() {
+  local path="$1" line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    parse_line "$line" || continue
+    matches_target "$LINE_REPO" "$LINE_KIND" "$LINE_NUMBER" && [[ "$LINE_PATH" == "$path" ]] && return 0
+  done < "$MANIFEST"
+  return 1
+}
+
 matches_target() {
   local repo="$1" kind="$2" number="$3"
   [[ "$repo" == "$REPO" && "$kind" == "$KIND" && "$number" == "$NUMBER" ]]
@@ -134,6 +156,7 @@ record() {
   mkdir -p "$(dirname "$MANIFEST")"
   acquire_lock
   touch "$MANIFEST"
+  [[ ! -s "$MANIFEST" || -z "$(tail -c 1 "$MANIFEST")" ]] || echo >> "$MANIFEST"
 
   local file path date recorded=0
   date="$(date +%Y-%m-%dT%H:%M:%S%z)"
@@ -151,8 +174,7 @@ record() {
       log "Outside screenshots and screencasts, not recorded: $path"
       continue
     fi
-    if awk -F '\t' -v repo="$REPO" -v kind="$KIND" -v number="$NUMBER" -v path="$path" \
-      '$2 == repo && $3 == kind && $4 == number && $5 == path { found = 1 } END { exit !found }' "$MANIFEST"; then
+    if already_recorded "$path"; then
       log "Already recorded: $path"
       continue
     fi
@@ -177,15 +199,16 @@ purge() {
 
   $DRY_RUN || acquire_lock
 
-  local date repo kind number path
-  local targets=() others=() kept_lines=()
-  while IFS=$'\t' read -r date repo kind number path; do
-    [[ -n "$path" ]] || continue
-    if matches_target "$repo" "$kind" "$number"; then
-      targets+=("$path")
+  local line path
+  local targets=() target_lines=() others=() kept_lines=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "${line%$'\r'}" ]] || continue
+    if parse_line "$line" && matches_target "$LINE_REPO" "$LINE_KIND" "$LINE_NUMBER"; then
+      targets+=("$LINE_PATH")
+      target_lines+=("$line")
     else
-      others+=("$path")
-      kept_lines+=("$(printf '%s\t%s\t%s\t%s\t%s' "$date" "$repo" "$kind" "$number" "$path")")
+      others+=("$LINE_PATH")
+      kept_lines+=("$line")
     fi
   done < "$MANIFEST"
 
@@ -199,9 +222,9 @@ purge() {
     exit 1
   fi
 
-  local trashed=0 missing=0 shared=0 failed=0 other
-  local failed_paths=()
-  for path in "${targets[@]}"; do
+  local trashed=0 missing=0 shared=0 failed=0 other index
+  for index in "${!targets[@]}"; do
+    path="${targets[$index]}"
     local still_referenced=false
     for other in ${others[@]+"${others[@]}"}; do
       [[ "$other" == "$path" ]] && still_referenced=true
@@ -220,7 +243,7 @@ purge() {
       trashed=$((trashed + 1))
     else
       warn "Could not trash, line kept: $path"
-      failed_paths+=("$path")
+      kept_lines+=("${target_lines[$index]}")
       failed=$((failed + 1))
     fi
   done
@@ -233,12 +256,8 @@ purge() {
   local tmp
   tmp="$(mktemp "$MANIFEST.XXXXXX")"
   {
-    for other in ${kept_lines[@]+"${kept_lines[@]}"}; do
-      printf '%s\n' "$other"
-    done
-    for path in ${failed_paths[@]+"${failed_paths[@]}"}; do
-      awk -F '\t' -v repo="$REPO" -v kind="$KIND" -v number="$NUMBER" -v path="$path" \
-        '$2 == repo && $3 == kind && $4 == number && $5 == path' "$MANIFEST"
+    for line in ${kept_lines[@]+"${kept_lines[@]}"}; do
+      printf '%s\n' "$line"
     done
   } > "$tmp"
   mv "$tmp" "$MANIFEST"
