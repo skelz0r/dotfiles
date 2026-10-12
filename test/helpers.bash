@@ -71,3 +71,23 @@ assert_not_contains() {
     return 1
   fi
 }
+
+assert_exists() {
+  local path
+  for path in "$@"; do
+    if [[ ! -e "$path" ]]; then
+      echo "expected to exist: $path"
+      return 1
+    fi
+  done
+}
+
+assert_missing() {
+  local path
+  for path in "$@"; do
+    if [[ -e "$path" ]]; then
+      echo "expected to be gone: $path"
+      return 1
+    fi
+  done
+}

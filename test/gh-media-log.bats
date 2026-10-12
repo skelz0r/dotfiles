@@ -42,8 +42,8 @@ log_cmd() {
   run log_cmd purge --repo acme/app --pr 12
   assert_equal "$status" 0
 
-  [[ ! -e "$shot" && ! -e "$cast" ]]
-  [[ -e "$HOME/.Trash/portal-after.png" && -e "$HOME/.Trash/demo.mp4" ]]
+  assert_missing "$shot" "$cast"
+  assert_exists "$HOME/.Trash/portal-after.png" "$HOME/.Trash/demo.mp4"
   assert_equal "$(cat "$MANIFEST")" ""
 }
 
@@ -68,7 +68,7 @@ log_cmd() {
   run log_cmd purge --repo acme/app --pr 12
   assert_equal "$status" 0
 
-  [[ -e "$shot" ]]
+  assert_exists "$shot"
   assert_equal "$(cut -f2- "$MANIFEST")" "$(printf 'acme/app\tissue\t7\t%s' "$shot")"
 }
 
@@ -84,7 +84,8 @@ log_cmd() {
   run log_cmd purge --repo acme/app --pr 12
   assert_equal "$status" 0
 
-  [[ ! -e "$mine" && -e "$theirs" && -e "$issue" ]]
+  assert_missing "$mine"
+  assert_exists "$theirs" "$issue"
   assert_equal "$(cut -f2-4 "$MANIFEST")" "$(printf 'acme/other\tpr\t12\nacme/app\tissue\t12')"
 }
 
@@ -98,7 +99,7 @@ log_cmd() {
   assert_equal "$status" 0
   assert_contains "$output" "Would trash: $shot"
 
-  [[ -e "$shot" ]]
+  assert_exists "$shot"
   assert_equal "$(cat "$MANIFEST")" "$before"
 }
 
@@ -111,6 +112,6 @@ log_cmd() {
   run log_cmd purge --repo acme/app --pr 12
   assert_equal "$status" 1
 
-  [[ -e "$shot" ]]
+  assert_exists "$shot"
   assert_equal "$(cut -f5 "$MANIFEST")" "$shot"
 }
