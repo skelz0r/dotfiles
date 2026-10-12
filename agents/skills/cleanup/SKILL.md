@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge.
 ---
 
 # Cleanup
@@ -29,12 +29,28 @@ cleanup.
    Known examples: `bin/remove_worktree.sh <name>`,
    `bin/worktree-remove <name>`.
 
-2. Resolve the PR: `gh pr view <number|branch> --json state,mergedAt,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup`.
+2. Resolve the PR: `gh pr view <number|branch> --json state,mergedAt,title,body,labels,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,reviews,statusCheckRollup`.
    Map it to its worktree with `git worktree list --porcelain`: the entry
    whose `branch refs/heads/<headRefName>`. This covers both the project
    worktrees directory and Claude Code ones (`.claude/worktrees/`).
 
-3. Land the PR when it is still `OPEN`, then go on with the cleanup:
+3. Land the PR when it is still `OPEN`, then go on with the cleanup.
+
+   A feature is not merged on review alone: unless the user explicitly
+   asked to merge this PR, stop and report before any rebase when the PR
+   is a feature (new behaviour, product change: anything but a bugfix,
+   a refactoring or a technical change without product decision) and
+   either:
+   - it had no review at all: no GitHub review (`reviews`), no review
+     comment, and no review (e.g. Codex) run in this conversation;
+   - its latest review still raised several findings that were not all
+     addressed by later commits.
+
+   The report names what is missing (no review, or the open findings)
+   so the user can review or explicitly ask for the merge. Bugfixes and
+   refactorings follow the project's own rules (some `CLAUDE.md` let the
+   session merge them once a review comes back clean).
+
    - behind its base or `CONFLICTING`: from the worktree, fetch and
      rebase onto `origin/<baseRefName>`, resolve the conflicts by reading
      both sides (and the commits that introduced them), run the tests
