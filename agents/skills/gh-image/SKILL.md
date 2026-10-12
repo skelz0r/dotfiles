@@ -1,6 +1,6 @@
 ---
 name: gh-image
-description: Attach local images or videos to GitHub issues, pull requests and comments with the native `--attach` flag of gh, which uploads them to GitHub and rewrites their references into hosted user-attachments URLs. Use whenever a screenshot, screencast or before/after evidence has to appear on GitHub, when the user asks to "mettre une capture sur la PR", "ajoute le screenshot à l'issue", "attache l'image", or to reuse a user-attachments URL in GitHub markdown.
+description: Attach local images or videos to GitHub issues, pull requests and comments with the native `--attach` flag of gh, which uploads them to GitHub and rewrites their references into hosted user-attachments URLs. Use whenever a screenshot, screencast or before/after evidence has to appear on GitHub, when the user asks to "mettre une capture sur la PR", "ajoute le screenshot à l'issue", "attache l'image", or to reuse a user-attachments URL in GitHub markdown. Records every uploaded screenshot or screencast in a manifest so /cleanup trashes it once the pull request is merged.
 license: MIT
 ---
 
@@ -94,6 +94,24 @@ When some uploads fail, the command can still create or update the resource
 with the others, then exit non-zero. Read stderr and the resource, then
 retry only the missing files with `edit` on that resource, never a second
 `create`.
+
+## Record the uploads
+
+Once the upload is confirmed, record the files so `/cleanup` trashes them
+when the pull request is merged:
+
+```bash
+gh-media-log record --repo OWNER/REPO --pr 123 /abs/path/portal-before.png /abs/path/portal-after.png
+```
+
+Use `--issue 123` for an issue or an issue comment, `--pr 123` for a pull
+request or its comments; for a `create`, take the number from the URL
+gh prints. Record the final path, after any rename, and only the files
+that made it: never one whose upload failed and was not retried
+successfully. The command only keeps files under `~/share/screenshots/`
+and `~/share/screencasts/` and skips the others, so pass every attached
+file. Issue uploads are recorded but no command trashes them yet:
+`gh-media-log purge --repo OWNER/REPO --issue 123` does it by hand.
 
 No direct upload to READMEs, gists or Discussions: reuse a hosted URL from
 a PR, issue or comment of the same repo.
