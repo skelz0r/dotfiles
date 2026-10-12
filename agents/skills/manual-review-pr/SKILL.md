@@ -18,6 +18,10 @@ the end, unless the user explicitly asks for it later in the conversation.
 - **Required**: the PR URL (or number in the current repository).
 - **Optional**: the user's first remarks. When given, they are the agenda:
   every one gets a verdict.
+- **Earlier work**: when the user already reviewed the PR (notes, a page,
+  a folder under `~/share/` or `sandbox/`), never modify it, and do not
+  read it before the own pass is done: a second opinion primed by the
+  first one is worth half as much.
 
 ## 2. Collect
 
@@ -40,11 +44,17 @@ git log --format='--- %s%n%n%b' "origin/<base>..<headRefOid>"
 ## 3. Size the pass
 
 - **Local pass only** when the hand-written diff stays under about 600
-  lines and touches no costly area (money, access, personal data,
-  outbound actions).
-- **Add a Codex pass** above that, or on a costly area: launch the
-  `codex-review` skill on the range in the background and do the local
-  pass meanwhile; triage its findings into the same list.
+  lines and touches no costly area.
+- **Costly areas**: money, access and authorization, personal data,
+  outbound actions (mails, webhooks, calls to third parties), documents
+  with evidentiary or legal value (attestations, proofs, signatures,
+  invoices), irreversible data changes, public contracts consumed by
+  others (API, SDK, file formats).
+- **Add a Codex pass** above the threshold, on a costly area, or when the
+  local pass cannot be independent (the user's conclusions are already
+  in the conversation): launch the `codex-review` skill on the range in
+  the background and do the local pass meanwhile; triage its findings
+  into the same list.
 
 The threshold is a starting point: adjust it when a review shows it was
 wrong, and record the change here.
@@ -54,27 +64,94 @@ wrong, and record the change here.
 Read the hand-written code and, more importantly, what it plugs into:
 base classes, callers, every other user of the classes it changes (one
 class shared by two entry points changes where a responsibility can
-live). Look for:
+live), the framework's extension points, and how the same problem is
+solved elsewhere in the repository.
 
-- **Misplaced responsibility**: a rule living in the orchestrator when the
-  object it is about could declare it (e.g. a hard-coded list of errors
-  instead of the error saying what it is).
-- **Ad-hoc lists without a business rule**: ask what justifies "this case
-  yes, that one no". If nothing does, the list is a smell.
-- **Duplicated paths**: test, mock or sandbox paths that re-implement the
-  decision of the real path.
-- **State leaking through shared context**: values set then reset to
-  hide them, copies made defensively.
-- **Hooks working around the framework** (e.g. an `around` because a
-  chain stops on failure): the sign the code sits in the wrong layer.
+Walk the whole grid below. Report only what the code shows: an empty
+category is a fine outcome, a finding stretched to fill it is not.
+
+**Responsibilities**
+
+- **Misplaced rule**: a decision taken by a caller, orchestrator or
+  controller about an object that could state it itself (e.g. a checkout
+  service with a `case` on payment types to know which are refundable,
+  instead of each payment type saying so).
+- **Re-derived knowledge**: a layer reconstructs from an output (a
+  message, a label, a serialized payload, a raw header) what another
+  layer knew as a typed fact. Matching on human-readable strings breaks
+  silently on a wording change.
+- **Ad-hoc lists**: ask what justifies "this case yes, that one no". If
+  no business rule does, the list is a smell; if one does, it belongs
+  in the code or the docs, not only in a commit message.
+- **Reaching through objects**: reading another object's internals or
+  transport details instead of asking it.
+- **Stretched inheritance**: a subclass overriding a base method to
+  disable it, a base designed for another case, constants borrowed from
+  a sibling class. Often composition, or a narrower base, fits better.
+- **Wrong level of abstraction**: generic machinery with a single user,
+  or a second copy-pasted variant. Ask what the next feature of the same
+  kind would have to write.
+
+**Control flow**
+
+- **Working around the framework**: callbacks wrapping a chain, rescue
+  and re-raise, private methods called with `send`, patches, because the
+  natural extension point does not fit. The sign the code sits in the
+  wrong layer.
+- **Exceptions as control flow**, and broad rescues that turn a bug into
+  a log line.
+- **Partial writes**: an object or context mutated step by step, so a
+  failure midway needs cleanup code; compute first, write once.
+
+**State and data**
+
+- **Shared mutable context**: values set then reset to hide them,
+  defensive copies, reads that depend on the order of steps.
+- **Inputs mutated in place** (normalization, defaults), so the original
+  value is lost to whoever needs it later.
+- **Time**: several "now" in one operation, time zones, expiry and
+  validity windows.
+- **Concurrency and idempotence**: retries, double submissions, jobs run
+  twice, a check and a write that can race.
+- **Cache**: whether the new behaviour bypasses, poisons or leaks through
+  a cache, and on which key.
+
+**Paths and environments**
+
+- **Duplicated paths**: test, mock, sandbox or feature-flag paths that
+  re-implement the decision of the real path, and can drift from it.
+- **Environment branches** in production code.
+
+**Contracts and evolution**
+
+- **Public contract**: response shape, error format, SDKs, generated
+  docs, versioning and backward compatibility for existing clients.
+- **Data changes**: migration reversibility, backfill, deploy order.
 - **Tests and public docs encoding the rule** rather than a need: they
-  will flip if the rule changes.
-- **Product or legal implications**: what the feature lets a user prove,
-  forge or skip.
+  will flip if the rule changes. Tests mocking internal collaborators
+  instead of the system boundary.
+- **Commit messages out of sync with the code**: a later commit changed
+  what an earlier message claims.
+
+**Failure and operations**
+
+- **What fails how**: what the user sees, what is logged, what alerts,
+  what fails silently.
+- **Cost**: extra calls to third parties, quotas, N+1 queries, payload
+  size.
+
+**Product, security, legal**
+
+- **What the feature lets a user prove, forge, skip or learn**: a
+  document that can be obtained with chosen inputs, a response that
+  reveals whether a record exists, a check that can be bypassed.
+- **Personal data**: minimization, who sees what, retention.
+- **Authorization**: who can trigger the new behaviour, under which
+  scope.
 
 Check every claim against the code before saying it. A user remark can
-rest on a wrong fact (e.g. "it matches on the error code" when it matches
-on titles): say so, then answer the real concern behind it.
+rest on a wrong fact (e.g. "it runs once per request" when it runs once
+per item): say so, then answer the real concern behind it.
 
 ## 5. Converse
 
