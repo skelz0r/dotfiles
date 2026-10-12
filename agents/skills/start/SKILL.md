@@ -52,6 +52,19 @@ inside the other inherits its variable, so herdr is checked first):
    `git worktree add worktrees/<name> -b feature/<name> origin/develop`
    (adapt the base branch) and tell the user nothing else is isolated.
 
+   When the repository uses git-crypt (`git config filter.git-crypt.smudge`
+   is set), that fallback fails in the smudge filter: git-crypt looks for
+   its key under the worktree's own git dir, not the common dir. Never
+   bypass the filter (`-c filter.git-crypt.smudge=cat`): secrets would stay
+   encrypted, and syncing or deploying from the worktree would overwrite
+   the real ones with ciphertext. Instead, stop if the primary checkout is
+   locked (no `$PRIMARY_ROOT/.git/git-crypt/keys/default`); otherwise add
+   the worktree with `--no-checkout`, link
+   `.git/worktrees/<name>/git-crypt` to `$PRIMARY_ROOT/.git/git-crypt`
+   (a symlink, never a copy of the key), then `git -C <worktree> reset -q
+   --hard`. Suggest the project gets its own setup script doing this
+   (example: `bin/setup_worktree.sh` in freebox-delta-vm).
+
 2. Check the names are free: no existing tab with that name (herdr:
    `herdr tab list --workspace "$HERDR_WORKSPACE_ID"`, field `label`;
    tmux: `tmux list-windows -a -F '#{window_name}'`) and no worktree
