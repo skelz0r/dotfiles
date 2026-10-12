@@ -24,7 +24,7 @@ Suites:
   lint      shell conventions and shellcheck (test/lint.sh)
   smoke     bin --help, zsh and vim startup, statusline, install dry run
   tests     behaviour tests: install.sh, migration, upload-assets prepare,
-            tidy-commits
+            gh-media-log, tidy-commits
 
 Options:
   -v, --verbose   Show the output of every bats test, not only failures

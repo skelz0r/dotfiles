@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+#
+# gh-media-log - Track screenshots and screencasts attached to GitHub, and
+# trash them once their pull request is merged
+#
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+MANIFEST="$HOME/share/.gh-image-uploads.tsv"
+LOCK_DIR="$MANIFEST.lock"
+MEDIA_DIRS=("$HOME/share/screenshots" "$HOME/share/screencasts")
+TRASH_CMD="${GH_MEDIA_LOG_TRASH:-/usr/bin/trash}"
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") record --repo OWNER/REPO (--pr|--issue) NUMBER FILE...
+       $(basename "$0") purge --repo OWNER/REPO (--pr|--issue) NUMBER [--dry-run]
+       $(basename "$0") list [--repo OWNER/REPO] [(--pr|--issue) NUMBER]
+
+Keep a manifest of the local screenshots and screencasts uploaded to a
+GitHub pull request or issue, so they can be trashed once it is done.
+
+Commands:
+  record   Append one line per FILE uploaded to the pull request or
+           issue. Only files under ~/share/screenshots or
+           ~/share/screencasts are recorded, others are skipped.
+  purge    Move to the trash the files recorded for the pull request or
+           issue, then remove its lines. A file already gone only loses
+           its line; a file still recorded for another pull request or
+           issue is kept.
+  list     Print the manifest lines, filtered by repo and number.
+
+Options:
+  --repo OWNER/REPO   Repository of the pull request or issue
+  --pr NUMBER         Pull request number (comments included)
+  --issue NUMBER      Issue number (comments included)
+  --dry-run           Show what purge would do without doing it
+  -h, --help          Show this help message
+
+Manifest: $MANIFEST
+Columns (tab separated): date, repo, kind (pr|issue), number, path.
+Trash command: $TRASH_CMD (GH_MEDIA_LOG_TRASH overrides it).
+EOF
+  exit 0
+}
+
+log() { echo -e "${BLUE}[INFO]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+success() { echo -e "${GREEN}[OK]${NC} $*"; }
+
+COMMAND=""
+REPO=""
+KIND=""
+NUMBER=""
+DRY_RUN=false
+FILES=()
+
+[[ $# -gt 0 ]] || usage
+
+case $1 in
+  -h|--help) usage ;;
+  record|purge|list) COMMAND="$1"; shift ;;
+  *) error "Unknown command: $1 (use --help)"; exit 1 ;;
+esac
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --repo) REPO="${2:-}"; shift 2 ;;
+    --pr) KIND="pr"; NUMBER="${2:-}"; shift 2 ;;
+    --issue) KIND="issue"; NUMBER="${2:-}"; shift 2 ;;
+    --dry-run) DRY_RUN=true; shift ;;
+    -h|--help) usage ;;
+    -*) error "Unknown option: $1 (use --help)"; exit 1 ;;
+    *) FILES+=("$1"); shift ;;
+  esac
+done
+
+require_target() {
+  if [[ ! "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    error "--repo OWNER/REPO is required"
+    exit 1
+  fi
+  if [[ -z "$KIND" || ! "$NUMBER" =~ ^[0-9]+$ ]]; then
+    error "--pr NUMBER or --issue NUMBER is required"
+    exit 1
+  fi
+}
+
+acquire_lock() {
+  local attempts=0
+  until mkdir "$LOCK_DIR" 2> /dev/null; do
+    attempts=$((attempts + 1))
+    if [[ "$attempts" -ge 50 ]]; then
+      error "Manifest locked by another process: remove $LOCK_DIR if stale"
+      exit 1
+    fi
+    sleep 0.1
+  done
+  trap 'rmdir "$LOCK_DIR" 2> /dev/null || true' EXIT
+}
+
+absolute_path() {
+  local file="$1"
+  echo "$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+}
+
+physical_dir() {
+  local dir="$1"
+  if [[ -d "$dir" ]]; then
+    (cd -P "$dir" && pwd)
+  else
+    echo "$dir"
+  fi
+}
+
+in_media_dirs() {
+  local path="$1" dir
+  for dir in "${MEDIA_DIRS[@]}"; do
+    [[ "$path" == "$dir"/* || "$path" == "$(physical_dir "$dir")"/* ]] && return 0
+  done
+  return 1
+}
+
+matches_target() {
+  local repo="$1" kind="$2" number="$3"
+  [[ "$repo" == "$REPO" && "$kind" == "$KIND" && "$number" == "$NUMBER" ]]
+}
+
+record() {
+  require_target
+  if [[ "${#FILES[@]}" -eq 0 ]]; then
+    error "No file to record"
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$MANIFEST")"
+  acquire_lock
+  touch "$MANIFEST"
+
+  local file path date recorded=0
+  date="$(date +%Y-%m-%dT%H:%M:%S%z)"
+  for file in "${FILES[@]}"; do
+    if [[ ! -f "$file" ]]; then
+      warn "Not a file, skipped: $file"
+      continue
+    fi
+    path="$(absolute_path "$file")"
+    if [[ "$path" == *$'\t'* || "$path" == *$'\n'* ]]; then
+      warn "Path with a tab or newline, skipped: $path"
+      continue
+    fi
+    if ! in_media_dirs "$path"; then
+      log "Outside screenshots and screencasts, not recorded: $path"
+      continue
+    fi
+    if awk -F '\t' -v repo="$REPO" -v kind="$KIND" -v number="$NUMBER" -v path="$path" \
+      '$2 == repo && $3 == kind && $4 == number && $5 == path { found = 1 } END { exit !found }' "$MANIFEST"; then
+      log "Already recorded: $path"
+      continue
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$date" "$REPO" "$KIND" "$NUMBER" "$path" >> "$MANIFEST"
+    recorded=$((recorded + 1))
+  done
+  success "$recorded file(s) recorded for $REPO $KIND #$NUMBER"
+}
+
+list() {
+  [[ -f "$MANIFEST" ]] || return 0
+  awk -F '\t' -v repo="$REPO" -v kind="$KIND" -v number="$NUMBER" \
+    '(repo == "" || $2 == repo) && (kind == "" || ($3 == kind && $4 == number))' "$MANIFEST"
+}
+
+purge() {
+  require_target
+  if [[ ! -f "$MANIFEST" ]]; then
+    log "No manifest, nothing to purge"
+    return 0
+  fi
+
+  $DRY_RUN || acquire_lock
+
+  local date repo kind number path
+  local targets=() others=() kept_lines=()
+  while IFS=$'\t' read -r date repo kind number path; do
+    [[ -n "$path" ]] || continue
+    if matches_target "$repo" "$kind" "$number"; then
+      targets+=("$path")
+    else
+      others+=("$path")
+      kept_lines+=("$(printf '%s\t%s\t%s\t%s\t%s' "$date" "$repo" "$kind" "$number" "$path")")
+    fi
+  done < "$MANIFEST"
+
+  if [[ "${#targets[@]}" -eq 0 ]]; then
+    log "Nothing recorded for $REPO $KIND #$NUMBER"
+    return 0
+  fi
+
+  if ! $DRY_RUN && [[ ! -x "$TRASH_CMD" ]] && ! command -v "$TRASH_CMD" > /dev/null; then
+    error "Trash command not found: $TRASH_CMD"
+    exit 1
+  fi
+
+  local trashed=0 missing=0 shared=0 failed=0 other
+  local failed_paths=()
+  for path in "${targets[@]}"; do
+    local still_referenced=false
+    for other in ${others[@]+"${others[@]}"}; do
+      [[ "$other" == "$path" ]] && still_referenced=true
+    done
+    if $still_referenced; then
+      log "Kept, still recorded elsewhere: $path"
+      shared=$((shared + 1))
+    elif [[ ! -e "$path" ]]; then
+      log "Already gone: $path"
+      missing=$((missing + 1))
+    elif $DRY_RUN; then
+      log "Would trash: $path"
+      trashed=$((trashed + 1))
+    elif "$TRASH_CMD" "$path"; then
+      log "Trashed: $path"
+      trashed=$((trashed + 1))
+    else
+      warn "Could not trash, line kept: $path"
+      failed_paths+=("$path")
+      failed=$((failed + 1))
+    fi
+  done
+
+  if $DRY_RUN; then
+    success "Dry run: $trashed to trash, $missing already gone, $shared kept for another pull request or issue"
+    return 0
+  fi
+
+  local tmp
+  tmp="$(mktemp "$MANIFEST.XXXXXX")"
+  {
+    for other in ${kept_lines[@]+"${kept_lines[@]}"}; do
+      printf '%s\n' "$other"
+    done
+    for path in ${failed_paths[@]+"${failed_paths[@]}"}; do
+      awk -F '\t' -v repo="$REPO" -v kind="$KIND" -v number="$NUMBER" -v path="$path" \
+        '$2 == repo && $3 == kind && $4 == number && $5 == path' "$MANIFEST"
+    done
+  } > "$tmp"
+  mv "$tmp" "$MANIFEST"
+
+  success "$trashed trashed, $missing already gone, $shared kept for another pull request or issue"
+  [[ "$failed" -eq 0 ]] || { error "$failed file(s) could not be trashed"; exit 1; }
+}
+
+case $COMMAND in
+  record) record ;;
+  purge) purge ;;
+  list) list ;;
+esac

@@ -178,7 +178,7 @@ Checks: git, zsh, nvim, tmux, rbenv, pyenv, nvm, symlinks, SSH, GPG
 dotfiles-test          # lint + smoke + behaviour tests
 dotfiles-test lint     # shell conventions and shellcheck
 dotfiles-test smoke    # --help, zsh/vim startup, statusline, install dry run
-dotfiles-test tests    # install.sh, migration, upload-assets, tidy-commits
+dotfiles-test tests    # install.sh, migration, upload-assets, gh-media-log, tidy-commits
 ```
 
 Needs `bats-core` and `shellcheck` (in the Brewfile). Tests run in a
