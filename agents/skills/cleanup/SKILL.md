@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases) and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge or passes --force.
 ---
 
 # Cleanup
@@ -8,6 +8,8 @@ description: Clean up after a worktree's pull request is merged — check the PR
 Tears down a git worktree once its pull request has landed. Argument: the
 worktree name (ticket like `API-7345` or slug like `cnav-nir`), a branch
 or a PR number. Without argument, use the worktree of the current session.
+`--force` skips the review check of step 3 for an open feature PR; it
+never bypasses GitHub's own protections.
 
 Every project isolates its worktrees differently (ports, Postgres, Redis,
 env files), so the teardown itself is delegated to the project's removal
@@ -36,8 +38,8 @@ cleanup.
 
 3. Land the PR when it is still `OPEN`, then go on with the cleanup.
 
-   A feature is not merged on review alone: unless the user explicitly
-   asked to merge this PR, stop and report before any rebase when the PR
+   A feature is not merged without review: unless the user explicitly
+   asked to merge this PR or passed `--force`, stop and report before any rebase when the PR
    is a feature (new behaviour, product change: anything but a bugfix,
    a refactoring or a technical change without product decision) and
    either:
@@ -47,7 +49,7 @@ cleanup.
      addressed by later commits.
 
    The report names what is missing (no review, or the open findings)
-   so the user can review or explicitly ask for the merge. Bugfixes and
+   so the user can review, or rerun with `--force` to merge anyway. Bugfixes and
    refactorings follow the project's own rules (some `CLAUDE.md` let the
    session merge them once a review comes back clean).
 
