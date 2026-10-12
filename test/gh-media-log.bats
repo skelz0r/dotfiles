@@ -11,9 +11,8 @@ setup() {
 }
 
 media() {
-  local path="$HOME/share/$1"
-  echo "fake" > "$path"
-  echo "$path"
+  echo "fake" > "$HOME/share/$1"
+  echo "$(cd -P "$HOME/share/$(dirname "$1")" && pwd)/$(basename "$1")"
 }
 
 log_cmd() {
@@ -114,4 +113,34 @@ log_cmd() {
 
   assert_exists "$shot"
   assert_equal "$(cut -f5 "$MANIFEST")" "$shot"
+}
+
+@test "a file reached through a symlinked folder is still protected by its other attachments" {
+  rmdir "$HOME/share/screenshots"
+  mkdir "$HOME/synced-screenshots"
+  ln -s "$HOME/synced-screenshots" "$HOME/share/screenshots"
+  echo "fake" > "$HOME/synced-screenshots/portal-after.png"
+  log_cmd record --repo acme/app --pr 12 "$HOME/share/screenshots/portal-after.png"
+  log_cmd record --repo acme/app --issue 7 "$HOME/synced-screenshots/portal-after.png"
+
+  run log_cmd purge --repo acme/app --pr 12
+  assert_equal "$status" 0
+
+  assert_exists "$HOME/synced-screenshots/portal-after.png"
+  assert_equal "$(stub_calls trash)" ""
+}
+
+@test "a symlink inside the media folders cannot get a file outside them recorded" {
+  mkdir -p "$HOME/elsewhere/sub"
+  echo "fake" > "$HOME/elsewhere/sub/a.png"
+  echo "fake" > "$HOME/elsewhere/a.png"
+  media screenshots/a.png > /dev/null
+  ln -s "$HOME/elsewhere/sub" "$HOME/share/screenshots/link"
+
+  run log_cmd record --repo acme/app --pr 12 \
+    "$HOME/share/screenshots/link/a.png" \
+    "$HOME/share/screenshots/link/../a.png"
+  assert_equal "$status" 0
+
+  assert_equal "$(cat "$MANIFEST")" ""
 }

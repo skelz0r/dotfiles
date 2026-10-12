@@ -106,24 +106,15 @@ acquire_lock() {
   trap 'rmdir "$LOCK_DIR" 2> /dev/null || true' EXIT
 }
 
-absolute_path() {
+physical_path() {
   local file="$1"
-  echo "$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
-}
-
-physical_dir() {
-  local dir="$1"
-  if [[ -d "$dir" ]]; then
-    (cd -P "$dir" && pwd)
-  else
-    echo "$dir"
-  fi
+  echo "$(cd -P "$(dirname "$file")" && pwd)/$(basename "$file")"
 }
 
 in_media_dirs() {
   local path="$1" dir
   for dir in "${MEDIA_DIRS[@]}"; do
-    [[ "$path" == "$dir"/* || "$path" == "$(physical_dir "$dir")"/* ]] && return 0
+    [[ -d "$dir" && "$path" == "$(cd -P "$dir" && pwd)"/* ]] && return 0
   done
   return 1
 }
@@ -147,11 +138,11 @@ record() {
   local file path date recorded=0
   date="$(date +%Y-%m-%dT%H:%M:%S%z)"
   for file in "${FILES[@]}"; do
-    if [[ ! -f "$file" ]]; then
-      warn "Not a file, skipped: $file"
+    if [[ ! -f "$file" || -L "$file" ]]; then
+      warn "Not a regular file, skipped: $file"
       continue
     fi
-    path="$(absolute_path "$file")"
+    path="$(physical_path "$file")"
     if [[ "$path" == *$'\t'* || "$path" == *$'\n'* ]]; then
       warn "Path with a tab or newline, skipped: $path"
       continue
