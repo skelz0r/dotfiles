@@ -220,7 +220,8 @@ Build to zero warnings, look at every tab and one sub-tab reached by
 
 ## 7. Publish
 
-Through `upload-assets`. Ask public or password, unless already said:
+As described in `static-page`, into the `<slug>-<suffix>` folder it
+records, with `--except build.py --except GUIDE.md`. Ask public or password, unless already said:
 public is fine when the repository is public on GitHub, a password when
 the feature or the discussion is internal. Give the URL. Do not link it
 from the PR unless asked.

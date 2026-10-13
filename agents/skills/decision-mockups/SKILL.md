@@ -131,8 +131,8 @@ it to `NOT_SHOWN` and `MOCKUPS.md` if a reader could expect it.
 
 ### 8. Offer to publish
 
-Propose to publish as described in `static-page`, into a folder
-chosen by the user, with `--except build.py --except MOCKUPS.md`. Check the
+Propose to publish as described in `static-page`, into the
+`<slug>-<suffix>` folder it records unless the user picks one, with `--except build.py --except MOCKUPS.md`. Check the
 fictional data one last time before the upload.
 
 ## Guidelines

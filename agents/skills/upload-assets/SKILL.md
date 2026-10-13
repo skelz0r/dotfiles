@@ -28,7 +28,9 @@ Three inputs are required. Ask for whichever the user has not already given.
 
 - **Folder**: destination under the assets root, used exactly as given, never
   renamed. Allowed: letters, digits, `.`, `_`, `-`, and `/` for subfolders
-  (`prez-editeurs`, `clients/acme`). Never upload at the root.
+  (`prez-editeurs`, `clients/acme`). Never upload at the root. Public
+  folders are only as private as their name: for a page, `static-page`
+  appends a random suffix to the slug.
 - **What to copy**: one or more local files and/or directories, optionally
   narrowed to a subset (see Selection).
 - **Access**: public, or behind a password (see Access). When republishing

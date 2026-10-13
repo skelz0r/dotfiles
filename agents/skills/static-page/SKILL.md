@@ -102,7 +102,21 @@ string (`?v=2`) after each build to dodge the cache.
 ## Publishing
 
 Through the `upload-assets` skill, into a folder named after the slug
-unless the user picks another one:
+followed by a short random suffix, unless the user picks another one:
+`<slug>-<8 hex>` (e.g. `apistration-pr-500-review-3f9a1c2e`). A bare slug
+is guessable from the PR number, and a public folder is only as private
+as its URL. Draw the suffix once, keep it next to the sources, and reuse
+it on every republish so the shared link never changes:
+
+```bash
+FOLDER_FILE=~/share/<slug>/.assets-folder
+[[ -f "$FOLDER_FILE" ]] || echo "<slug>-$(openssl rand -hex 4)" > "$FOLDER_FILE"
+FOLDER="$(cat "$FOLDER_FILE")"
+```
+
+The dotfile is skipped by the upload. A page already published under a
+bare slug keeps it unless the user asks to move it: the old URL may have
+been shared.
 
 - **Exclude the sources**: `--except` the source file, `build.py` and any
   notes file, so only what the page needs goes online.
@@ -117,4 +131,5 @@ unless the user picks another one:
   then offer the next step of the skill (e.g. link it from the PR
   description).
 
-To iterate, edit the source, rebuild and republish to the same folder.
+To iterate, edit the source, rebuild and republish to the same folder
+(the one in `.assets-folder`).
