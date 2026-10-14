@@ -4,14 +4,20 @@ set -euo pipefail
 
 usage() {
   cat << EOF
-Usage: $(basename "$0") [-c] [-i] <regex>
+Usage: $(basename "$0") [-c] [-i] [-f|-n] <regex>
 
 Search your gists (public and secret) with an extended regex (grep -E).
 Matches description and file names; with -c, also file contents.
 
+Gists are mirrored in $cache_dir: each search first
+fetches only the gists updated since the last sync, and resyncs
+everything once a week to drop deleted ones.
+
 Options:
   -c  Search file contents too
   -i  Case insensitive
+  -f  Force a full resync before searching
+  -n  Search the local mirror without syncing
   -h  Show this help
 
 Output: one tab-separated match per line
@@ -24,15 +30,26 @@ Examples:
 EOF
 }
 
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/gist-search"
+gists_dir="$cache_dir/gists"
+login_file="$cache_dir/login"
+last_sync_file="$cache_dir/last_sync"
+last_full_sync_file="$cache_dir/last_full_sync"
+full_sync_max_age=$((7 * 24 * 3600))
+
 [[ "${1:-}" == "--help" ]] && { usage; exit 0; }
 
 search_content=false
+ignore_case=false
+sync_mode=auto
 grep_flags=(-E)
 
-while getopts "cih" option; do
+while getopts "cifnh" option; do
   case "$option" in
     c) search_content=true ;;
-    i) grep_flags+=(-i) ;;
+    i) ignore_case=true; grep_flags+=(-i) ;;
+    f) sync_mode=full ;;
+    n) sync_mode=none ;;
     h) usage; exit 0 ;;
     *) usage >&2; exit 1 ;;
   esac
@@ -42,50 +59,143 @@ shift $((OPTIND - 1))
 [[ $# -eq 1 ]] || { usage >&2; exit 1; }
 pattern="$1"
 
-list_gist_files() {
-  gh api --paginate '/gists?per_page=100' --jq '
-    .[] | .html_url as $url | (.description // "") as $description
-    | .files[]
-    | [
-        $url + "#file-" + (.filename | ascii_downcase | gsub("[^a-z0-9]"; "-")),
-        .filename,
-        ($description | gsub("[\t\n\r]"; " ")),
-        .raw_url
-      ]
-    | join("\u001f")
+write_gist_files() {
+  local root="$1" id description filename content
+
+  while IFS= read -r -d '' id \
+    && IFS= read -r -d '' description \
+    && IFS= read -r -d '' filename \
+    && IFS= read -r -d '' content; do
+    mkdir -p "$root/$id/files"
+    printf '%s' "$description" > "$root/$id/description"
+    printf '%s' "$content" > "$root/$id/files/$filename"
+  done
+}
+
+full_sync() {
+  local staging
+
+  echo "Mirroring all gists in $cache_dir..." >&2
+  staging=$(mktemp -d "$cache_dir/gists.XXXXXX")
+
+  if ! gh api graphql --paginate -f query='
+      query($endCursor: String) {
+        viewer {
+          gists(first: 100, privacy: ALL, after: $endCursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes { name description files { name text } }
+          }
+        }
+      }' \
+    | jq -j '
+      .data.viewer.gists.nodes[]
+      | .name as $id | (.description // "") as $description
+      | .files[] | select(.text != null)
+      | [$id, $description, .name, .text] | map(. + "\u0000") | add
+    ' \
+    | write_gist_files "$staging"; then
+    rm -rf "$staging"
+    exit 1
+  fi
+
+  gh api user --jq .login > "$login_file"
+  rm -rf "$gists_dir"
+  mv "$staging" "$gists_dir"
+  date +%s > "$last_full_sync_file"
+}
+
+incremental_sync() {
+  local since="$1" id
+
+  gh api --paginate "/gists?per_page=100&since=$since" --jq '.[].id' \
+    | while read -r id; do
+        rm -rf "${gists_dir:?}/$id"
+        gh api "/gists/$id" | jq -j '
+          .id as $id | (.description // "") as $description
+          | .files[] | select(.content != null)
+          | [$id, $description, .filename, .content] | map(. + "\u0000") | add
+        ' | write_gist_files "$gists_dir"
+      done
+}
+
+sync_mirror() {
+  local sync_started_at last_full_sync
+
+  mkdir -p "$cache_dir"
+  chmod 700 "$cache_dir"
+  sync_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  last_full_sync=$(cat "$last_full_sync_file" 2> /dev/null || echo 0)
+
+  if [[ "$sync_mode" == full || ! -d "$gists_dir" || ! -f "$last_sync_file" ]] \
+    || (( $(date +%s) - last_full_sync > full_sync_max_age )); then
+    full_sync
+  else
+    incremental_sync "$(cat "$last_sync_file")"
+  fi
+
+  printf '%s\n' "$sync_started_at" > "$last_sync_file"
+}
+
+list_files() {
+  local file_path relative_path description
+
+  for file_path in "$gists_dir"/*/files/*; do
+    relative_path="${file_path#"$gists_dir"/}"
+    IFS= read -r -d '' description < "${file_path%/files/*}/description" || true
+    printf '%s\t%s\t%s\n' "${relative_path%%/*}" "${relative_path#*/files/}" "${description//[$'\t\n\r']/ }"
+  done
+}
+
+search_contents() {
+  local file_path relative_path match
+
+  grep -rnIH --null "${grep_flags[@]}" -- "$pattern" "$gists_dir" \
+    | while IFS= read -r -d '' file_path && IFS= read -r match; do
+        relative_path="${file_path#"$gists_dir"/}"
+        printf '%s\t%s\t%s\t%s\n' "${relative_path%%/*}" "${relative_path#*/files/}" "${match%%:*}" "${match#*:}"
+      done || true
+}
+
+format_matches() {
+  login="$(cat "$login_file")" awk -F'\t' '
+    function anchor(filename) {
+      filename = tolower(filename)
+      gsub(/[^a-z0-9]/, "-", filename)
+      return "https://gist.github.com/" ENVIRON["login"] "/" $1 "#file-" filename
+    }
+    NF == 3 { print anchor($2) "\t" $2 "\t" $3 }
+    NF >= 4 {
+      text = substr($0, length($1 $2 $3) + 4)
+      sub(/\r$/, "", text)
+      print anchor($2) "-L" $3 "\t" $2 ":" $3 "\t" text
+    }
   '
 }
 
-search_file_content() {
-  local url="$1" filename="$2" raw_url="$3"
-  local matches
-
-  matches=$(
-    curl -fsSL "$raw_url" \
-      | LC_ALL=C tr -d '\r' \
-      | { grep -nI "${grep_flags[@]}" -- "$pattern" || true; } \
-      | while IFS=: read -r line_number line; do
-          printf '%s-L%s\t%s:%s\t%s\n' "$url" "$line_number" "$filename" "$line_number" "$line"
-        done
-  )
-  [[ -z "$matches" ]] || printf '%s\n' "$matches"
+filter_names() {
+  ignore_case="$ignore_case" pattern="$pattern" awk -F'\t' '
+    BEGIN {
+      pattern = ENVIRON["pattern"]
+      ignore_case = ENVIRON["ignore_case"] == "true"
+      if (ignore_case) pattern = tolower(pattern)
+    }
+    {
+      filename = $2
+      description = $3
+      if (ignore_case) {
+        filename = tolower(filename)
+        description = tolower(description)
+      }
+      if (filename ~ pattern || description ~ pattern) print
+    }
+  '
 }
 
-gist_files=$(list_gist_files)
+[[ "$sync_mode" == none ]] || sync_mirror
 
-while IFS=$'\x1f' read -r url filename description raw_url; do
-  if printf '%s\n%s\n' "$filename" "$description" | grep -q "${grep_flags[@]}" -- "$pattern"; then
-    printf '%s\t%s\t%s\n' "$url" "$filename" "$description"
+{
+  list_files | filter_names
+  if $search_content; then
+    search_contents
   fi
-done <<< "$gist_files"
-
-if $search_content; then
-  export pattern
-  export -f search_file_content
-  grep_flags_definition=$(declare -p grep_flags)
-
-  while IFS=$'\x1f' read -r url filename description raw_url; do
-    printf '%s\0%s\0%s\0' "$url" "$filename" "$raw_url"
-  done <<< "$gist_files" \
-    | xargs -0 -n 3 -P 16 bash -c "$grep_flags_definition; search_file_content \"\$@\"" _
-fi
+} | format_matches
