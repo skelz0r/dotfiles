@@ -168,7 +168,7 @@ fi
 if command -v rbenv &> /dev/null; then
   if [[ -f ruby-version ]]; then
     RUBY_VERSION=$(cat ruby-version)
-    if rbenv versions | grep -q "$RUBY_VERSION"; then
+    if rbenv prefix "$RUBY_VERSION" &> /dev/null; then
       log "Ruby $RUBY_VERSION already installed"
     else
       if ! dry "install Ruby $RUBY_VERSION"; then

@@ -112,3 +112,19 @@ backup_files() {
   assert_equal "$(stub_calls sudo)" ""
   assert_equal "$(stub_calls gpgconf)" ""
 }
+
+@test "an already installed Ruby is not installed again" {
+  local wanted
+  wanted="$(cat "$REPO_ROOT/ruby-version")"
+  stub gem
+  stub rbenv 'case "$1" in
+  versions) echo "  '"$wanted"'"; for i in $(seq 5000); do echo "  9.9.$i"; done ;;
+  prefix) [[ "$2" == '"$wanted"' ]] ;;
+esac'
+
+  run install
+  assert_equal "$status" 0
+
+  assert_contains "$output" "Ruby $wanted already installed"
+  [[ "$(stub_calls rbenv)" != *install* ]]
+}
