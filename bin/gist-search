@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [-c] [-i] <regex>
+
+Search your gists (public and secret) with an extended regex (grep -E).
+Matches description and file names; with -c, also file contents.
+
+Options:
+  -c  Search file contents too
+  -i  Case insensitive
+  -h  Show this help
+
+Output: one tab-separated match per line
+  name match:     <url>  <file>         <description>
+  content match:  <url>  <file>:<line>  <matching line>
+
+Examples:
+  $(basename "$0") docker | cut -f1 | sort -u
+  $(basename "$0") -ci 'select .* from' | fzf | cut -f1 | xargs open
+EOF
+}
+
+[[ "${1:-}" == "--help" ]] && { usage; exit 0; }
+
+search_content=false
+grep_flags=(-E)
+
+while getopts "cih" option; do
+  case "$option" in
+    c) search_content=true ;;
+    i) grep_flags+=(-i) ;;
+    h) usage; exit 0 ;;
+    *) usage >&2; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+[[ $# -eq 1 ]] || { usage >&2; exit 1; }
+pattern="$1"
+
+list_gist_files() {
+  gh api --paginate '/gists?per_page=100' --jq '
+    .[] | .html_url as $url | (.description // "") as $description
+    | .files[]
+    | [
+        $url + "#file-" + (.filename | ascii_downcase | gsub("[^a-z0-9]"; "-")),
+        .filename,
+        ($description | gsub("[\t\n\r]"; " ")),
+        .raw_url
+      ]
+    | join("\u001f")
+  '
+}
+
+search_file_content() {
+  local url="$1" filename="$2" raw_url="$3"
+  local matches
+
+  matches=$(
+    curl -fsSL "$raw_url" \
+      | LC_ALL=C tr -d '\r' \
+      | { grep -nI "${grep_flags[@]}" -- "$pattern" || true; } \
+      | while IFS=: read -r line_number line; do
+          printf '%s-L%s\t%s:%s\t%s\n' "$url" "$line_number" "$filename" "$line_number" "$line"
+        done
+  )
+  [[ -z "$matches" ]] || printf '%s\n' "$matches"
+}
+
+gist_files=$(list_gist_files)
+
+while IFS=$'\x1f' read -r url filename description raw_url; do
+  if printf '%s\n%s\n' "$filename" "$description" | grep -q "${grep_flags[@]}" -- "$pattern"; then
+    printf '%s\t%s\t%s\n' "$url" "$filename" "$description"
+  fi
+done <<< "$gist_files"
+
+if $search_content; then
+  export pattern
+  export -f search_file_content
+  grep_flags_definition=$(declare -p grep_flags)
+
+  while IFS=$'\x1f' read -r url filename description raw_url; do
+    printf '%s\0%s\0%s\0' "$url" "$filename" "$raw_url"
+  done <<< "$gist_files" \
+    | xargs -0 -n 3 -P 16 bash -c "$grep_flags_definition; search_file_content \"\$@\"" _
+fi
