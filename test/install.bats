@@ -33,6 +33,18 @@ backup_files() {
   assert_equal "$(cat "$backup")" "mine"
 }
 
+@test "a directory in the way holding a dangling symlink is backed up and replaced" {
+  mkdir -p "$HOME/.claude/skills/kept"
+  echo mine > "$HOME/.claude/skills/kept/SKILL.md"
+  ln -s "$HOME/nowhere" "$HOME/.claude/skills/dangling"
+
+  run install
+  assert_equal "$status" 0
+
+  assert_equal "$(readlink "$HOME/.claude/skills")" "$HOME/.agents/skills"
+  assert_equal "$(cat "$HOME"/.dotfiles_backup/*/skills/kept/SKILL.md)" "mine"
+}
+
 @test "--dry-run neither replaces a file in the way nor backs it up" {
   mkdir -p "$HOME/.config/nvim"
   echo mine > "$HOME/.config/nvim/coc-settings.json"

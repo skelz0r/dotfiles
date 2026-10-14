@@ -67,7 +67,7 @@ backup_file() {
       return
     fi
     mkdir -p "$BACKUP_DIR"
-    cp -r "$file" "$backup_path"
+    cp -R "$file" "$backup_path"
     log "Backed up $file"
   fi
 }
