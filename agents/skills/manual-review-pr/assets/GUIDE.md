@@ -16,9 +16,17 @@ Source unique : on itère ici, jamais dans index.html.
 
 La [PR #<n>](pr:) <ce qu'elle apporte, en une phrase>. Cette page ne relit
 pas le code ligne à ligne : elle résume les choix de conception à
-reprendre et les décisions prises pendant la revue. Les extraits de la
-cible sont des esquisses, pas du code de la PR. Liens figés sur
+reprendre et les décisions prises pendant la revue. Liens figés sur
 [`<sha7>`](tree:).
+
+::: {.callout .info}
+**Les contraintes engagent, les esquisses illustrent**
+
+Chaque axe pose d'abord les contraintes que toute solution doit tenir :
+ce sont elles que la revue de la correction vérifiera. Les options et
+les extraits de code qui suivent ne servent qu'à rendre une piste
+concrète ; s'en écarter est attendu, tant que les contraintes tiennent.
+:::
 
 <!-- tab: Vue d'ensemble -->
 
@@ -34,9 +42,9 @@ cible sont des esquisses, pas du code de la PR. Liens figés sur
 
 ## Les grandes lignes de la revue
 
-| Axe | Dans la PR | Cible | Détail |
+| Axe | Dans la PR | Contrainte | Détail |
 | --- | --- | --- | --- |
-| <axe> | <aujourd'hui> | <cible> | [<sous-onglet>](#<ancre-du-titre>) |
+| <axe> | <aujourd'hui> | <ce que toute solution doit garantir> | [<sous-onglet>](#<ancre-du-titre>) |
 
 L'onglet [Cible finale](#cible-finale) montre l'interface obtenue à la
 fin, d'un seul tenant ; l'onglet Solutions détaille chaque axe.
@@ -54,8 +62,17 @@ fin, d'un seul tenant ; l'onglet Solutions détaille chaque axe.
 
 ## L'interface à la fin du refactor
 
-<Esquisse : les noms et le découpage sont la cible, le corps des méthodes
-est indicatif.>
+::: {.callout .info}
+**Une cible possible, pas la cible**
+
+Cet onglet assemble les options recommandées de chaque axe, pour montrer
+qu'elles tiennent ensemble. Les noms et le code sont illustratifs. Ce qui
+engage, ce sont les contraintes de chaque axe, dans l'onglet Solutions.
+:::
+
+### Les contraintes, d'un seul tenant
+
+- <ce que toute solution doit garantir, axe par axe>
 
 ### Qui fait quoi
 
@@ -114,7 +131,20 @@ décrit la cible, avec les justifications données en revue.
 <La justification de l'utilisateur, dans ses mots.>
 :::
 
-### Cible
+### Contraintes
+
+- <ce que toute solution doit garantir : qui ne doit pas savoir quoi,
+  quels chemins doivent s'accorder, ce que le contrat ne doit pas gagner>
+
+### Options
+
+| Option | Pour | Contre |
+| --- | --- | --- |
+| <option, dont l'idée de l'utilisateur s'il en avait une> | <gain> | <coût> |
+
+Recommandée : <option>, <pourquoi>.
+
+### Esquisse de l'option recommandée
 
 ```ruby
 # cible (esquisse)
