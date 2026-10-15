@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: record-ios-test <simulator-udid> <xcodebuild-log> <test-method> <output.mp4>
+
+Waits for the XCUITest run writing <xcodebuild-log> to start, records the
+simulator screen with `simctl io recordVideo`, and stops the recording with
+SIGINT once <test-method> has passed or failed. Start it in the background
+right before the test runner, after removing any previous log.
+
+Recording starts on the suite start line, a few seconds before the test
+itself, because xcodebuild logs lag: trim the head afterwards.
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    usage
+    exit 0
+fi
+
+if [[ $# -ne 4 ]]; then
+    usage >&2
+    exit 1
+fi
+
+udid="$1"
+log="$2"
+test_method="$3"
+output="$4"
+
+until grep -q "Test Suite '.*' started" "$log" 2>/dev/null; do
+    sleep 0.5
+done
+
+xcrun simctl io "$udid" recordVideo --codec=h264 --force "$output" &
+recorder=$!
+
+until grep -qE "${test_method}\]' (passed|failed)" "$log" 2>/dev/null; do
+    if ! kill -0 "$recorder" 2>/dev/null; then
+        echo "recordVideo exited before the end of ${test_method}" >&2
+        exit 1
+    fi
+    sleep 0.5
+done
+
+kill -INT "$recorder"
+wait "$recorder"

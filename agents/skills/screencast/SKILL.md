@@ -1,9 +1,12 @@
 ---
 name: screencast
-description: Record agent-browser sessions to video, paced like a human demo (animated cursor, progressive typing, smooth scrolling). Use when user wants to create video demos, record browser automation, or capture agent-browser workflows. Triggers on requests involving screencasting, video recording, or visual demos of web interactions, or when a recorded demo looks robotic and should be smoother.
+description: Record agent-browser sessions to video, paced like a human demo (animated cursor, progressive typing, smooth scrolling), or an iOS app in the simulator driven by a temporary XCUITest (see ios.md). Use when user wants to create video demos, record browser automation, capture agent-browser workflows, or film an iOS journey for a pull request ("screencast iOS de la PR", "vidéo du parcours sur le simulateur"). Triggers on requests involving screencasting, video recording, or visual demos of web or iOS interactions, or when a recorded demo looks robotic and should be smoother.
 ---
 
 # Screencast Recording
+
+For an iOS app, follow `ios.md` next to this file instead: the rest of
+this page covers web pages through agent-browser.
 
 Record agent-browser sessions using WebSocket streaming. The recorder
 (`bin/agent-screencast`) consumes the CDP screencast frames the browser emits on
