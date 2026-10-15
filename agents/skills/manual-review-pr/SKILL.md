@@ -1,6 +1,6 @@
 ---
 name: manual-review-pr
-description: Review a pull request together with the user at the design level — a quick local pass (or a Codex pass when the PR is large), the main design findings ranked, then a conversation where the user's own remarks are checked against the code and challenged, alternatives explored and decisions recorded with their justification, ending with a design review page (overview, final target, one sub-tab per solution, product decisions, minor notes) published on assets.delmai.re. Never posts anything on the PR. Use when the user runs /manual-review-pr <url>, says "je relis la PR …", "fais toi aussi une passe et challenge mes points", "relis cette PR avec moi", "review de conception", "on discute de la PR avant que je commente", or wants a shareable summary of a review discussion.
+description: Review a pull request together with the user at the design level — a quick local pass (or a Codex pass when the PR is large), the main design findings ranked, then a conversation where the user's own remarks are checked against the code and challenged, alternatives explored and decisions recorded with their justification, ending with a design review page (overview, final target, one sub-tab per solution, product decisions, minor notes) published on assets.delmai.re (in public when the repository is), plus a short TL;DR to post with the review. Never posts anything on the PR unless asked. Use when the user runs /manual-review-pr <url>, says "je relis la PR …", "fais toi aussi une passe et challenge mes points", "relis cette PR avec moi", "review de conception", "on discute de la PR avant que je commente", or wants a shareable summary of a review discussion or a TL;DR of their review to post on the PR.
 ---
 
 # Manual PR review
@@ -221,7 +221,40 @@ Build to zero warnings, look at every tab and one sub-tab reached by
 ## 7. Publish
 
 As described in `static-page`, into the `<slug>-<suffix>` folder it
-records, with `--except build.py --except GUIDE.md`. Ask public or password, unless already said:
-public is fine when the repository is public on GitHub, a password when
-the feature or the discussion is internal. Give the URL. Do not link it
-from the PR unless asked.
+records, with `--except build.py --except GUIDE.md`.
+
+Access follows the repository, without asking:
+
+- **Public repository on GitHub** (`gh repo view --json visibility`):
+  publish in public, even for an unreleased feature, since the code is
+  already public. Before the upload, check that everything the page says
+  is already public: code, commits, PR description and comments, docs of
+  the repository. Nothing from the ticket tracker (Linear, Jira), Slack,
+  meetings, Sentry, metrics or production data, no internal URL, no real
+  personal data (a name or identity from a fixture is fine, one from a
+  log is not), no internal plan or other team's position. Rephrase or
+  drop what is not; when a decision rests on internal context, keep the
+  decision and drop the context.
+- **Private repository**: behind a password.
+
+Give the URL. Do not link it from the PR unless asked.
+
+## 8. TL;DR for the PR review
+
+Along with the URL, draft the comment the user will post with their
+review: the page link first, then a few short prose paragraphs on what
+does not suit them, conclusions only, in the decisions' order of
+weight: what to rework in the design, the bugs, then the product points,
+with what is not blocking flagged as such. No headings, bold, tables or
+checklists, nothing that looks generated; the user's language. Same
+leak check as a public page: the PR comment is as public as the
+repository.
+
+Show it in the conversation and wait for the user's go. Then, only when
+asked, post it or amend the review they already submitted, keeping its
+state:
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<n>/reviews --jq '.[] | select(.user.login == "<user>") | {id, state, body}'
+gh api -X PUT repos/<owner>/<repo>/pulls/<n>/reviews/<id> -F body=@<file>
+```
