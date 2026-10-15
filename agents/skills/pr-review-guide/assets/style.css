@@ -164,3 +164,20 @@ pre.http .h-path { color: #a5d6ff; }
 pre.http .h-header { color: #79c0ff; }
 
 footer { border-top: 2px solid var(--primary); padding: 1.5rem 0; font-size: .8125rem; color: var(--strong-muted); }
+
+/* Design tab: flow steps, screenshot galleries, redesign cards */
+.steps ol { list-style: none; counter-reset: step; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
+.steps li { counter-increment: step; background: var(--surface); border-top: 4px solid var(--primary-light); border-radius: 8px; padding: 1rem; margin: 0; font-size: .925rem; }
+.steps li::before { content: counter(step); display: flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--primary); color: var(--primary-light); font-weight: 700; margin-bottom: .5rem; }
+.steps li p { margin: 0; }
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 2rem 1.5rem; margin: 1.5rem 0 2.5rem; }
+.shot { font-size: .9rem; color: var(--strong-muted); }
+.shot img { display: block; width: 100%; height: auto; border-radius: 14px; box-shadow: 0 2px 12px rgba(0, 0, 0, .18); background: #0a0a0a; }
+.shot p { margin: .25rem 0 0; }
+.shot img + p, .shot p:has(> strong:only-child) { color: var(--text); font-weight: 700; margin-top: .75rem; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 1rem; margin: 1.5rem 0 2rem; }
+.card { border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: 8px; padding: 1rem 1.25rem; font-size: .95rem; }
+.card p:last-child { margin-bottom: 0; }
+.card .where { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }

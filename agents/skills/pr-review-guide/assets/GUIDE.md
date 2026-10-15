@@ -60,6 +60,95 @@ au moment de la rédaction.
 <Ce qu'on suppose, pourquoi, et qui devra s'adapter si c'est faux.>
 :::
 
+<!-- tab: Design -->
+<!-- Seulement si la PR touche une interface. Voir references/design.md. -->
+
+::: callout
+**Fonctionnel, design à reprendre**
+
+<Ce que la feature permet, en deux phrases.> Les écrans ci-dessous sont la
+version fonctionnelle, posée sans maquette. Livrable attendu : <où le
+designer dépose ses maquettes, nommé comme dans son outil>.
+:::
+
+## Le parcours
+
+::: steps
+1. **<Verbe>.** <Ce que fait l'utilisateur à cette étape.>
+2. **<Verbe>.** <…>
+:::
+
+<!-- subtab: Écrans -->
+
+## <Moment du parcours>
+
+<Ce qui se passe à ce moment, en une ou deux phrases.>
+
+::: gallery
+::: shot
+![<Titre de l'écran>](img/<capture>.png)
+
+**<Titre de l'écran>**
+
+<Ce qu'on y voit, ou l'état montré.>
+:::
+:::
+
+<Ce que les captures ne montrent pas : animation, vibration, état
+impossible à figer.>
+
+<!-- subtab: À redessiner -->
+
+## À redessiner en priorité
+
+::: cards
+::: card
+[<Écran · zone>]{.where}
+
+**<Élément>**
+
+<Ce qui manque, et ce qu'il doit faire.>
+:::
+:::
+
+## Ce que le système impose
+
+<Composants natifs qu'on peut teinter mais pas remplacer sans coût.>
+
+## Contraintes à garder
+
+- **<Contrainte>.** <Pourquoi, venue du code ou d'un échec.>
+
+<!-- subtab: Règles -->
+
+## Règles à respecter
+
+| Règle | Détail |
+| --- | --- |
+| <Taille, titre, droits…> | <La règle métier, telle que le code l'applique> |
+
+<!-- subtab: États et textes -->
+
+## Les états à couvrir
+
+| # | Brique | Où | États à couvrir |
+| --- | --- | --- | --- |
+| 1 | <élément> | <écrans> | <repos, chargement, vide, erreur, plein, désactivé…> |
+
+## Tous les textes affichés
+
+| Brique | Texte |
+| --- | --- |
+| <élément> | « <texte exact relevé dans le code> » · « <…> » |
+
+<!-- subtab: Tokens -->
+
+## Les tokens de l'app
+
+| Token | Valeur | Rôle |
+| --- | --- | --- |
+| [`<token>`](gh:<fichier du design system>) | <valeur> | <où il sert> |
+
 <!-- tab: Exemple de bout en bout -->
 
 ## <Un cas réel, nommé>, de la déclaration à l'écran
