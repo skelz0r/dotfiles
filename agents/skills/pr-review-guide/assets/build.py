@@ -14,7 +14,9 @@ GUIDE.md syntax, on top of CommonMark:
   tree:path          directory at the pinned sha
   commit:abc1234     commit page, inside the PR when `pr` is set
   pr:                the pull request
-  ::: callout        callout box (add .info, .good or .warning); a first
+  ::: callout        callout box; with a variant, ::: {.callout .warning}
+                     (.info, .good or .warning: `::: callout .warning` is
+                     not a div and renders as text); a first
                      paragraph made only of bold text becomes its title
   [503]{.status}     HTTP status badge; cells of a table column headed
                      "Statut", "Status" or "HTTP" get one too
@@ -321,6 +323,8 @@ def check_output(page):
     for leftover in sorted(set(re.findall(r'(?:href|src)="((?:gh|tree|commit|pr):[^"]*)"', page))):
         warn(f"unresolved link {leftover}")
     text = re.sub(r"<(pre|code)[^>]*>.*?</\1>", "", page, flags=re.S)
+    for leftover in sorted(set(re.findall(r"^<p>(:::.*?)(?:<|$)", text, flags=re.M))):
+        warn(f"fenced div rendered as text: {leftover} (variants go in braces: ::: {{.callout .warning}})")
     for leftover in sorted(set(re.findall(r"\[[^\]<>]+\]\[[^\]<>]*\]", text))):
         warn(f"unresolved reference link {leftover}")
     for src in re.findall(r'<img [^>]*src="([^"]+)"', page):
