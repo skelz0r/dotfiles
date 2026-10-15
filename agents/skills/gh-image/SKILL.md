@@ -1,6 +1,6 @@
 ---
 name: gh-image
-description: Attach local images or videos to GitHub issues, pull requests and comments with the native `--attach` flag of gh, which uploads them to GitHub and rewrites their references into hosted user-attachments URLs. Use whenever a screenshot, screencast or before/after evidence has to appear on GitHub, when the user asks to "mettre une capture sur la PR", "ajoute le screenshot à l'issue", "attache l'image", or to reuse a user-attachments URL in GitHub markdown. Records every uploaded screenshot or screencast in a manifest so /cleanup trashes it once the pull request is merged.
+description: Attach local images or videos to GitHub issues, pull requests and comments with the native `--attach` flag of gh, which uploads them to GitHub and rewrites their references into hosted user-attachments URLs. Use whenever a screenshot, screencast or before/after evidence has to appear on GitHub, when the user asks to "mettre une capture sur la PR", "ajoute le screenshot à l'issue", "attache l'image", or to reuse a user-attachments URL in GitHub markdown, or when images already on GitHub are too big ("les screenshots sont trop gros"). Sizes portrait captures so they stay readable side by side. Records every uploaded screenshot or screencast in a manifest so /cleanup trashes it once the pull request is merged.
 license: MIT
 ---
 
@@ -79,6 +79,28 @@ absolute paths: relative ones resolve from the command's working directory,
 including those written in the body file. For appended images, give alt
 text after `#` and quote paths with spaces. Videos render as players and
 take no alt text: let gh generate their reference.
+
+## Size the images
+
+GitHub draws a markdown image at its natural size, capped at the body
+width (about 880 px): a phone capture (750 × 1334 at 2x) then fills more
+than a screen and before/after can no longer be compared. Check the
+dimensions before uploading (`sips -g pixelWidth -g pixelHeight a.png`):
+
+- crop very tall images (a Figma frame, a full-page capture) to the part
+  that matters, at most about a screen ratio, under a new name, before
+  attaching them;
+- after the upload, replace each `![alt](https://github.com/user-attachments/…)`
+  of a portrait capture by `<img src="…" alt="alt" width="240">`, and put
+  the images to compare on the same line, separated by a space, so they
+  render side by side (Figma, before, after);
+- keep the markdown form for landscape or desktop captures already
+  readable at body width.
+
+gh only rewrites markdown destinations, not an `<img src>` holding a local
+path: always attach with `![alt](/abs/path)`, then fetch the saved body,
+swap in the `<img>` tags and save it with `gh pr edit --body-file`,
+without `--attach`, which would upload the files a second time.
 
 ## Verify and recover
 
