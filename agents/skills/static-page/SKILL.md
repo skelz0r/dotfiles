@@ -128,8 +128,14 @@ been shared.
 - **Last check before the upload**: no personal data, token, internal URL
   or real identity left in the page.
 - Give the URL (with the password and the direct link when protected),
-  then offer the next step of the skill (e.g. link it from the PR
-  description).
+  then offer the next step of the skill.
+- **A report tied to a pull request** (the branch's own PR, or the PR the
+  work follows up): amend its description without asking, with
+  `gh pr edit <n> --body-file`. Add a line linking the report (URL only:
+  the password goes to the user, never into the PR), and remove from the
+  description the images the report now carries (screenshots, charts,
+  tables pasted as images), so they live in one place. Show the user the
+  new description.
 
 To iterate, edit the source, rebuild and republish to the same folder
 (the one in `.assets-folder`).
