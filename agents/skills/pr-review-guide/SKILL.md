@@ -122,7 +122,9 @@ These come from iterations on a real guide; each was a correction.
   what the reader is looking at, and its first sentence says how it differs
   from the previous one: a title like "what the API returns in production"
   left the reader lost between the catalogue of what can happen and what
-  actually happens.
+  actually happens. When the case crosses an interface, put each screen
+  under the step it belongs to, next to the payload that drives it, not
+  only in the Design tab.
 - **Only real artefacts.** Code excerpts, payloads, generated
   documentation, failure messages and screenshots all come from the pinned
   commit or from running it. Truncate visibly with `…`. Never invent a

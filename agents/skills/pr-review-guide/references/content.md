@@ -63,7 +63,14 @@ Artefacts, all real:
   token, no internal URL that should not leak.
 - **Generated documentation** (OpenAPI, JSON schema, config): the exact
   excerpt of the generated file.
-- **Screens**: screenshots of the real application (see below).
+- **Screens**: screenshots of the real application (see below). When the
+  case goes through an interface, each step that produces or reads a screen
+  shows it right after its request or response, as a small `::: gallery`
+  of captioned `::: shot` blocks (the same component as the Design tab):
+  the form that sent the payload, the screen built from the response, the
+  state after the action. When the screenshots come from the UI tests'
+  data rather than the run that produced the payloads, say so once at the
+  top of the tab.
 
 ## Architecture tab
 

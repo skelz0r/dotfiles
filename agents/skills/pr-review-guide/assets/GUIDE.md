@@ -183,7 +183,18 @@ Content-Type: application/json
 
 ### 5. Ce que l'écran affiche
 
-![<ce que montre la capture>](img/<capture>.png)
+<!-- Quand le cas traverse une interface, chaque étape qui produit ou lit un
+écran montre ses captures juste après sa requête, dans une petite galerie. -->
+
+::: gallery
+::: shot
+![<Ce que montre la capture>](img/<capture>.png)
+
+**<Ce que montre la capture>**
+
+<Le lien avec la requête ou la réponse ci-dessus.>
+:::
+:::
 
 <!-- tab: Architecture -->
 
