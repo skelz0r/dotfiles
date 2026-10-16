@@ -46,11 +46,17 @@ Be extremely concise. Sacrifice grammar for concision.
   dotfiles scripts), never code shipped to clients: once verified it
   works, rebase on the default branch and push directly, without PR nor
   review
-- Single-commit PR: reuse the commit message as the description, verbatim
-- Otherwise, PR description = compact summary of the commits, not a
+- PR description written for the human reviewer first: a TL;DR on top,
+  readable in 90 seconds, at most ~1,500 characters
+- Single-commit PR: the commit message is the TL;DR, verbatim
+- Otherwise, the TL;DR is a compact summary of the commits, not a
   re-explanation of each
 - Bullet points only when the branch holds distinct logical groups of commits
   (e.g. an unrelated doc commit alongside the feature); otherwise prose
+- Context an agent picking up the PR would need and that does not fit the
+  TL;DR (business constraints, edge cases, rejected alternatives) goes
+  below in a collapsed `<details><summary>Context</summary>` block: never
+  drop a constraint to fit the cap
 
 ## Ruby
 
