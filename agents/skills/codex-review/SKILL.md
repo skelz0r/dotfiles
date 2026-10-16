@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Run an adversarial code review of a diff, commit or branch through the Codex CLI (a different model family), sizing the reasoning effort to the complexity of the change, then triage the findings. Use when the user asks to review something with Codex, wants a second opinion or an external/independent review of code just written, says "review avec codex", "codex review", "fais relire ça", "double-check this diff", or asks to cross-check a change before opening or merging a PR.
+description: Run an adversarial code review of a diff, commit or branch through the Codex CLI (a different model family), sizing the reasoning effort to the complexity of the change, then triage the findings and publish a proof of review (status and comment) on one's own pull request. Use when the user asks to review something with Codex, wants a second opinion or an external/independent review of code just written, says "review avec codex", "codex review", "fais relire ça", "double-check this diff", or asks to cross-check a change before opening or merging a PR, or to show reviewers which agentic reviews a PR went through ("publie la review sur la PR", "agentic review status").
 ---
 
 # Codex review
@@ -137,3 +137,54 @@ When a finding spans several origin commits, split the fix along them. When it d
 any branch commit (a pre-existing problem you chose to fix anyway), give it its own commit with a
 message that explains the defect. A test hardened because Codex showed it was vacuous is a fixup of
 the commit that added the test.
+
+### 7. Publish the proof of review on the pull request
+
+A human reviewer cannot tell which passes the branch went through, on what, and whether they still
+cover the code. `scripts/agentic-review` records them and publishes, on one's own pull request, a
+commit status `Agentic review` on the head commit and a single comment, edited at each pass, with
+the passes, the fixed findings and the ones left with their reason.
+
+Record as you go, never reconstruct afterwards:
+
+```bash
+scripts/agentic-review start --reviewer Codex --effort xhigh --scope "whole branch, focus on <hypothesis>"
+scripts/agentic-review finding --kind bug --severity P1 --title "<defect, one line>" --open
+scripts/agentic-review finding --id f1 --fixed "<the fix>" --commit <fixup sha>
+scripts/agentic-review finding --id f2 --left "<why it stays: pre-existing, own ticket…>"
+```
+
+- `start` right before running Codex: it snapshots the diff the pass reads (per-file patch-ids of
+  `git diff <merge-base>..HEAD`), so commit first.
+- One `finding` per triaged finding, when it is triaged. Kinds: security, bug, product, perf,
+  design, test, docs, nit. Keep Codex's severity (`--severity P1`) when it gave one. `--commit` is
+  followed through autosquash by its subject.
+- Other passes use the same commands: `--reviewer "Claude code-review" --effort max` for
+  `/code-review`, and `decision --axis --problem --decision --why [--commit]` for a design pass,
+  where "kept" is a valid decision and the why quotes the author when they settled it.
+
+Freshness lives in the status, never in the comment's wording: the status is `success` when a pass
+read exactly the diff of the pushed head (a rebase without conflict keeps it), `failure` with a
+description starting with `Stale:` otherwise. Fixes made after a pass make it stale by design: once
+autosquashed, run a short confirmation pass on them before publishing:
+
+```bash
+git range-diff <base> <head reviewed> HEAD     # the fixes, as Codex must read them
+scripts/agentic-review start --reviewer Codex --effort medium --scope "confirmation: fixes of Codex 1"
+scripts/agentic-review check                   # exit 1 and the unreviewed files when stale
+```
+
+Publish only at the end of the triage, after pushing:
+
+```bash
+scripts/agentic-review publish --dry-run
+scripts/agentic-review publish [--note "<what changed since the last pass, when stale>"]
+```
+
+It refuses a pull request opened by someone else or a local HEAD that differs from the pushed one.
+Before the pull request exists, the state stays in the git dir of the worktree and `publish` says
+so; run it again once the pull request is open. Leaving a pull request stale is fine when the last
+changes are trivial: the comment's "Not reviewed" row tells the reviewer what was not read. Going
+from `success` to `failure` posts a one-line notice, since editing a comment notifies nobody.
+Never put secrets or production data in titles and reasons: the comment is visible to anyone who
+can read the repository.
