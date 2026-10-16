@@ -1,0 +1,626 @@
+#!/usr/bin/env python3
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+COMMENT_MARKER = "<!-- agentic-review -->"
+STATE_OPEN = "<!-- agentic-review-state"
+STATE_CLOSE = "-->"
+STATUS_CONTEXT = "Agentic review"
+STATUS_DESCRIPTION_LIMIT = 140
+KINDS = ["security", "bug", "product", "perf", "design", "test", "docs", "nit"]
+SEVERITIES = ["P0", "P1", "P2", "P3"]
+STATE_VERSION = 1
+
+DESCRIPTION = """\
+Record the agentic review passes of the current branch and publish them
+on its pull request: one "Agentic review" commit status on the head
+commit and one comment, edited in place, holding the passes, the
+findings and their triage.
+
+State lives in the git dir of the worktree until the pull request
+exists, then also in a hidden marker of the comment.
+
+A pass covers the head commit when the per-file patch-ids of
+`git diff <merge-base>..HEAD` equal the ones recorded when the pass
+started: a rebase without conflict keeps the coverage, a fix or a
+conflict resolution makes it stale.
+"""
+
+EPILOG = """\
+examples:
+  agentic-review start --reviewer Codex --effort xhigh --scope "whole branch"
+  agentic-review finding --kind bug --severity P1 --title "..." --fixed "..." --commit <sha>
+  agentic-review finding --kind security --title "..." --left "pre-existing, own ticket"
+  agentic-review finding --id f3 --fixed "..."
+  agentic-review decision --axis "..." --problem "..." --decision kept --why "..."
+  agentic-review check
+  agentic-review publish --dry-run
+"""
+
+
+class Failure(Exception):
+    pass
+
+
+def run(args, input_text=None, check=True):
+    result = subprocess.run(args, input=input_text, capture_output=True, text=True,
+                            stdin=None if input_text is not None else subprocess.DEVNULL)
+    if check and result.returncode != 0:
+        raise Failure(f"{' '.join(args[:3])} failed: {result.stderr.strip()}")
+    return result
+
+
+def git(*args, input_text=None, check=True):
+    return run(["git", *args], input_text=input_text, check=check).stdout
+
+
+def gh(*args, input_text=None):
+    return run(["gh", *args], input_text=input_text).stdout
+
+
+def now_iso():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def short_date(iso):
+    moment = datetime.fromisoformat(iso)
+    return f"{moment:%b} {moment.day}"
+
+
+def current_branch():
+    branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()
+    if branch == "HEAD":
+        raise Failure("detached HEAD: check out the branch of the pull request")
+    return branch
+
+
+def state_path():
+    git_dir = Path(git("rev-parse", "--absolute-git-dir").strip())
+    return git_dir / "agentic-review" / (current_branch().replace("/", "__") + ".json")
+
+
+def empty_state():
+    return {"version": STATE_VERSION, "revision": 0, "branch": current_branch(),
+            "passes": [], "findings": [], "decisions": [], "note": "", "published": {}}
+
+
+def load_local_state():
+    path = state_path()
+    if path.exists():
+        return json.loads(path.read_text())
+    return None
+
+
+def save_state(state):
+    path = state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n")
+
+
+def find_pull_request(selector):
+    fields = "number,url,author,headRefOid,baseRefName,state"
+    args = ["pr", "view", "--json", fields]
+    if selector:
+        args.insert(2, selector)
+    result = run(["gh", *args], check=False)
+    if result.returncode != 0:
+        return None
+    pull = json.loads(result.stdout)
+    match = re.match(r"https://[^/]+/([^/]+/[^/]+)/pull/\d+", pull["url"])
+    pull["repo"] = match.group(1)
+    return pull
+
+
+def current_login():
+    return gh("api", "user", "--jq", ".login").strip()
+
+
+def find_comment(pull, login):
+    lines = gh("api", "--paginate", f"repos/{pull['repo']}/issues/{pull['number']}/comments",
+               "--jq", f'.[] | select(.user.login == "{login}" and (.body | startswith("{COMMENT_MARKER}")))'
+               ' | [.id, .html_url] | @tsv').strip().splitlines()
+    if not lines:
+        return None
+    comment_id, url = lines[0].split("\t")
+    return {"id": int(comment_id), "url": url}
+
+
+def state_from_body(body):
+    start = body.find(STATE_OPEN)
+    if start < 0:
+        return None
+    end = body.find(STATE_CLOSE, start + len(STATE_OPEN))
+    return json.loads(body[start + len(STATE_OPEN):end])
+
+
+def state_to_marker(state):
+    payload = json.dumps(state, ensure_ascii=False, separators=(",", ":")).replace(">", "\\u003e")
+    return f"{STATE_OPEN}\n{payload}\n{STATE_CLOSE}"
+
+
+def load_state(args):
+    state = load_local_state()
+    if state is not None:
+        return state
+    pull = find_pull_request(getattr(args, "pr", None))
+    if pull:
+        login = current_login()
+        comment = find_comment(pull, login)
+        if comment:
+            body = gh("api", f"repos/{pull['repo']}/issues/comments/{comment['id']}", "--jq", ".body")
+            remote = state_from_body(body)
+            if remote:
+                return remote
+    return empty_state()
+
+
+def default_base_ref(pull):
+    if pull:
+        return f"origin/{pull['baseRefName']}"
+    head = git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD", check=False).strip()
+    if head:
+        return head.removeprefix("refs/remotes/")
+    for candidate in ("origin/main", "origin/master", "origin/develop"):
+        if git("rev-parse", "--verify", "--quiet", candidate, check=False).strip():
+            return candidate
+    raise Failure("cannot guess the base branch: pass --base")
+
+
+def refresh_base(base_ref):
+    remote, _, branch = base_ref.partition("/")
+    if branch:
+        git("fetch", "--quiet", remote, branch, check=False)
+
+
+def resolve_base(args, pull=None):
+    base_ref = args.base or default_base_ref(pull)
+    refresh_base(base_ref)
+    return git("merge-base", base_ref, "HEAD").strip()
+
+
+def split_diff(diff):
+    chunks = []
+    for line in diff.splitlines(keepends=True):
+        if line.startswith("diff --git "):
+            chunks.append([line])
+        elif chunks:
+            chunks[-1].append(line)
+    return ["".join(chunk) for chunk in chunks]
+
+
+def chunk_path(chunk):
+    header = chunk.split("\n", 1)[0]
+    return header[header.rfind(" b/") + 3:]
+
+
+def fallback_id(chunk):
+    stable = "\n".join(line for line in chunk.splitlines() if not line.startswith("@@"))
+    return hashlib.sha1(stable.encode()).hexdigest()
+
+
+def file_patch_ids(base, head):
+    diff = git("diff", "--no-color", "--no-ext-diff", "-M", base, head)
+    chunks = split_diff(diff)
+    feed = "".join(f"commit {index:040x}\n{chunk}" for index, chunk in enumerate(chunks))
+    computed = {}
+    for line in git("patch-id", "--stable", input_text=feed).splitlines():
+        patch_id, index = line.split()
+        computed[int(index, 16)] = patch_id
+    return {chunk_path(chunk): computed.get(index, fallback_id(chunk))[:12]
+            for index, chunk in enumerate(chunks)}
+
+
+def coverage(state, base):
+    head = git("rev-parse", "HEAD").strip()
+    current = file_patch_ids(base, head)
+    for review in reversed(state["passes"]):
+        if review["files"] == current:
+            return {"covered": True, "head": head, "pass": review, "changed": []}
+    last = state["passes"][-1] if state["passes"] else {"files": {}}
+    changed = sorted(path for path in set(current) | set(last["files"])
+                     if current.get(path) != last["files"].get(path))
+    return {"covered": False, "head": head, "pass": None, "changed": changed}
+
+
+def next_id(prefix, items):
+    numbers = [int(item["id"][1:]) for item in items if item["id"][1:].isdigit()]
+    return f"{prefix}{max(numbers, default=0) + 1}"
+
+
+def pass_by_id(state, pass_id):
+    if not state["passes"]:
+        raise Failure("no pass recorded: run `agentic-review start` first")
+    if pass_id is None:
+        return state["passes"][-1]
+    for review in state["passes"]:
+        if review["id"] == pass_id:
+            return review
+    raise Failure(f"unknown pass {pass_id}")
+
+
+def commit_reference(sha):
+    if not sha:
+        return None
+    full = git("rev-parse", "--verify", f"{sha}^{{commit}}").strip()
+    subject = git("log", "-1", "--format=%s", full).strip()
+    return {"sha": full, "subject": strip_autosquash_prefix(subject)}
+
+
+def strip_autosquash_prefix(subject):
+    return re.sub(r"^((fixup|squash|amend)! )+", "", subject)
+
+
+def bump(state):
+    state["revision"] = state.get("revision", 0) + 1
+    save_state(state)
+
+
+def command_start(args):
+    state = load_state(args)
+    pull = find_pull_request(args.pr)
+    base = resolve_base(args, pull)
+    if git("status", "--porcelain", "--untracked-files=no").strip():
+        print("warning: uncommitted changes are not part of the recorded diff", file=sys.stderr)
+    head = git("rev-parse", "HEAD").strip()
+    reviewer_passes = [p for p in state["passes"] if p["reviewer"] == args.reviewer]
+    review = {
+        "id": next_id("p", state["passes"]),
+        "label": args.label or f"{args.reviewer.split()[0]} {len(reviewer_passes) + 1}",
+        "reviewer": args.reviewer,
+        "effort": args.effort or "",
+        "scope": args.scope,
+        "at": now_iso(),
+        "head": head,
+        "base": base,
+        "files": file_patch_ids(base, head),
+    }
+    state["passes"].append(review)
+    state["note"] = ""
+    bump(state)
+    print(review["id"])
+
+
+def apply_triage(finding, args):
+    if args.fixed is not None:
+        finding.update(status="fixed", fix=args.fixed, reason="")
+    elif args.left is not None:
+        finding.update(status="left", reason=args.left, fix="")
+    elif args.open:
+        finding.update(status="open", fix="", reason="")
+    if args.commit:
+        finding["commit"] = commit_reference(args.commit)
+
+
+def command_finding(args):
+    state = load_state(args)
+    if args.id:
+        finding = next((f for f in state["findings"] if f["id"] == args.id), None)
+        if finding is None:
+            raise Failure(f"unknown finding {args.id}")
+        for field in ("kind", "severity", "title"):
+            if getattr(args, field):
+                finding[field] = getattr(args, field)
+    else:
+        if not (args.kind and args.title):
+            raise Failure("a new finding needs --kind and --title")
+        finding = {"id": next_id("f", state["findings"]), "pass": pass_by_id(state, args.pass_id)["id"],
+                   "kind": args.kind, "severity": args.severity or "", "title": args.title,
+                   "status": "open", "fix": "", "reason": "", "commit": None}
+        state["findings"].append(finding)
+    apply_triage(finding, args)
+    bump(state)
+    print(finding["id"])
+
+
+def command_decision(args):
+    state = load_state(args)
+    decision = {"id": next_id("d", state["decisions"]), "pass": pass_by_id(state, args.pass_id)["id"],
+                "axis": args.axis, "problem": args.problem, "decision": args.decision,
+                "why": args.why, "commit": commit_reference(args.commit)}
+    state["decisions"].append(decision)
+    bump(state)
+    print(decision["id"])
+
+
+def cell(text):
+    return (text or "").replace("|", "\\|").replace("\n", " ").strip()
+
+
+def short(sha):
+    return sha[:7]
+
+
+def current_commit_for(reference, base):
+    if not reference:
+        return None
+    if run(["git", "merge-base", "--is-ancestor", reference["sha"], "HEAD"], check=False).returncode == 0:
+        return reference["sha"]
+    for line in git("log", "--format=%H%x09%s", f"{base}..HEAD").splitlines():
+        sha, subject = line.split("\t", 1)
+        if subject == reference["subject"]:
+            return sha
+    return None
+
+
+def with_commit(text, reference, base):
+    sha = current_commit_for(reference, base)
+    return f"{cell(text)} ({short(sha)})" if sha else cell(text)
+
+
+def finding_order(indexed):
+    index, finding = indexed
+    severity = finding.get("severity") or ""
+    return (finding["kind"] != "security",
+            SEVERITIES.index(severity) if severity in SEVERITIES else len(SEVERITIES),
+            KINDS.index(finding["kind"]),
+            index)
+
+
+def sorted_findings(findings):
+    return [finding for _, finding in sorted(enumerate(findings), key=finding_order)]
+
+
+def kind_cell(finding):
+    return f"{finding['kind']} {finding['severity']}" if finding.get("severity") else finding["kind"]
+
+
+def pass_name(review):
+    return f"{review['reviewer']}, {review['effort']}" if review["effort"] else review["reviewer"]
+
+
+def pass_counts(state, review):
+    own = [f for f in state["findings"] if f["pass"] == review["id"]]
+    fixed = [f for f in own if f["status"] == "fixed" and f["kind"] != "nit"]
+    nits = [f for f in own if f["status"] == "fixed" and f["kind"] == "nit"]
+    left = [f for f in own if f["status"] != "fixed"]
+    fixed_text = f"{len(fixed)} + {len(nits)} nits" if nits else str(len(fixed))
+    return fixed_text, str(len(left))
+
+
+def unreviewed_scope(state, result):
+    files = result["changed"]
+    listed = ", ".join(f"`{path}`" for path in files[:5])
+    more = f" and {len(files) - 5} more" if len(files) > 5 else ""
+    noun = "file" if len(files) == 1 else "files"
+    summary = f"{len(files)} {noun} differ from the last pass: {listed}{more}"
+    return f"{cell(state['note'])}. {summary}" if state.get("note") else summary
+
+
+def verdict(result):
+    head = short(result["head"])
+    if result["covered"]:
+        review = result["pass"]
+        return (f"Covered: the head commit `{head}` carries the diff {review['label']} "
+                f"read on {short_date(review['at'])}.")
+    return f"Stale: the head commit `{head}` is not covered by any pass."
+
+
+def render(state, result, base):
+    passes = {review["id"]: review for review in state["passes"]}
+    lines = [COMMENT_MARKER, "### Agentic review", "", verdict(result), "",
+             "| Pass | When | Scope | Fixed | Left |", "|---|---|---|---|---|"]
+    for review in state["passes"]:
+        fixed, left = pass_counts(state, review)
+        lines.append(f"| {cell(pass_name(review))} | {short_date(review['at'])} | {cell(review['scope'])} "
+                     f"| {fixed} | {left} |")
+    if not result["covered"]:
+        head_date = git("log", "-1", "--format=%cI", "HEAD").strip()
+        lines.append(f"| Not reviewed | {short_date(head_date)} | {unreviewed_scope(state, result)} | | |")
+
+    left = sorted_findings([f for f in state["findings"] if f["status"] != "fixed"])
+    if left:
+        lines += ["", "#### Left unfixed", "", "| Kind | Finding | Decision |", "|---|---|---|"]
+        for finding in left:
+            decision = finding["reason"] if finding["status"] == "left" else "not triaged"
+            lines.append(f"| {kind_cell(finding)} | {cell(finding['title'])} | {cell(decision)} |")
+
+    if state["decisions"]:
+        lines += ["", "#### Design decisions", "", "| Axis | Problem | Decision | Why |", "|---|---|---|---|"]
+        for decision in state["decisions"]:
+            lines.append(f"| {cell(decision['axis'])} | {cell(decision['problem'])} "
+                         f"| {with_commit(decision['decision'], decision.get('commit'), base)} "
+                         f"| {cell(decision['why'])} |")
+
+    fixed = sorted_findings([f for f in state["findings"] if f["status"] == "fixed"])
+    if fixed:
+        lines += ["", "<details>", f"<summary>Fixed findings ({len(fixed)})</summary>", "",
+                  "| Kind | Pass | Finding | Fix |", "|---|---|---|---|"]
+        for finding in fixed:
+            lines.append(f"| {kind_cell(finding)} | {cell(passes[finding['pass']]['label'])} "
+                         f"| {cell(finding['title'])} | {with_commit(finding['fix'], finding.get('commit'), base)} |")
+        lines += ["", "</details>"]
+
+    lines += ["", state_to_marker(state), ""]
+    return "\n".join(lines)
+
+
+def status_description(state, result):
+    groups = {}
+    for review in state["passes"]:
+        name = " ".join(part for part in (review["reviewer"].split()[0], review["effort"]) if part)
+        groups[name] = groups.get(name, 0) + 1
+    reviewers = ", ".join(f"{name} x{count}" for name, count in groups.items())
+    fixed = sum(1 for f in state["findings"] if f["status"] == "fixed")
+    left = len(state["findings"]) - fixed
+    text = f"{reviewers}: {fixed} fixed, {left} not fixed"
+    if not result["covered"]:
+        noun = "file" if len(result["changed"]) == 1 else "files"
+        text = f"Stale: {len(result['changed'])} {noun} unreviewed. {text}"
+    if len(text) > STATUS_DESCRIPTION_LIMIT:
+        text = text[:STATUS_DESCRIPTION_LIMIT - 1] + "…"
+    return text
+
+
+def require_own_open_pull(pull, login):
+    if pull["author"]["login"] != login:
+        raise Failure(f"pull request #{pull['number']} belongs to {pull['author']['login']}, not {login}: "
+                      "nothing is posted on someone else's pull request")
+    if pull["state"] != "OPEN":
+        raise Failure(f"pull request #{pull['number']} is {pull['state'].lower()}: nothing posted")
+
+
+def command_check(args):
+    state = load_state(args)
+    if not state["passes"]:
+        raise Failure("no pass recorded")
+    base = resolve_base(args, find_pull_request(args.pr))
+    result = coverage(state, base)
+    print(verdict(result))
+    for path in result["changed"]:
+        print(f"  {path}")
+    return 0 if result["covered"] else 1
+
+
+def command_show(args):
+    state = load_state(args)
+    if args.json:
+        print(json.dumps(state, indent=2, ensure_ascii=False))
+        return 0
+    if not state["passes"]:
+        raise Failure("no pass recorded")
+    base = resolve_base(args, find_pull_request(args.pr))
+    print(render(state, coverage(state, base), base))
+    return 0
+
+
+def command_path(args):
+    print(state_path())
+    return 0
+
+
+def publish_comment(pull, comment, body):
+    if comment:
+        output = gh("api", "-X", "PATCH", f"repos/{pull['repo']}/issues/comments/{comment['id']}",
+                    "-F", "body=@-", "--jq", ".html_url", input_text=body)
+        return {"id": comment["id"], "url": output.strip()}
+    output = gh("api", f"repos/{pull['repo']}/issues/{pull['number']}/comments",
+                "-F", "body=@-", "--jq", "[.id, .html_url] | @tsv", input_text=body)
+    comment_id, url = output.strip().split("\t")
+    return {"id": int(comment_id), "url": url}
+
+
+def command_publish(args):
+    state = load_state(args)
+    if not state["passes"]:
+        raise Failure("no pass recorded")
+    pull = find_pull_request(args.pr)
+    if pull is None:
+        save_state(state)
+        print(f"no pull request for {current_branch()} yet: state kept in {state_path()}")
+        return 0
+    login = current_login()
+    require_own_open_pull(pull, login)
+    head = git("rev-parse", "HEAD").strip()
+    if pull["headRefOid"] != head:
+        raise Failure(f"pull request head {short(pull['headRefOid'])} differs from local HEAD {short(head)}: "
+                      "push or pull first")
+    if args.note is not None:
+        state["note"] = args.note
+    base = resolve_base(args, pull)
+    result = coverage(state, base)
+    status = "success" if result["covered"] else "failure"
+    description = status_description(state, result)
+    comment = find_comment(pull, login)
+    previous_status = state.get("published", {}).get("status")
+    notify = previous_status == "success" and status == "failure"
+
+    state["published"] = {**state.get("published", {}), "status": status, "sha": head, "at": now_iso()}
+    body = render(state, result, base)
+
+    if args.dry_run:
+        action = f"edit comment {comment['id']}" if comment else "create a comment"
+        print(f"[dry-run] {action} on {pull['url']}:\n")
+        print(body)
+        print(f"[dry-run] status {status} on {short(head)}, context \"{STATUS_CONTEXT}\": {description}")
+        if notify:
+            print("[dry-run] post a short comment: the review went from success to failure")
+        return 0
+
+    published = publish_comment(pull, comment, body)
+    gh("api", f"repos/{pull['repo']}/statuses/{head}", "-f", f"state={status}",
+       "-f", f"context={STATUS_CONTEXT}", "-f", f"description={description}",
+       "-f", f"target_url={published['url']}", "--silent")
+    if notify:
+        gh("api", f"repos/{pull['repo']}/issues/{pull['number']}/comments", "-f",
+           f"body=The agentic review no longer covers the head commit, see {published['url']}", "--silent")
+    state["published"].update(comment_id=published["id"], comment_url=published["url"])
+    bump(state)
+    print(f"{status}: {description}\n{published['url']}")
+    return 0
+
+
+def parser():
+    root = argparse.ArgumentParser(prog="agentic-review", description=DESCRIPTION, epilog=EPILOG,
+                                   formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = root.add_subparsers(dest="command", required=True)
+
+    def add(name, help_text, handler):
+        sub = commands.add_parser(name, help=help_text, description=help_text)
+        sub.add_argument("--pr", help="pull request number or URL (default: the one of the current branch)")
+        sub.set_defaults(handler=handler)
+        return sub
+
+    start = add("start", "record a pass on the diff of HEAD against the base branch, print its id", command_start)
+    start.add_argument("--reviewer", required=True, help='who reviews, e.g. "Codex", "Claude code-review"')
+    start.add_argument("--effort", help="reasoning effort, e.g. xhigh")
+    start.add_argument("--scope", required=True, help="what the pass read and focused on")
+    start.add_argument("--label", help='short name in the findings table (default: "Codex 2")')
+    start.add_argument("--base", help="base ref (default: origin/<pull request base> or origin/HEAD)")
+
+    finding = add("finding", "add a finding to a pass, or update one with --id, print its id", command_finding)
+    finding.add_argument("--id", help="finding to update")
+    finding.add_argument("--pass", dest="pass_id", help="pass id (default: the last one)")
+    finding.add_argument("--kind", choices=KINDS)
+    finding.add_argument("--severity", choices=SEVERITIES, help="severity given by the reviewer, kept as is")
+    finding.add_argument("--title", help="the defect, in one line")
+    triage = finding.add_mutually_exclusive_group()
+    triage.add_argument("--fixed", metavar="FIX", help="how it was fixed")
+    triage.add_argument("--left", metavar="DECISION", help="why it stays unfixed")
+    triage.add_argument("--open", action="store_true", help="not triaged yet")
+    finding.add_argument("--commit", help="commit holding the fix, followed through autosquash by subject")
+
+    decision = add("decision", "record a design decision, print its id", command_decision)
+    decision.add_argument("--pass", dest="pass_id", help="pass id (default: the last one)")
+    decision.add_argument("--axis", required=True)
+    decision.add_argument("--problem", required=True)
+    decision.add_argument("--decision", required=True, help='e.g. "kept", "split the service"')
+    decision.add_argument("--why", required=True, help="the reason, quoting the author when they decided")
+    decision.add_argument("--commit", help="commit applying the decision")
+
+    check = add("check", "tell whether a pass covers HEAD (exit 1 when stale)", command_check)
+    check.add_argument("--base")
+
+    show = add("show", "print the comment as it would be published", command_show)
+    show.add_argument("--base")
+    show.add_argument("--json", action="store_true", help="print the raw state")
+
+    add("path", "print the path of the local state file", command_path)
+
+    publish = add("publish", "post the status and create or edit the comment on one's own pull request",
+                  command_publish)
+    publish.add_argument("--base")
+    publish.add_argument("--note", help="what changed since the last pass, shown in the Not reviewed row")
+    publish.add_argument("--dry-run", action="store_true", help="print what would be posted, post nothing")
+    return root
+
+
+def main():
+    args = parser().parse_args()
+    try:
+        return args.handler(args) or 0
+    except Failure as failure:
+        print(f"agentic-review: {failure}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    os.environ.setdefault("GH_PROMPT_DISABLED", "1")
+    sys.exit(main())

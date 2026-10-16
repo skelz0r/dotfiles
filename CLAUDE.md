@@ -59,6 +59,6 @@ Before committing:
 
 Behaviour tests exist only where a bug costs data or exposure
 (install.sh, migration, upload-assets prepare, gh-media-log purge,
-tidy-commits); the other scripts are covered by lint and `--help` smoke
+tidy-commits, agentic-review publish); the other scripts are covered by lint and `--help` smoke
 tests. Tests go through the CLI boundary with a sandboxed HOME and
 stubbed external commands (see test/helpers.bash).
