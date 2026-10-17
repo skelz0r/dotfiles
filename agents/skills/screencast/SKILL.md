@@ -38,7 +38,10 @@ page is held, not collapsed into a fraction of a second). Consequences:
    (`--executable-path`) so TLS/DNS work; pass the same `AGENT_BROWSER_STREAM_PORT`.
 
 2. **Dry run first**: drive the whole scenario once without recording to find
-   selectors and confirm it works (`agent-browser snapshot -i`). Write the
+   selectors and confirm it works (`agent-browser snapshot -i`). When an
+   end-to-end test already walks the journey (a feature spec, a
+   Playwright test), take its steps, selectors and starting data from it
+   instead of rediscovering them screen by screen. Write the
    scenario as a script file and the data reset as another one (e.g. a
    `bin/rails runner` file): reset, dry run, reset, record. Each take must
    start from the same state, otherwise the second run walks a different
