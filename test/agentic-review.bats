@@ -51,7 +51,7 @@ write_calls() {
 
 review_branch() {
   agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
-  agentic_review finding --kind bug --title "five is wrong" --left "by design" > /dev/null
+  agentic_review finding --kind bug --title "five is wrong" --left "by design" --verdict intentional > /dev/null
 }
 
 @test "nothing is posted on a pull request opened by someone else" {
@@ -140,4 +140,19 @@ review_branch() {
   agentic_review publish > /dev/null
   agentic_review publish > /dev/null
   assert_equal "$(stub_calls gh | grep -c "no longer covers the head commit")" "1"
+}
+
+@test "a finding left unfixed must say whether it was wrong, intentional, pre-existing or deferred" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+
+  run agentic_review finding --kind bug --title "five is wrong" --left "by design"
+  assert_equal "$status" 2
+  assert_contains "$output" "--left needs --verdict"
+}
+
+@test "the comment shows why each finding was left unfixed" {
+  review_branch
+
+  agentic_review publish > /dev/null
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | intentional: by design |"
 }

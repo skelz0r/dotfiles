@@ -94,6 +94,9 @@ Sort every finding into one of three buckets and say which is which:
 - **Wrong or not worth it** → say so with the reason. Codex reports real-looking findings that do not
   hold; verify each one against the code before acting.
 
+When a finding names a class of defect, fix every instance of the class in the diff in the same
+round, not only the line Codex pointed at: otherwise the next pass finds the next instance.
+
 Check the findings that clear you too, not only the ones that accuse you — a "no regression found" on
 a worry you raised in your own summary is worth relaying.
 
@@ -106,7 +109,24 @@ git stash push <changed files> -q && <test command>; git stash pop -q
 Then re-run the project's own checks. A Codex review is not a substitute for the test suite; it did
 not run it.
 
-### 6. Commit each fix where it belongs
+### 6. Converge: cap the passes
+
+An agent fixing and an agent reviewing can keep each other busy forever: each pass digs up a few
+more defects in code that was already there at the first pass. Anthropic saw a pull request go
+through more than fifty overnight rounds this way, 59% of the repeated findings on code present
+since the first pass; capping the rounds and re-reviewing only the new diff took the pull requests
+needing five rounds or more from 8.9% to 1.5%.
+
+- The first pass reads the whole branch. Every later pass reads only the fixes
+  (`git range-diff <base> <head reviewed> HEAD`), never the whole branch again.
+- Every later prompt lists what is already triaged, from `scripts/agentic-review known`, and asks
+  Codex not to report it again (see the template).
+- Three passes on a branch is the cap. A third pass still finding regressions means the approach is
+  wrong, not unfinished: stop, tell the user what keeps breaking and question the design instead of
+  launching a fourth pass. Old defects the passes surface are `pre-existing`, not a reason for
+  another round.
+
+### 7. Commit each fix where it belongs
 
 One commit per finding, never one "address review" commit for all of them. Make it a fixup of the
 commit that introduced the defect, found with `git log -L` or `git blame` on the lines you changed:
@@ -138,7 +158,7 @@ any branch commit (a pre-existing problem you chose to fix anyway), give it its 
 message that explains the defect. A test hardened because Codex showed it was vacuous is a fixup of
 the commit that added the test.
 
-### 7. Publish the proof of review on the pull request
+### 8. Publish the proof of review on the pull request
 
 A human reviewer cannot tell which passes the branch went through, on what, and whether they still
 cover the code. `scripts/agentic-review` records them and publishes, on one's own pull request, a
@@ -151,7 +171,7 @@ Record as you go, never reconstruct afterwards:
 scripts/agentic-review start --reviewer Codex --effort xhigh --scope "whole branch, focus on <hypothesis>"
 scripts/agentic-review finding --kind bug --severity P1 --title "<defect, one line>" --open
 scripts/agentic-review finding --id f1 --fixed "<the fix>" --commit <fixup sha>
-scripts/agentic-review finding --id f2 --left "<why it stays: pre-existing, own ticket…>"
+scripts/agentic-review finding --id f2 --left "<why it stays>" --verdict pre-existing
 ```
 
 - `start` right before running Codex: it snapshots the diff the pass reads (per-file patch-ids of
@@ -159,6 +179,11 @@ scripts/agentic-review finding --id f2 --left "<why it stays: pre-existing, own 
 - One `finding` per triaged finding, when it is triaged. Kinds: security, bug, product, perf,
   design, test, docs, nit. Keep Codex's severity (`--severity P1`) when it gave one. `--commit` is
   followed through autosquash by its subject.
+- A finding left unfixed carries its verdict: `wrong` (false alarm), `intentional`, `pre-existing`
+  or `deferred` (own ticket). Be honest with `wrong`: the verdicts, read back across pull requests
+  from the state in their comments, measure how much of Codex's output is noise at each effort, and
+  are the only evidence to move the effort ladder above or the size threshold of
+  `manual-review-pr`.
 - Other passes use the same commands: `--reviewer "Claude code-review" --effort max` for
   `/code-review`, and `decision --axis --problem --decision --why [--commit]` for a design pass,
   where "kept" is a valid decision and the why quotes the author when they settled it.

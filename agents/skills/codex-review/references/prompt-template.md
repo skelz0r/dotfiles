@@ -22,8 +22,14 @@ Focus, in order of importance:
 4. <PERFORMANCE, IF A HOT PATH IS TOUCHED>
 5. Test quality: would the new specs actually fail against the pre-change code, or are any vacuous?
 
-Report concrete defects with file:line and a failing scenario. Skip style nits. If you find nothing
-real in a section, say so plainly instead of inventing findings.
+<ON A LATER PASS ONLY>
+Already triaged by earlier passes, do not report them again, whatever their status:
+<OUTPUT OF scripts/agentic-review known>
+
+Report concrete defects with file:line and a failing scenario. For each one, name its class (e.g.
+"unscoped query on a soft-deleted association") and list every other instance of that class in the
+diff, so all of them get fixed at once. Skip style nits. If you find nothing real in a section, say
+so plainly instead of inventing findings.
 ```
 
 ## Section notes
@@ -45,6 +51,13 @@ budget goes elsewhere.
 **Blast radius.** Name the callers by file, especially anything with outward-facing effects
 (webhooks, CRM sync, notifications, public API responses). Codex will not find them reliably on its
 own and a silent behaviour change there is the expensive kind.
+
+**Already triaged.** On a later pass, the target is the range-diff of the fixes, not the branch, and
+this list keeps Codex from re-reporting what was decided: a finding left as intentional or wrong
+comes back otherwise, and every repeat costs a round.
+
+**Class of defect.** One instance per pass is how a review drags on for rounds: naming the class
+makes the author sweep the diff once.
 
 **Anti-fabrication clause.** Keep the last sentence verbatim. Without it a high-effort run pads the
 report with speculative findings to look thorough.

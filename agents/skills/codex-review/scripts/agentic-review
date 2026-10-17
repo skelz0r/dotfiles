@@ -17,6 +17,7 @@ STATUS_CONTEXT = "Agentic review"
 STATUS_DESCRIPTION_LIMIT = 140
 KINDS = ["security", "bug", "product", "perf", "design", "test", "docs", "nit"]
 SEVERITIES = ["P0", "P1", "P2", "P3"]
+VERDICTS = ["wrong", "intentional", "pre-existing", "deferred"]
 STATE_VERSION = 1
 
 DESCRIPTION = """\
@@ -38,7 +39,8 @@ EPILOG = """\
 examples:
   agentic-review start --reviewer Codex --effort xhigh --scope "whole branch"
   agentic-review finding --kind bug --severity P1 --title "..." --fixed "..." --commit <sha>
-  agentic-review finding --kind security --title "..." --left "pre-existing, own ticket"
+  agentic-review finding --kind security --title "..." --left "own ticket" --verdict pre-existing
+  agentic-review known
   agentic-review finding --id f3 --fixed "..."
   agentic-review decision --axis "..." --problem "..." --decision kept --why "..."
   agentic-review check
@@ -292,9 +294,13 @@ def apply_triage(finding, args):
     if args.fixed is not None:
         finding.update(status="fixed", fix=args.fixed, reason="")
     elif args.left is not None:
-        finding.update(status="left", reason=args.left, fix="")
+        if args.verdict is None:
+            raise Failure(f"--left needs --verdict ({', '.join(VERDICTS)})")
+        finding.update(status="left", reason=args.left, verdict=args.verdict, fix="")
     elif args.open:
         finding.update(status="open", fix="", reason="")
+    if args.verdict is not None and args.left is None:
+        raise Failure("--verdict goes with --left")
     if args.commit:
         finding["commit"] = commit_reference(args.commit)
 
@@ -368,6 +374,13 @@ def sorted_findings(findings):
     return [finding for _, finding in sorted(enumerate(findings), key=finding_order)]
 
 
+def left_decision(finding):
+    if finding["status"] != "left":
+        return "not triaged"
+    verdict = finding.get("verdict")
+    return f"{verdict}: {finding['reason']}" if verdict else finding["reason"]
+
+
 def kind_cell(finding):
     return f"{finding['kind']} {finding['severity']}" if finding.get("severity") else finding["kind"]
 
@@ -419,8 +432,7 @@ def render(state, result, base):
     if left:
         lines += ["", "#### Left unfixed", "", "| Kind | Finding | Decision |", "|---|---|---|"]
         for finding in left:
-            decision = finding["reason"] if finding["status"] == "left" else "not triaged"
-            lines.append(f"| {kind_cell(finding)} | {cell(finding['title'])} | {cell(decision)} |")
+            lines.append(f"| {kind_cell(finding)} | {cell(finding['title'])} | {cell(left_decision(finding))} |")
 
     if state["decisions"]:
         lines += ["", "#### Design decisions", "", "| Axis | Problem | Decision | Why |", "|---|---|---|---|"]
@@ -488,6 +500,16 @@ def command_show(args):
         raise Failure("no pass recorded")
     base = resolve_base(args, find_pull_request(args.pr))
     print(render(state, coverage(state, base), base))
+    return 0
+
+
+def command_known(args):
+    state = load_state(args)
+    for finding in state["findings"]:
+        if finding["status"] == "fixed":
+            print(f"- fixed: {finding['title']} ({finding['fix']})")
+        elif finding["status"] == "left":
+            print(f"- left as {left_decision(finding)}: {finding['title']}")
     return 0
 
 
@@ -585,6 +607,8 @@ def parser():
     triage.add_argument("--fixed", metavar="FIX", help="how it was fixed")
     triage.add_argument("--left", metavar="DECISION", help="why it stays unfixed")
     triage.add_argument("--open", action="store_true", help="not triaged yet")
+    finding.add_argument("--verdict", choices=VERDICTS,
+                         help="why a left finding stays: wrong (false alarm), intentional, pre-existing, deferred")
     finding.add_argument("--commit", help="commit holding the fix, followed through autosquash by subject")
 
     decision = add("decision", "record a design decision, print its id", command_decision)
@@ -601,6 +625,9 @@ def parser():
     show = add("show", "print the comment as it would be published", command_show)
     show.add_argument("--base")
     show.add_argument("--json", action="store_true", help="print the raw state")
+
+    add("known", "print the findings already triaged, for the next pass not to report them again",
+        command_known)
 
     add("path", "print the path of the local state file", command_path)
 
