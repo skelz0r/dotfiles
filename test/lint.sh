@@ -73,7 +73,7 @@ cli_scripts() {
 
 skill_scripts() {
   local file
-  for file in agents/skills/*/scripts/*.sh claude/statusline-command.sh; do
+  for file in agents/skills/*/scripts/*.sh claude/statusline-command.sh claude/hooks/*.sh; do
     [[ -f "$file" ]] && ! is_library "$file" && echo "$file"
   done
 }
