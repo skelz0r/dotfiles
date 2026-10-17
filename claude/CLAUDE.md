@@ -17,10 +17,21 @@ Be extremely concise. Sacrifice grammar for concision.
   facts (ids, volumes, link to the PR)
 - No headings, tables, bold or checklists: must not look AI-generated
 
+## Checks
+
+Rules below are enforced by a check: a refusal means fix the cause,
+never bypass it (`--no-verify`). Prose stays only for what the check
+cannot see.
+
+| Rule | Enforced by | Still prose |
+|---|---|---|
+| Final newline, no trailing whitespace | git `pre-commit` in `~/dotfiles/git-hooks`, on staged changes | - |
+| Commit subject <= 50, blank line, body <= 72 | git `commit-msg` in `~/dotfiles/git-hooks` | imperative mood, repository's language |
+| No read under `secrets/`, no `git-crypt unlock`/`export-key` | Claude Code PreToolUse hook `~/dotfiles/claude/hooks/block-secrets.sh` (not Codex) | Secrets section: scripts, recursive greps, globs |
+| No `is_a?` / `respond_to?` | RuboCop cop `config/rubocop/duck_typing.rb` of dotfiles, only where copied | Ruby section |
+
 ## Code Style
 
-- All files end with newline
-- No trailing whitespace
 - No comments - use meaningful names for variables/methods and commits messages instead
 
 ## Git
@@ -28,8 +39,7 @@ Be extremely concise. Sacrifice grammar for concision.
 - Write commit messages in the repository's own language: read `git log`
   before writing to know whether it is French or English
 - Atomic commits with clear messages, prefer the why than the what
-- Standard Git commit message formatting: imperative subject limited to
-  50 characters, blank line before the body, body wrapped at 72 characters
+- Imperative subject
 - Commit bodies should be explicit and detailed enough to understand the
   change without context, but stay short when the change is simple: go
   into detail only when the why is complicated or not visible in the code
