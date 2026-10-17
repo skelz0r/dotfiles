@@ -45,6 +45,7 @@
   editor = nvim
   whitespace = -trailing-space,-indent-with-non-tab,-tab-in-indent
   pager = delta
+  hooksPath = ~/dotfiles/git-hooks
 [interactive]
   diffFilter = delta --color-only
 [delta]

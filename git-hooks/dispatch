@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+#
+# dispatch - Global git hook: check the commit conventions, then run the
+# repository's own hook
+#
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+HOOK_NAME="$(basename "$0")"
+SUBJECT_MAX=50
+BODY_MAX=72
+
+usage() {
+  cat << USAGE
+Usage: <hook-name> [GIT HOOK ARGUMENTS]
+
+Every git hook of ~/dotfiles/git-hooks (core.hooksPath in gitconfig)
+is a link to this script. It runs the checks of the hook it is called as, then
+the repository's own hook from .git/hooks, if any, which core.hooksPath
+would otherwise disable. push-to-checkout and proc-receive are not
+linked: git changes its behaviour as soon as they exist.
+
+Checks:
+  pre-commit    staged changes add no trailing whitespace and every
+                staged text file ends with a newline
+  commit-msg    subject of at most $SUBJECT_MAX characters, blank line
+                after it, body lines of at most $BODY_MAX characters
+                (lines holding a URL excepted)
+
+Skipped for merges, cherry-picks and reverts in progress, and for
+fixup!, squash!, amend!, Merge and Revert subjects. Bypass with
+git commit --no-verify.
+
+Options:
+  -h, --help    Show this help message
+USAGE
+  exit 0
+}
+
+[[ "$HOOK_NAME" == dispatch || "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
+
+FAILED=false
+
+refuse() {
+  echo -e "${RED}[$HOOK_NAME]${NC} $*" >&2
+  FAILED=true
+}
+
+hint() {
+  echo -e "${YELLOW}[$HOOK_NAME]${NC} $*" >&2
+}
+
+foreign_changes_in_progress() {
+  local git_dir marker
+  git_dir="$(git rev-parse --git-dir)"
+  for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+    [[ -e "$git_dir/$marker" ]] && return 0
+  done
+  return 1
+}
+
+message_lines() {
+  local file="$1" comment_char line started=false
+  comment_char="$(git config core.commentString || git config core.commentChar || true)"
+  [[ -z "$comment_char" || "$comment_char" == auto ]] && comment_char='#'
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" == "$comment_char ------------------------ >8 ------------------------" ]] && break
+    [[ "$line" == "$comment_char"* ]] && continue
+    [[ "$started" == false && -z "${line//[[:space:]]/}" ]] && continue
+    started=true
+    printf '%s\n' "$line"
+  done < "$file"
+}
+
+check_commit_message() {
+  local LC_ALL=C.UTF-8 lines=() line number
+  while IFS= read -r line; do lines+=("$line"); done < <(message_lines "$1")
+  [[ "${#lines[@]}" -eq 0 ]] && return 0
+
+  local subject="${lines[0]}"
+  case "$subject" in
+    "fixup! "*|"squash! "*|"amend! "*|"Merge "*|'Revert "'*) return 0 ;;
+  esac
+
+  if [[ "${#subject}" -gt "$SUBJECT_MAX" ]]; then
+    refuse "subject is ${#subject} characters, max $SUBJECT_MAX: keep the what in the subject, move the why to the body"
+  fi
+  if [[ "${#lines[@]}" -gt 1 && -n "${lines[1]}" ]]; then
+    refuse "line 2 must be blank: separate the subject from the body"
+  fi
+  for ((number = 2; number < ${#lines[@]}; number++)); do
+    line="${lines[$number]}"
+    [[ "$line" == *://* ]] && continue
+    if [[ "${#line}" -gt "$BODY_MAX" ]]; then
+      refuse "body line $((number + 1)) is ${#line} characters, max $BODY_MAX: wrap it"
+    fi
+  done
+  return 0
+}
+
+files_losing_final_newline() {
+  local staged_diff
+  staged_diff="$(git -c core.quotePath=false diff --cached --no-color --no-ext-diff --no-textconv \
+    --no-renames --diff-filter=ACMR --unified=0)" || return 1
+  awk '
+    /^diff --git / { in_hunk = 0; not_text = 0; next }
+    !in_hunk && / (120000|160000)$/ { not_text = 1; next }
+    !in_hunk && /^\+\+\+ / { file = substr($0, 7); sub(/\t$/, "", file); next }
+    /^@@ / { in_hunk = 1; previous = ""; next }
+    in_hunk && /^\\ / { if (previous == "+" && !not_text) print file; next }
+    in_hunk { previous = substr($0, 1, 1) }
+  ' <<< "$staged_diff"
+}
+
+check_staged_files() {
+  local report file whitespace
+  whitespace="$(git config core.whitespace || true)"
+  whitespace="${whitespace:+$whitespace,}trailing-space,-space-before-tab,-indent-with-non-tab,-tab-in-indent"
+  if ! report="$(git -c core.whitespace="$whitespace" \
+    diff --cached --check --no-color --no-ext-diff -- . ':!*.patch' ':!*.diff')"; then
+    refuse "staged changes add trailing whitespace or blank lines at end of file:"
+    echo "$report" >&2
+  fi
+  local files
+  if ! files="$(files_losing_final_newline)"; then
+    refuse "git diff of the staged changes failed, so the final newlines could not be checked"
+    return 0
+  fi
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && refuse "$file: missing final newline"
+  done <<< "$files"
+  return 0
+}
+
+run_repository_hook() {
+  local common_dir hook
+  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2> /dev/null)" || exit 0
+  hook="$common_dir/hooks/$HOOK_NAME"
+  [[ -x "$hook" && ! "$hook" -ef "$0" ]] || exit 0
+  exec "$hook" "$@"
+}
+
+case "$HOOK_NAME" in
+  commit-msg) foreign_changes_in_progress || check_commit_message "$1" ;;
+  pre-commit) foreign_changes_in_progress || check_staged_files ;;
+esac
+
+if [[ "$FAILED" == true ]]; then
+  hint "fix the commit, or bypass deliberately with git commit --no-verify"
+  exit 1
+fi
+
+run_repository_hook "$@"

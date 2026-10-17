@@ -20,9 +20,10 @@ setup() {
   assert_equal "$failures" ""
 }
 
-@test "install.sh and symlink.sh exit 0 on --help" {
+@test "install.sh, symlink.sh and the git hooks exit 0 on --help" {
   "$REPO_ROOT/install.sh" --help > /dev/null
   "$REPO_ROOT/symlink.sh" --help > /dev/null
+  "$REPO_ROOT/git-hooks/dispatch" --help > /dev/null
 }
 
 @test "--help prints a usage line" {

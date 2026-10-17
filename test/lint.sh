@@ -66,7 +66,7 @@ is_library() {
 
 cli_scripts() {
   local file
-  for file in bin/* install.sh symlink.sh test/lint.sh; do
+  for file in bin/* install.sh symlink.sh test/lint.sh git-hooks/dispatch; do
     [[ -f "$file" ]] && echo "$file"
   done
 }
