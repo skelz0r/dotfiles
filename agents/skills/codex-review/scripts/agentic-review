@@ -73,7 +73,7 @@ def now_iso():
 
 
 def short_date(iso):
-    moment = datetime.fromisoformat(iso)
+    moment = datetime.fromisoformat(iso.replace("Z", "+00:00"))
     return f"{moment:%b} {moment.day}"
 
 
