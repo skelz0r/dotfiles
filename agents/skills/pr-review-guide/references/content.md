@@ -95,6 +95,13 @@ URL of the local environment.
 
 ## Screenshots
 
+Start from the end-to-end tests the PR touches when the project can
+capture them (`bin/qa` with `QA_SCREENSHOTS=1`, see the project's
+`verify-<app>` skill, or `create-verify-skill` to set one up): each test
+already puts the screen in the state the guide needs, the captures are
+reproducible, and driving a browser by hand costs far more. Drive the
+app by hand only for a state no test reaches, as below.
+
 ```bash
 cd <app> && bin/rails s -d                 # or the project's own command
 python3 -m http.server 8765               # for static pages: file:// is rejected
