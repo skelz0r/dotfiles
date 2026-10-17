@@ -88,7 +88,10 @@ Then:
 ## 5. Loop
 
 Back to step 3 after every push or rerun, until the CI is green or every
-remaining failure is outside the branch and reported. When an outside fix
+remaining failure is outside the branch and reported. The `codex-review`
+passes on the fixes count against its cap of three passes per branch:
+once reached, stop looping and ask the user to rethink the approach
+rather than pushing a fourth fix. When an outside fix
 lands on the default branch, rebase again (step 1).
 
 ## Report
