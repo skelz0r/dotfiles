@@ -65,7 +65,9 @@ Read the hand-written code and, more importantly, what it plugs into:
 base classes, callers, every other user of the classes it changes (one
 class shared by two entry points changes where a responsibility can
 live), the framework's extension points, and how the same problem is
-solved elsewhere in the repository.
+solved elsewhere in the repository. Follow what grep does not show: the
+JSON a response returns, a column another job or app reads, a feature
+flag, the source of a gem at its pinned version.
 
 Walk the whole grid below. Report only what the code shows: an empty
 category is a fine outcome, a finding stretched to fill it is not.
@@ -152,6 +154,16 @@ category is a fine outcome, a finding stretched to fill it is not.
 Check every claim against the code before saying it. A user remark can
 rest on a wrong fact (e.g. "it runs once per request" when it runs once
 per item): say so, then answer the real concern behind it.
+
+A design that looks risky is usually safe, or not, because of a single
+fact (e.g. "the job only reads rows the request already committed").
+Find it instead of listing maybes, and say how far it is proven:
+cited (`file:line`, or the library's source at the pinned version),
+walked (the failing scenario followed step by step does not reach),
+ran (a small script calling the real code fails loud if it is false),
+reproduced (in the running app). On a costly area, take it to ran
+before the verdict, and keep the script: it is the cheapest check to
+hand the author. A fact left unproven is said so.
 
 ## 5. Converse
 
