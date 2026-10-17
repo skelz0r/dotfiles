@@ -18,6 +18,9 @@ STATUS_DESCRIPTION_LIMIT = 140
 KINDS = ["security", "bug", "product", "perf", "design", "test", "docs", "nit"]
 SEVERITIES = ["P0", "P1", "P2", "P3"]
 VERDICTS = ["wrong", "intentional", "pre-existing", "deferred"]
+PROOFS = ["cited", "walked", "ran", "reproduced"]
+EXECUTED_PROOFS = ["ran", "reproduced"]
+HIGH_STAKES_SEVERITIES = ["P0", "P1"]
 STATE_VERSION = 1
 
 DESCRIPTION = """\
@@ -40,6 +43,7 @@ examples:
   agentic-review start --reviewer Codex --effort xhigh --scope "whole branch"
   agentic-review finding --kind bug --severity P1 --title "..." --fixed "..." --commit <sha>
   agentic-review finding --kind security --title "..." --left "own ticket" --verdict pre-existing
+  agentic-review finding --id f2 --left "only stale keys: <script output>" --verdict wrong --proof ran
   agentic-review known
   agentic-review finding --id f3 --fixed "..."
   agentic-review decision --axis "..." --problem "..." --decision kept --why "..."
@@ -296,13 +300,33 @@ def apply_triage(finding, args):
     elif args.left is not None:
         if args.verdict is None:
             raise Failure(f"--left needs --verdict ({', '.join(VERDICTS)})")
-        finding.update(status="left", reason=args.left, verdict=args.verdict, fix="")
+        finding.update(status="left", reason=args.left, verdict=args.verdict, fix="",
+                       proof=checked_proof(finding, args))
     elif args.open:
         finding.update(status="open", fix="", reason="")
     if args.verdict is not None and args.left is None:
         raise Failure("--verdict goes with --left")
+    if args.proof is not None and args.verdict != "wrong":
+        raise Failure("--proof goes with --verdict wrong")
     if args.commit:
         finding["commit"] = commit_reference(args.commit)
+
+
+def high_stakes(finding):
+    return finding["kind"] == "security" or finding.get("severity") in HIGH_STAKES_SEVERITIES
+
+
+def checked_proof(finding, args):
+    if args.verdict != "wrong":
+        return ""
+    if args.proof is None:
+        raise Failure(f"--verdict wrong needs --proof ({', '.join(PROOFS)}): "
+                      "how far the fact clearing the finding was proven")
+    if high_stakes(finding) and args.proof not in EXECUTED_PROOFS:
+        label = " ".join(filter(None, [finding["kind"], finding.get("severity")]))
+        raise Failure(f"a {label} finding dismissed as wrong needs "
+                      f"--proof {' or '.join(EXECUTED_PROOFS)}: run the real code, do not argue")
+    return args.proof
 
 
 def command_finding(args):
@@ -378,6 +402,8 @@ def left_decision(finding):
     if finding["status"] != "left":
         return "not triaged"
     verdict = finding.get("verdict")
+    if finding.get("proof"):
+        verdict = f"{verdict} ({finding['proof']})"
     return f"{verdict}: {finding['reason']}" if verdict else finding["reason"]
 
 
@@ -609,6 +635,10 @@ def parser():
     triage.add_argument("--open", action="store_true", help="not triaged yet")
     finding.add_argument("--verdict", choices=VERDICTS,
                          help="why a left finding stays: wrong (false alarm), intentional, pre-existing, deferred")
+    finding.add_argument("--proof", choices=PROOFS,
+                         help="for --verdict wrong, how far the fact clearing it was proven: cited (file:line), "
+                              "walked (failing scenario shown not to reach), ran (script on the real code), "
+                              "reproduced (in the running app); ran or reproduced for security, P0 and P1")
     finding.add_argument("--commit", help="commit holding the fix, followed through autosquash by subject")
 
     decision = add("decision", "record a design decision, print its id", command_decision)

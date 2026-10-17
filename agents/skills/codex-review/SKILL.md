@@ -92,7 +92,13 @@ Sort every finding into one of three buckets and say which is which:
 - **Pre-existing problem the diff merely exposes** → report it, do not silently widen the scope. If
   the proper fix is architectural, say so and why a patch would be worse.
 - **Wrong or not worth it** → say so with the reason. Codex reports real-looking findings that do not
-  hold; verify each one against the code before acting.
+  hold; verify each one against the code before acting. A dismissal that reads right is worth nothing
+  on its own: most alarming findings are cleared by a single fact (e.g. "this callback only runs
+  after commit, so a rollback never purges"). Name that fact and prove it as far as is cheap:
+  `cited` (a real `file:line`, or the gem's source at the pinned version), `walked` (the failing
+  scenario followed step by step does not reach), `ran` (a small script calling the real code fails
+  loud if the fact is false), `reproduced` (in the running app). `agentic-review` refuses a `wrong`
+  without that level, and below `ran` on a security, P0 or P1 finding.
 
 When a finding names a class of defect, fix every instance of the class in the diff in the same
 round, not only the line Codex pointed at: otherwise the next pass finds the next instance.
@@ -180,7 +186,9 @@ scripts/agentic-review finding --id f2 --left "<why it stays>" --verdict pre-exi
   design, test, docs, nit. Keep Codex's severity (`--severity P1`) when it gave one. `--commit` is
   followed through autosquash by its subject.
 - A finding left unfixed carries its verdict: `wrong` (false alarm), `intentional`, `pre-existing`
-  or `deferred` (own ticket). Be honest with `wrong`: the verdicts, read back across pull requests
+  or `deferred` (own ticket). A `wrong` also takes `--proof` and its reason states the fact that
+  clears it with the evidence (the `file:line`, the script's output). Be honest with `wrong`: the
+  verdicts, read back across pull requests
   from the state in their comments, measure how much of Codex's output is noise at each effort, and
   are the only evidence to move the effort ladder above or the size threshold of
   `manual-review-pr`.

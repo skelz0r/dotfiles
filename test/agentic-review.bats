@@ -156,3 +156,30 @@ review_branch() {
   agentic_review publish > /dev/null
   assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | intentional: by design |"
 }
+
+@test "a finding dismissed as wrong must say how far the fact clearing it was proven" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+
+  run agentic_review finding --kind bug --title "five is wrong" --left "a.txt:5 is never read" --verdict wrong
+  assert_equal "$status" 2
+  assert_contains "$output" "--verdict wrong needs --proof"
+}
+
+@test "a security, P0 or P1 finding is dismissed as wrong only on code that was run" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+
+  run agentic_review finding --kind security --title "leaks five" --left "a.txt:5 is public" --verdict wrong --proof cited
+  assert_equal "$status" 2
+  run agentic_review finding --kind bug --severity P1 --title "five is wrong" --left "never read" --verdict wrong --proof walked
+  assert_equal "$status" 2
+  run agentic_review finding --kind bug --severity P1 --title "five is wrong" --left "never read: script output" --verdict wrong --proof ran
+  assert_equal "$status" 0
+}
+
+@test "the comment shows how far a dismissed finding was proven" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --title "five is wrong" --left "a.txt:5 is never read" --verdict wrong --proof cited > /dev/null
+
+  agentic_review publish > /dev/null
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | wrong (cited): a.txt:5 is never read |"
+}

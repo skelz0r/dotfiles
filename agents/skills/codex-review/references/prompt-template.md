@@ -50,7 +50,9 @@ budget goes elsewhere.
 
 **Blast radius.** Name the callers by file, especially anything with outward-facing effects
 (webhooks, CRM sync, notifications, public API responses). Codex will not find them reliably on its
-own and a silent behaviour change there is the expensive kind.
+own and a silent behaviour change there is the expensive kind. Point it at the readers a symbol
+search misses: the JSON an endpoint returns, a database column another job or app reads, a feature
+flag, a serialized payload, code several calls downstream.
 
 **Already triaged.** On a later pass, the target is the range-diff of the fixes, not the branch, and
 this list keeps Codex from re-reporting what was decided: a finding left as intentional or wrong
