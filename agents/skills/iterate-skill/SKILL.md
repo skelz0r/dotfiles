@@ -43,7 +43,19 @@ the checkout once the change is pushed.
    otherwise create the worktree next to the repository instead of inside it.
    One worktree can hold several skills when the user asks for them together.
 
-4. Write the learnings into the skill, reading it entirely first:
+4. For each learning, first ask whether a check would enforce it more
+   reliably than prose: a script shipped with the skill that fails loud,
+   a validation inside an existing helper, a lint, a git or Claude Code
+   hook, a test. Prose only works when the agent remembers to read and
+   apply it; a check fails when the rule is broken. When a check can
+   carry the rule, write the check and only reference it from the
+   skill, without restating the rule in prose next to it. When the
+   check lives outside the skill's repository (a project lint, a CI
+   step), propose it to the user instead of writing it. Keep prose for
+   judgment calls no check can settle, and make it prominent with an
+   example of the failure it prevents.
+
+   Then write the learnings into the skill, reading it entirely first:
    - only what this conversation established: failures met and their fix,
      what made the result good, pitfalls that cost a retry;
    - generic rules first, project details only as examples;
