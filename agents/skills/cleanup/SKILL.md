@@ -69,6 +69,16 @@ PR's media and of the tab.
      (`git log --merges` on the base branch: merge commits →
      `gh pr merge --merge`, otherwise `--squash` or `--rebase`).
 
+   When the project's `CLAUDE.md` provides local CI scripts, use them
+   for both: push with its push script (e.g. `bin/local-ci-push`, whose
+   result replaces `gh pr checks`) and merge with its merge script run
+   from the worktree (e.g. `bin/local-merge-pr`), never `gh pr merge`,
+   which runs the remote CI and may deploy without the local one. A
+   merge script running in the background uses the worktree: wait for
+   its log (e.g. `tmp/local-ci.log`) to report the end before step 5,
+   and report a failed CI or deploy instead of cleaning up. It may leave
+   the worktree detached on the merge commit with the branch deleted.
+
    Stop and report when GitHub blocks the merge (`BLOCKED`: missing
    approval, failing required check, draft) or when the PR is closed
    without merge: never bypass a protection with `--admin`. An unmerged
@@ -77,7 +87,9 @@ PR's media and of the tab.
 4. Check nothing unpublished remains in the worktree:
    - `git -C <path> status --short` must be empty;
    - `git -C <path> rev-parse HEAD` must equal `headRefOid` (read it
-     again after a rebase in step 3).
+     again after a rebase in step 3), or contain it
+     (`git merge-base --is-ancestor <headRefOid> HEAD`) when a local
+     merge script left it on the merge commit.
    Otherwise stop and show what would be lost.
 
 5. From the primary checkout (never from inside the worktree being
