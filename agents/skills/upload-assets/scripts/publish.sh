@@ -52,13 +52,22 @@ http_status() {
   curl -s -o /dev/null -I -w '%{http_code}' "$@"
 }
 
+is_locked() {
+  case "$1" in
+    401 | 429) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 failures=0
 urls=()
+anonymous_probed=false
 while IFS= read -r encoded_path; do
   url="$BASE_URL/$folder/$encoded_path"
-  if [ -n "$protected_by" ]; then
+  if [ -n "$protected_by" ] && [ "$anonymous_probed" = false ]; then
+    anonymous_probed=true
     anonymous_status=$(http_status "$url")
-    if [ "$anonymous_status" != "401" ]; then
+    if ! is_locked "$anonymous_status"; then
       echo "NOT PROTECTED ($anonymous_status): $url" >&2
       failures=$((failures + 1))
       continue
@@ -82,10 +91,10 @@ done < <(cd "$stage" && find . -type f ! -path './.*' | sed 's|^\./||' | sort | 
 
 if [ "${#entries[@]}" -eq 0 ]; then
   anonymous_status=$(http_status "$BASE_URL/$folder/")
-  if [ -n "$protected_by" ] && [ "$anonymous_status" != "401" ]; then
+  if [ -n "$protected_by" ] && ! is_locked "$anonymous_status"; then
     echo "NOT PROTECTED ($anonymous_status): $BASE_URL/$folder/" >&2
     failures=$((failures + 1))
-  elif [ -z "$protected_by" ] && [ "$anonymous_status" = "401" ]; then
+  elif [ -z "$protected_by" ] && is_locked "$anonymous_status"; then
     echo "STILL PROTECTED: $BASE_URL/$folder/" >&2
     failures=$((failures + 1))
   fi

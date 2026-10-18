@@ -135,7 +135,9 @@ scripts/publish.sh <folder> <stage>
 ```
 
 Sets or removes the password, uploads with `upload-assets`, checks every
-URL answers HTTP 200 (and 401 without the key when protected), deletes the
+URL answers HTTP 200 with the key, and that one anonymous request per
+folder is locked out (401, or 429 once nginx rate limits the unlock
+page that only locked requests reach), deletes the
 staging dir on success and keeps it on failure for a retry. Prints the
 access, with the password and the direct link when it set one.
 
