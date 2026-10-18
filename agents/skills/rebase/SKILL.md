@@ -41,12 +41,21 @@ the project's tests for the files touched by the branch before pushing.
 - PR authored by the user (`gh pr view --json author` matches
   `gh api user --jq .login`): `git push --force-with-lease`.
 - Someone else's PR: ask before force pushing.
+- When the project's `CLAUDE.md` provides a script that pushes and runs
+  the CI locally (e.g. `bin/local-ci-push`), push with it instead of
+  `git push`: GitHub Actions then skips the commit, and some machines
+  refuse the raw push through a pre-push hook.
 
 ## 3. Watch the CI
 
 ```bash
 gh pr checks <pr> --watch --fail-fast
 ```
+
+With a local CI script, its exit code and failure report (e.g.
+`tmp/local-ci-report/`, the `Local CI` commit status) are the CI: read
+them instead of waiting for GitHub checks, and rerun the script where a
+remote rerun is suggested below.
 
 Green: report and stop. Red: open the failed job log
 (`gh run view <run> --log-failed`, or `--job <id> --log` when
