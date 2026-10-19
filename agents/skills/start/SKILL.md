@@ -91,7 +91,14 @@ inside the other inherits its variable, so herdr is checked first):
      testing instruction, the global CLAUDE.md sets the policy;
    - the expected outcome: atomic commits, PR against the base branch,
      or direct push for internal tooling as the global CLAUDE.md
-     allows — unless the user asked for something else.
+     allows — unless the user asked for something else;
+   - for a feature (new behaviour, product change: anything but a
+     bugfix, a minor UI change or a refactoring), an agentic review
+     once the code is finished and pushed, before handing back: the
+     `codex-review` skill, findings triaged and fixed, proof published
+     on the PR. Without it `/cleanup` refuses to merge the PR, and the
+     user has to ask for the review in a second round (a dictation
+     language setting was pushed and declared done with no review).
 
    No code, no step-by-step implementation: describe the target, not
    the diff. Save it to the scratchpad directory when one is listed,
