@@ -152,6 +152,12 @@ These come from iterations on a real guide; each was a correction.
   exact texts, tokens) into the guide; it does not change the guide's look,
   which stays the project's design system. A standalone design overview
   with its own palette was the right content in the wrong place.
+- **Number what gets pointed at.** Catalogues whose items reviewers cite
+  one by one get short stable IDs: E1, E2… for screens, the same idea for
+  commits, behaviour changes or decisions when they are discussed item by
+  item; never for prose sections. A screen keeps its ID wherever it
+  appears, so "E4: buttons misaligned" needs no description of which
+  screen, and proposals made after that feedback cite the same IDs.
 - **Show the overview in charts, drawn from real numbers.** A reviewer
   grasps "seven paths sent nothing, three sent twice" from bars faster
   than from a table; but a chart of estimated values is a plausible

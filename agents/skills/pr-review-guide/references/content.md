@@ -88,7 +88,9 @@ Artefacts, all real:
   shows it right after its request or response, as a small `::: gallery`
   of captioned `::: shot` blocks (the same component as the Design tab):
   the form that sent the payload, the screen built from the response, the
-  state after the action. When the screenshots come from the UI tests'
+  state after the action. Prefix each caption and alt text with the
+  screen's ID from the Design tab (`![E4 · Codes de secours](img/04-backup-codes.png)`).
+  When the screenshots come from the UI tests'
   data rather than the run that produced the payloads, say so once at the
   top of the tab.
 

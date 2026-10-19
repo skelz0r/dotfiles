@@ -124,19 +124,17 @@ designer dépose ses maquettes, nommé comme dans son outil>.
 
 <!-- subtab: Écrans -->
 
+Chaque écran a un identifiant stable (E1, E2…) repris partout dans le
+guide : citez-le dans vos retours (« E4 : boutons mal alignés »), `#e4`
+pointe directement dessus.
+
 ## <Moment du parcours>
 
 <Ce qui se passe à ce moment, en une ou deux phrases.>
 
-::: gallery
-::: shot
-![<Titre de l'écran>](img/<capture>.png)
-
-**<Titre de l'écran>**
-
-<Ce qu'on y voit, ou l'état montré.>
-:::
-:::
+| ID | Écran | Capture |
+| --- | --- | --- |
+| [E1]{#e1} | **<Titre de l'écran>** · <ce qu'on y voit, ou l'état montré> | ![E1 · <Titre de l'écran>](img/<capture>.png) |
 
 <Ce que les captures ne montrent pas : animation, vibration, état
 impossible à figer.>
@@ -147,7 +145,7 @@ impossible à figer.>
 
 ::: cards
 ::: card
-[<Écran · zone>]{.where}
+[<E4> · <zone>]{.where}
 
 **<Élément>**
 
@@ -232,9 +230,9 @@ Content-Type: application/json
 
 ::: gallery
 ::: shot
-![<Ce que montre la capture>](img/<capture>.png)
+![E1 · <Ce que montre la capture>](img/<capture>.png)
 
-**<Ce que montre la capture>**
+**E1 · <Ce que montre la capture>**
 
 <Le lien avec la requête ou la réponse ci-dessus.>
 :::
