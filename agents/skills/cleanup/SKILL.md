@@ -57,13 +57,18 @@ PR's media and of the tab.
    refactorings follow the project's own rules (some `CLAUDE.md` let the
    session merge them once a review comes back clean).
 
-   - behind its base or `CONFLICTING`: from the worktree, fetch and
-     rebase onto `origin/<baseRefName>`, resolve the conflicts by reading
-     both sides (and the commits that introduced them), run the tests
-     covering the touched files, then
+   - `mergeable` is `CONFLICTING`, or `mergeStateStatus` is `BEHIND`
+     (the repository requires up-to-date branches): from the worktree,
+     fetch and rebase onto `origin/<baseRefName>`, resolve the conflicts
+     by reading both sides (and the commits that introduced them), run
+     the tests covering the touched files, then
      `git push --force-with-lease`. Ask the user when a conflict needs a
-     functional decision rather than a mechanical merge;
-   - wait for the checks the push triggered (`gh pr checks --watch`);
+     functional decision rather than a mechanical merge. A branch merely
+     behind its base, without either state, is merged as is: the CI on
+     the base branch checks the integration, and a rebase only to catch
+     up costs a second full CI run for nothing;
+   - after such a push, wait for the checks it triggered
+     (`gh pr checks --watch`);
    - merge once `mergeStateStatus` is `CLEAN` (or `UNSTABLE` for
      non-required checks only), with the method the repository uses
      (`git log --merges` on the base branch: merge commits →
