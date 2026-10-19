@@ -20,6 +20,22 @@ GUIDE.md syntax, on top of CommonMark:
                      paragraph made only of bold text becomes its title
   [503]{.status}     HTTP status badge; cells of a table column headed
                      "Statut", "Status" or "HTTP" get one too
+  ::: {.chart .bars target=1}
+                     bar chart from the table inside: first column labels,
+                     one bar track per other column (e.g. base branch, PR);
+                     a row with empty value cells is a group heading; with
+                     `target`, a dashed line marks it and bars are colored
+                     on target, above or below; optional `max`
+  ::: {.chart .stack}
+                     one stacked bar from a two-column table (label, value),
+                     shares and total computed
+                     both: a first paragraph made only of bold text is the
+                     title, other paragraphs are the caption
+  ::: flows          side-by-side flows, each a ::: {.flow title="…"} holding
+                     a list: one node per item, arrows between them; an item
+                     starting with "↓" is an arrow label, [text]{.ok},
+                     {.dup} or {.none} colors a node, a nested list splits
+                     into nodes side by side
 
 Links are resolved on pandoc's syntax tree, so code blocks and inline code
 are never touched, and the document is rendered in one pass, so every id is
@@ -40,8 +56,10 @@ SOURCE = ROOT / "GUIDE.md"
 OUTPUT = ROOT / "index.html"
 
 LABELS = {
-    "fr": {"tabs": "Sections du guide", "footer": "Guide de revue — liens figés sur le commit {sha}."},
-    "en": {"tabs": "Guide sections", "footer": "Review guide — links pinned to commit {sha}."},
+    "fr": {"tabs": "Sections du guide", "footer": "Guide de revue — liens figés sur le commit {sha}.",
+           "on_target": "sur la cible", "above": "au-dessus", "below": "en dessous", "total": "total"},
+    "en": {"tabs": "Guide sections", "footer": "Review guide — links pinned to commit {sha}.",
+           "on_target": "on target", "above": "above", "below": "below", "total": "total"},
 }
 
 STATUS = r"[1-5]\d\d"
@@ -201,7 +219,179 @@ def walk(node, visit):
     return node
 
 
-def transform(ast, links):
+def div(classes, blocks, style=None):
+    return {"t": "Div", "c": [["", classes, [["style", style]] if style else []], blocks]}
+
+
+def plain(inlines):
+    return {"t": "Plain", "c": inlines}
+
+
+def text(inlines):
+    return {"t": "Str", "c": inlines}
+
+
+def stringify(node):
+    if isinstance(node, list):
+        return "".join(stringify(item) for item in node)
+    if not isinstance(node, dict):
+        return ""
+    kind = node.get("t")
+    if kind == "Str":
+        return node["c"]
+    if kind in ("Space", "SoftBreak", "LineBreak"):
+        return " "
+    if kind == "Code":
+        return node["c"][1]
+    return stringify(node.get("c", []))
+
+
+def cell_inlines(cell):
+    blocks = cell[4]
+    return blocks[0]["c"] if blocks and blocks[0]["t"] in ("Plain", "Para") else []
+
+
+def table_rows(table):
+    _, _, _, head, bodies, _ = table["c"]
+    rows = list(head[1])
+    for body in bodies:
+        rows += body[2] + body[3]
+    return [[cell_inlines(cell) for cell in row[1]] for row in rows]
+
+
+def number(inlines, where):
+    raw = re.sub(r"[\s  _]", "", stringify(inlines))
+    if not raw:
+        return None
+    try:
+        return float(raw.replace(",", "."))
+    except ValueError:
+        warn(f"{where}: `{stringify(inlines)}` is not a number")
+        return None
+
+
+def grouped(value, lang):
+    rendered = f"{value:,.0f}" if value == int(value) else f"{value:,.1f}"
+    return rendered.replace(",", " ") if lang == "fr" else rendered
+
+
+def chart_parts(blocks):
+    title, caption, table = None, [], None
+    for block in blocks:
+        if block["t"] == "Table" and table is None:
+            table = block
+        elif title is None and not caption and block["t"] == "Para" and len(block["c"]) == 1 and block["c"][0]["t"] == "Strong":
+            title = block["c"][0]["c"]
+        else:
+            caption.append(block)
+    head = [div(["chart-title"], [plain(title)])] if title else []
+    return head + [div(["chart-sub"], caption)] if caption else head, table
+
+
+def bars_chart(attr, blocks, labels):
+    options = dict(attr[2])
+    head, table = chart_parts(blocks)
+    if table is None:
+        warn("::: {.chart .bars} without a table")
+        return div(["chart"], head)
+    header, *rows = table_rows(table)
+    values = [[number(cell, "bar chart") for cell in row[1:]] for row in rows]
+    target = float(options["target"]) if "target" in options else None
+    top = float(options.get("max") or max([v for row in values for v in row if v is not None] + [target or 0, 1]))
+    columns = len(header) - 1
+    grid = [div(["head", "first"], [plain(header[0])])] + [div(["head"], [plain(cell)]) for cell in header[1:]]
+    for row, numbers in zip(rows, values):
+        if all(v is None for v in numbers):
+            grid.append(div(["group"], [plain(row[0])]))
+            continue
+        grid.append(div(["label"], [plain(row[0])]))
+        for column, value in enumerate(numbers):
+            if value is None:
+                grid.append(div(["track"], []))
+                continue
+            if target is None:
+                tone = f"series-{column % 4 + 1}"
+            else:
+                tone = "ok" if value == target else "dup" if value > target else "none"
+            width = f"width:{value / top * 100:.2f}%" if value else None
+            bar = div(["bar", tone] + ([] if value else ["zero"]), [plain([text(grouped(value, labels["lang"]))])], width)
+            grid.append(div(["track"], [bar]))
+    style = f"grid-template-columns:minmax(10rem,1.3fr) repeat({columns},1fr);--columns:{columns}"
+    if target is not None:
+        style += f";--target:{target / top * 100:.2f}%"
+        legend = [div(["chart-legend"], [plain([
+            {"t": "Span", "c": [["", [tone], []], [text(labels[key])]]}
+            for tone, key in (("ok", "on_target"), ("dup", "above"), ("none", "below"))])])]
+    else:
+        legend = []
+    return div(["chart"], head + legend + [div(["paths"] + (["targeted"] if target is not None else []), grid, style)])
+
+
+def stack_chart(attr, blocks, labels):
+    head, table = chart_parts(blocks)
+    if table is None:
+        warn("::: {.chart .stack} without a table")
+        return div(["chart"], head)
+    _, *rows = table_rows(table)
+    parts = [(row[0], number(row[1] if len(row) > 1 else [], "stacked bar")) for row in rows]
+    parts = [(label, value) for label, value in parts if value]
+    total = sum(value for _, value in parts)
+    lang = labels["lang"]
+    segments = [div([f"series-{i % 4 + 1}"], [plain([text(grouped(value, lang))])], f"flex:{value}") for i, (label, value) in enumerate(parts)]
+    legend = []
+    for i, (label, value) in enumerate(parts):
+        share = value / total * 100
+        legend.append({"t": "Span", "c": [["", [f"series-{i % 4 + 1}"], []],
+                       label + [text(f" {grouped(value, lang)} ({share:.0f} %)" if lang == "fr" else f" {grouped(value, lang)} ({share:.0f}%)")]]})
+    legend.append({"t": "Span", "c": [["", ["total"], []], [text(f"{labels['total']} {grouped(total, lang)}")]]})
+    return div(["chart"], head + [div(["stack"], segments), div(["chart-legend"], [plain(legend)])])
+
+
+def flow_node(inlines):
+    if len(inlines) == 1 and inlines[0]["t"] == "Span":
+        classes = [c for c in inlines[0]["c"][0][1] if c in ("ok", "dup", "none", "entry")]
+        if classes:
+            return div(["node"] + classes, [plain(inlines[0]["c"][1])])
+    return div(["node"], [plain(inlines)])
+
+
+def flow_lane(items):
+    if any(item and item[0]["t"] == "Para" for item in items):
+        warn("::: flow: a list with blank lines between items is one lane; start each lane with another marker (- then *)")
+    out = []
+    for position, item in enumerate(items):
+        inlines = item[0]["c"] if item and item[0]["t"] in ("Plain", "Para") else []
+        if stringify(inlines).startswith("↓"):
+            out.append(div(["arrow"], [plain(inlines)]))
+            continue
+        if out and "arrow" not in out[-1]["c"][0][1]:
+            out.append(div(["arrow"], [plain([text("↓")])]))
+        node = flow_node(inlines)
+        if position == 0 and len(node["c"][0][1]) == 1:
+            node["c"][0][1].append("entry")
+        out.append(node)
+        nested = [b for b in item[1:] if b["t"] in ("BulletList", "OrderedList")]
+        for listing in nested:
+            entries = listing["c"] if listing["t"] == "BulletList" else listing["c"][1]
+            out.append(div(["arrow"], [plain([text("↓")])]))
+            out.append(div(["split"], [flow_node(e[0]["c"] if e and e[0]["t"] in ("Plain", "Para") else []) for e in entries]))
+    return div(["lane"], out)
+
+
+def flow(attr, blocks):
+    title = dict(attr[2]).get("title")
+    out = [div(["flow-title"], [plain([text(title)])])] if title else []
+    for block in blocks:
+        if block["t"] == "BulletList":
+            out.append(flow_lane(block["c"]))
+        elif block["t"] == "OrderedList":
+            out.append(flow_lane(block["c"][1]))
+        else:
+            out.append(block)
+    return div(["flow"], out)
+
+
+def transform(ast, links, labels):
     def visit(node):
         kind = node.get("t")
         if kind in ("Link", "Image"):
@@ -212,6 +402,12 @@ def transform(ast, links):
             fmt, text = node["c"]
             if fmt == "html" and text.lstrip().startswith("<!--") and not TAB_MARKER.match(text.strip()):
                 return []
+        if kind == "Div" and {"chart", "bars"} <= set(node["c"][0][1]):
+            return bars_chart(node["c"][0], walk(node["c"][1], visit), labels)
+        if kind == "Div" and {"chart", "stack"} <= set(node["c"][0][1]):
+            return stack_chart(node["c"][0], walk(node["c"][1], visit), labels)
+        if kind == "Div" and "flow" in node["c"][0][1]:
+            return flow(node["c"][0], walk(node["c"][1], visit))
         if kind == "Div" and "callout" in node["c"][0][1]:
             blocks = node["c"][1]
             if blocks and blocks[0]["t"] == "Para" and len(blocks[0]["c"]) == 1 and blocks[0]["c"][0]["t"] == "Strong":
@@ -418,12 +614,12 @@ def main():
     raw = SOURCE.read_text(encoding="utf-8")
     meta, body = front_matter(raw)
     offset = raw[: len(raw) - len(body)].count("\n") + 1
-    labels = LABELS.get(meta.get("lang", "fr"), LABELS["fr"])
+    labels = {**LABELS.get(meta.get("lang", "fr"), LABELS["fr"]), "lang": meta.get("lang", "fr")}
 
     check_sources(body, offset)
     links = Links(meta, Source(body, offset))
     ast = json.loads(pandoc(["-f", "commonmark_x", "-t", "json"], body))
-    ast["blocks"] = transform(ast["blocks"], links)
+    ast["blocks"] = transform(ast["blocks"], links, labels)
     rendered = enhance(pandoc(["-f", "json", "-t", "html5", "--wrap=none"], json.dumps(ast)))
 
     parts = re.split(r"^<!-- tab: (.+?) -->\s*$", rendered, flags=re.M)

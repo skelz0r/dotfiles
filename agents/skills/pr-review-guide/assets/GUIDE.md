@@ -28,6 +28,26 @@ au moment de la rédaction.
 <Ce que la PR change, pour qui, et ce qui garantit que ça tient.>
 :::
 
+<!-- Avant / après quand la PR change un comportement : une liste par
+couloir, un nœud par élément ; deux couloirs d'un même flow commencent par
+des puces différentes (- puis *). -->
+
+::: flows
+::: {.flow title="avant"}
+- <point d'entrée>
+- <étape>
+- [<ce qui sort, et pourquoi c'est faux>]{.none}
+:::
+
+::: {.flow title="cette PR"}
+- <point d'entrée>
+- ↓ <étiquette de flèche, facultative>
+- <étape>
+  - [<issue attendue>]{.ok}
+  - <autre issue>
+:::
+:::
+
 ## Ce que la PR livre
 
 | Surface | Ce qu'on y trouve |
@@ -38,6 +58,14 @@ au moment de la rédaction.
 
 <!-- Chiffres tirés du diff (git diff --numstat), pas estimés. -->
 
+::: {.chart .stack}
+**Lignes ajoutées par zone**
+
+| Zone | Lignes |
+| --- | --- |
+| <zone> | <N> |
+:::
+
 | Zone | Volume | Nature |
 | --- | --- | --- |
 | [`<dossier généré>`](tree:<dossier>) | +<N> / −<N> | généré par `<commande>` |
@@ -47,6 +75,22 @@ au moment de la rédaction.
 « Architecture ».
 
 ## Changements visibles par les utilisateurs
+
+<!-- Quand des specs mesurent une valeur par cas (notifications envoyées,
+requêtes, erreurs), la même valeur sur la branche de base et sur la PR,
+relevée en exécutant les specs sur le code de base. Une ligne aux cellules
+de valeur vides est un intertitre. Sans cible, retirer target. -->
+
+::: {.chart .bars target=1}
+**<Valeur mesurée>, par cas**
+
+<D'où viennent les chiffres : quelles specs, sur quel commit.>
+
+| Cas | <branche de base> | cette PR |
+| --- | --- | --- |
+| <groupe> | | |
+| <cas> | <N> | <N> |
+:::
 
 | Avant | Après | Pourquoi |
 | --- | --- | --- |

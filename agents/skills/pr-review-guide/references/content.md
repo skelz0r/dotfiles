@@ -44,6 +44,26 @@ Mechanical changes are the same one-line edit repeated across many files
 - Any decision resting on an assumption, in a `warning` callout titled
   as such: what is assumed, why it is believed, who adapts if it is wrong.
 
+Charts, each only when the PR gives the numbers, all in markdown (syntax in
+the docstring of `build.py`):
+
+- **Lines added per zone** (`::: {.chart .stack}`), always: the zones of
+  "what can be skimmed", from `git diff --numstat`.
+- **Before / after flow** (`::: flows`), when the PR changes a behaviour:
+  the paths through the old code and where they end (nothing, twice),
+  next to the single path of the new one. Above "what ships", under the
+  problem it answers.
+- **A value per case, base branch against the PR** (`::: {.chart .bars
+  target=…}`), when specs measure something on both: run the PR's new
+  specs on the base code (`git checkout <commit of the specs>`, which
+  holds the specs and not the fix), read the `got:` of each failure, then
+  run them on the branch. Group the cases by what was wrong; the target is
+  the expected value.
+- **Data a migration touches** (`::: {.chart .stack}`), when it rewrites
+  production rows: the count of the migration's `WHERE` turned into a
+  `SELECT`, measured read-only on production and dated, against the
+  total.
+
 ## End-to-end tab
 
 Pick one real case that crosses most layers of the change, and follow it

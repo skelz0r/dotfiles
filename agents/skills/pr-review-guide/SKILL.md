@@ -1,6 +1,6 @@
 ---
 name: pr-review-guide
-description: Turn a large pull request into a review guide published as a static HTML page with tabs (overview, one real end-to-end example, architecture, safety nets, commits and tests), every file and commit linked on GitHub at the pinned head commit, real code excerpts, payloads and failure messages, screenshots of the real UI, plus a Design tab for the designer when the PR changes an interface (flow, captioned screens with every state, what to redraw, rules, texts, tokens), styled with the project's visual identity and published through upload-assets. Use when a PR is too long to read, when the user asks for "un guide de revue", "un doc qui explique les grands changements techniques de la PR", "un résumé technique pour les reviewers", "une page partageable qui explique la PR", "avec les écrans pour le designer", "une section design dans le guide", or wants reviewers to know what to read, in which order, and what can be skipped.
+description: Turn a large pull request into a review guide published as a static HTML page with tabs (overview, one real end-to-end example, architecture, safety nets, commits and tests), every file and commit linked on GitHub at the pinned head commit, real code excerpts, payloads and failure messages, screenshots of the real UI, charts in the overview drawn from measured numbers (lines per zone, before / after flow, a value per case on the base branch against the PR, data a migration touches), plus a Design tab for the designer when the PR changes an interface (flow, captioned screens with every state, what to redraw, rules, texts, tokens), styled with the project's visual identity and published through upload-assets. Use when a PR is too long to read, when the user asks for "un guide de revue", "un doc qui explique les grands changements techniques de la PR", "un résumé technique pour les reviewers", "une page partageable qui explique la PR", "avec les écrans pour le designer", "une section design dans le guide", "ajoute des graphes au guide", "des graphes dans la vue d'ensemble", or wants reviewers to know what to read, in which order, and what can be skipped.
 ---
 
 # PR review guide
@@ -76,7 +76,9 @@ skeleton, plus the Design tab when there is one (delete it otherwise). Link with
 `<!-- subtab: Name -->` inside a tab (sub-tabs drawn as a DSFR segmented
 control, for a tab holding several parallel topics), `::: callout` (variants in braces, `::: {.callout .warning}` with `.info`, `.good` or `.warning`; a first paragraph made only of
 bold text becomes its title), `::: steps`, `::: gallery` of `::: shot`
-and `::: cards` of `::: card` for the Design tab, `[503]{.status}` badges (cells of a table
+and `::: cards` of `::: card` for the Design tab, `::: {.chart .stack}`,
+`::: {.chart .bars target=…}` and `::: flows` of `::: {.flow title=…}` for
+the overview's charts (syntax in the docstring of `build.py`), `[503]{.status}` badges (cells of a table
 column headed "Statut", "Status" or "HTTP" get one too), tables, fenced code
 with a language (`ruby`, `json`, `yaml`, `http`, `bash`). Links and comments
 inside code are left alone: `build.py` works on pandoc's syntax tree.
@@ -150,6 +152,11 @@ These come from iterations on a real guide; each was a correction.
   exact texts, tokens) into the guide; it does not change the guide's look,
   which stays the project's design system. A standalone design overview
   with its own palette was the right content in the wrong place.
+- **Show the overview in charts, drawn from real numbers.** A reviewer
+  grasps "seven paths sent nothing, three sent twice" from bars faster
+  than from a table; but a chart of estimated values is a plausible
+  fake. Each chart says where its numbers come from, and it is left out
+  when the PR gives nothing to measure.
 - **Numbers come from commands.** Operation counts, file counts, line
   counts: computed on the pinned commit, identical wherever they appear.
 - **The only script switches tabs** and keeps `#anchors` working; without
