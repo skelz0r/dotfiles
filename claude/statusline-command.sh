@@ -66,7 +66,7 @@ ccusage_refresh_cache() {
   tmp_file=""
   trap 'rmdir "$CCUSAGE_LOCK_DIR" 2>/dev/null; rm -f "${tmp_file:-}"' EXIT
   tmp_file=$(mktemp "$CCUSAGE_CACHE_DIR/ccusage-today.XXXXXX")
-  if ccusage daily --since "$(date +%Y%m%d)" --json >"$tmp_file" && jq -e '.daily' "$tmp_file" >/dev/null; then
+  if ccusage claude daily --since "$(date +%Y%m%d)" --json >"$tmp_file" && jq -e '.daily' "$tmp_file" >/dev/null; then
     mv "$tmp_file" "$CCUSAGE_CACHE_FILE"
   fi
 }
