@@ -131,6 +131,9 @@ needing five rounds or more from 8.9% to 1.5%.
   wrong, not unfinished: stop, tell the user what keeps breaking and question the design instead of
   launching a fourth pass. Old defects the passes surface are `pre-existing`, not a reason for
   another round.
+- Work the user adds to the branch afterwards (a new feature in the same pull request) opens its own
+  series of at most three passes, the first reading only that work
+  (`git range-diff <base> <head reviewed> HEAD`), not the whole branch again.
 
 ### 7. Commit each fix where it belongs
 

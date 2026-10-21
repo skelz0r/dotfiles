@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 
 import argparse
+import base64
 import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
 COMMENT_MARKER = "<!-- agentic-review -->"
 STATE_OPEN = "<!-- agentic-review-state"
 STATE_CLOSE = "-->"
+STATE_COMPRESSED = "zlib"
+COMMENT_LIMIT = 65536
 STATUS_CONTEXT = "Agentic review"
 STATUS_DESCRIPTION_LIMIT = 140
 KINDS = ["security", "bug", "product", "perf", "design", "test", "docs", "nit"]
@@ -144,12 +148,22 @@ def state_from_body(body):
     if start < 0:
         return None
     end = body.find(STATE_CLOSE, start + len(STATE_OPEN))
-    return json.loads(body[start + len(STATE_OPEN):end])
+    header, _, payload = body[start + len(STATE_OPEN):end].partition("\n")
+    if header.strip() == STATE_COMPRESSED:
+        return json.loads(zlib.decompress(base64.b64decode(payload)))
+    return json.loads(header + payload)
+
+
+def compact_state(state):
+    passes = [{**{key: value for key, value in review.items() if key != "files"}, "digest": pass_digest(review)}
+              for review in state["passes"][:-1]]
+    return {**state, "passes": passes + state["passes"][-1:]}
 
 
 def state_to_marker(state):
-    payload = json.dumps(state, ensure_ascii=False, separators=(",", ":")).replace(">", "\\u003e")
-    return f"{STATE_OPEN}\n{payload}\n{STATE_CLOSE}"
+    payload = json.dumps(compact_state(state), ensure_ascii=False, separators=(",", ":"))
+    encoded = base64.b64encode(zlib.compress(payload.encode(), 9)).decode()
+    return f"{STATE_OPEN} {STATE_COMPRESSED}\n{encoded}\n{STATE_CLOSE}"
 
 
 def load_state(args):
@@ -224,15 +238,24 @@ def file_patch_ids(base, head):
             for index, chunk in enumerate(chunks)}
 
 
+def files_digest(files):
+    return hashlib.sha1(json.dumps(files, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def pass_digest(review):
+    return review["digest"] if "digest" in review else files_digest(review["files"])
+
+
 def coverage(state, base):
     head = git("rev-parse", "HEAD").strip()
     current = file_patch_ids(base, head)
+    current_digest = files_digest(current)
     for review in reversed(state["passes"]):
-        if review["files"] == current:
+        if pass_digest(review) == current_digest:
             return {"covered": True, "head": head, "pass": review, "changed": []}
-    last = state["passes"][-1] if state["passes"] else {"files": {}}
-    changed = sorted(path for path in set(current) | set(last["files"])
-                     if current.get(path) != last["files"].get(path))
+    last_files = state["passes"][-1].get("files", {}) if state["passes"] else {}
+    changed = sorted(path for path in set(current) | set(last_files)
+                     if current.get(path) != last_files.get(path))
     return {"covered": False, "head": head, "pass": None, "changed": changed}
 
 
@@ -582,6 +605,9 @@ def command_publish(args):
 
     state["published"] = {**state.get("published", {}), "status": status, "sha": head, "at": now_iso()}
     body = render(state, result, base)
+    if len(body) > COMMENT_LIMIT:
+        raise Failure(f"comment of {len(body)} characters exceeds GitHub's limit of {COMMENT_LIMIT}: "
+                      "shorten the titles, fixes and reasons, or split the findings across pull requests")
 
     if args.dry_run:
         action = f"edit comment {comment['id']}" if comment else "create a comment"
