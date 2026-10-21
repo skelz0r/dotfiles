@@ -48,12 +48,48 @@ format_tokens() {
   fi
 }
 
-# Get ccusage information (check if ccusage command exists)
+CCUSAGE_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/claude-statusline"
+CCUSAGE_CACHE_FILE="$CCUSAGE_CACHE_DIR/ccusage-today.json"
+CCUSAGE_LOCK_DIR="$CCUSAGE_CACHE_DIR/ccusage.lock"
+
+ccusage_cache_fresh() {
+  [[ -n "$(find "$CCUSAGE_CACHE_FILE" -mmin -1 2>/dev/null)" ]]
+}
+
+ccusage_release_orphan_lock() {
+  if [[ -n "$(find "$CCUSAGE_LOCK_DIR" -maxdepth 0 -mmin +5 2>/dev/null)" ]]; then
+    rmdir "$CCUSAGE_LOCK_DIR" 2>/dev/null || true
+  fi
+}
+
+ccusage_refresh_cache() {
+  tmp_file=""
+  trap 'rmdir "$CCUSAGE_LOCK_DIR" 2>/dev/null; rm -f "${tmp_file:-}"' EXIT
+  tmp_file=$(mktemp "$CCUSAGE_CACHE_DIR/ccusage-today.XXXXXX")
+  if ccusage daily --since "$(date +%Y%m%d)" --json >"$tmp_file" && jq -e '.daily' "$tmp_file" >/dev/null; then
+    mv "$tmp_file" "$CCUSAGE_CACHE_FILE"
+  fi
+}
+
+ccusage_refresh_in_background() {
+  mkdir -p "$CCUSAGE_CACHE_DIR"
+  ccusage_release_orphan_lock
+  if mkdir "$CCUSAGE_LOCK_DIR" 2>/dev/null; then
+    (ccusage_refresh_cache) </dev/null >/dev/null 2>&1 &
+    disown
+  fi
+}
+
 TODAY_DATA=""
 TOTAL_COST=""
 TOTAL_TOKENS=""
-if command -v ccusage >/dev/null 2>&1; then
-  TODAY_DATA=$(ccusage --json 2>/dev/null | jq --arg today "$(date +%Y-%m-%d)" '.daily[] | select(.date == $today)' || true)
+if command -v ccusage >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  if ! ccusage_cache_fresh; then
+    ccusage_refresh_in_background
+  fi
+  if [[ -f "$CCUSAGE_CACHE_FILE" ]]; then
+    TODAY_DATA=$(jq -c --arg today "$(date +%Y-%m-%d)" '.daily[] | select(.date == $today)' "$CCUSAGE_CACHE_FILE" 2>/dev/null || true)
+  fi
   if [[ -n "$TODAY_DATA" ]]; then
     TOTAL_COST=$(echo "$TODAY_DATA" | jq -r '.totalCost | . * 100 | round / 100')
     TOTAL_TOKENS=$(echo "$TODAY_DATA" | jq -r '.totalTokens | (. / 1000 | floor | tostring)')
