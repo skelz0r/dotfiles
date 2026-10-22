@@ -275,7 +275,24 @@ for skill_dir in "$DOTFILES_DIR"/agents/skills/*/; do
   safe_symlink "$skill_dir" "$HOME/.agents/skills/$skill_name"
 done
 safe_symlink "$HOME/.agents/skills" "$HOME/.claude/skills"
+safe_symlink "$DOTFILES_DIR/agents/skill-lock.json" "$HOME/.agents/.skill-lock.json"
 success "Agents skills installed"
+
+# Step 6d: Third-party skills locked in agents/skill-lock.json, installed
+# only when missing: updates stay a reviewed `npx skills update`
+if command -v npx &> /dev/null && command -v jq &> /dev/null; then
+  while IFS=$'\t' read -r skill_name source_url; do
+    [[ -e "$HOME/.agents/skills/$skill_name" ]] && continue
+    if dry "install skill $skill_name from $source_url"; then
+      continue
+    fi
+    log "Installing skill $skill_name..."
+    npx -y skills add "$source_url" --skill "$skill_name" --global --agent claude-code -y > /dev/null \
+      || warn "Failed to install skill $skill_name"
+  done < <(jq -r '.skills | to_entries[] | [.key, .value.sourceUrl] | @tsv' "$DOTFILES_DIR/agents/skill-lock.json")
+else
+  warn "npx or jq missing, third-party skills not installed"
+fi
 
 # Step 7: GPG config
 ensure_dir "$HOME/.gnupg" 700

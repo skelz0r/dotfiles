@@ -8,6 +8,7 @@ setup() {
   stub sudo
   stub gpgconf
   stub syncthing
+  stub npx 'mkdir -p "$HOME/.agents/skills/${*: -5:1}"'
   stub git 'if [[ "$1" == clone ]]; then mkdir -p "${!#}"; exit 0; fi
 exec /usr/bin/git "$@"'
 }
@@ -127,4 +128,19 @@ esac'
 
   assert_contains "$output" "Ruby $wanted already installed"
   [[ "$(stub_calls rbenv)" != *install* ]]
+}
+
+@test "a locked third-party skill is installed only when missing, never updated" {
+  mkdir -p "$HOME/.agents/skills/find-skills"
+
+  install > /dev/null
+
+  assert_equal "$(readlink "$HOME/.agents/.skill-lock.json")" "$REPO_ROOT/agents/skill-lock.json"
+  assert_contains "$(stub_calls npx)" "skills add https://github.com/cloudflare/security-audit-skill.git --skill security-audit --global"
+  assert_not_contains "$(stub_calls npx)" "find-skills"
+
+  rm -f "$STUB_DIR/npx.calls"
+  install > /dev/null
+  install --dry-run > /dev/null
+  assert_equal "$(stub_calls npx)" ""
 }
