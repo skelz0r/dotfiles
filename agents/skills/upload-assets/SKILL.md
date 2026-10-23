@@ -113,18 +113,32 @@ a file left out by the selection.
 Exit code 2 means invalid input: fix it with the user and re-run. To change
 the selection, `rm -rf <stage>` and re-run with new patterns.
 
-### 3. Confirm
+### 3. Confirm, only when something is left to decide
 
-Upload is outward-facing: always get an explicit go first. Recap:
+When the user asked for the publication (in their words, or by invoking a
+skill whose workflow publishes, such as `pr-review-guide` or
+`static-page`), that request is the go: print the recap and publish
+without asking again. Asking "je publie ?" after "fais un guide de revue"
+only costs a round trip.
+
+Stop and ask only for what the user has not decided:
+
+- **overwrites** of files this session did not publish: existing URLs
+  would serve new content;
+- **broken local links**, with a suggested pattern change to include the
+  missing files;
+- the **access**, when it was not given and the folder is new (see
+  Access);
+- anything personal, a token or a real identity found in the files.
+
+The recap, printed either way:
 
 - destination URL
 - access: public, protected (new or replaced password), or protected by an
   existing password
 - files to upload (full list if short, count otherwise)
-- **overwrites**, stated explicitly: existing URLs will serve new content
+- overwrites, stated explicitly
 - hidden entries skipped, if any
-- broken local links, if any, with a suggested pattern change to include
-  the missing files
 
 If the user declines, `rm -rf <stage>`.
 
