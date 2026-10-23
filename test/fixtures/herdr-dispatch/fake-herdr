@@ -1,0 +1,252 @@
+#!/bin/sh
+world="$FAKE_HERDR_WORLD"
+command="$1 $2"
+shift 2
+
+usage_error() {
+  printf 'error: %s\n\nUsage: herdr %s\n' "$1" "$command" >&2
+  exit 2
+}
+
+herdr_error() {
+  printf '{"error":{"code":"%s","message":"%s"},"id":"cli:%s"}\n' "$1" "$2" "$(printf '%s' "$command" | tr ' ' ':')" >&2
+  exit 1
+}
+
+positional_count=0
+until_states=""
+option_values=""
+parse() {
+  allowed_flags="$1"
+  allowed_options="$2"
+  shift 2
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --)
+        return 0
+        ;;
+      --*)
+        if printf ' %s ' "$allowed_flags" | grep -q " $1 "; then
+          option_values="$option_values$1=1
+"
+        elif printf ' %s ' "$allowed_options" | grep -q " $1 "; then
+          [ $# -ge 2 ] || usage_error "a value is required for '$1'"
+          case "$1 $2" in
+            "--until idle" | "--until working" | "--until blocked" | "--until done" | "--until unknown") until_states="$until_states $2" ;;
+            --until*) usage_error "invalid value '$2' for '--until <STATUS>'" ;;
+            --timeout*) case "$2" in '' | *[!0-9]*) usage_error "invalid value '$2' for '--timeout <MS>'" ;; esac ;;
+          esac
+          option_values="$option_values$1=$2
+"
+          shift
+        else
+          usage_error "unexpected argument '$1' found"
+        fi
+        ;;
+      *)
+        positional_count=$((positional_count + 1))
+        eval "positional_$positional_count=\$1"
+        ;;
+    esac
+    shift
+  done
+}
+
+option() {
+  printf '%s' "$option_values" | sed -n "s/^$1=//p" | tail -n 1
+}
+
+positional() {
+  eval "printf '%s' \"\${positional_$1}\""
+}
+
+require_positionals() {
+  [ "$positional_count" -eq "$1" ] || usage_error "expected $1 argument(s)"
+}
+
+agent_file() {
+  cat "$world/agents/$1/$2" 2>/dev/null
+}
+
+agent_object() {
+  name="$1"
+  kind="$(agent_file "$name" kind)"
+  herdr_name="$(agent_file "$name" name)"
+  case "$name" in *:*) pane_id="$name" ;; *) herdr_name="$name"; pane_id="$(agent_file "$name" pane_id)" ;; esac
+  workspace_id="$(agent_file "$name" workspace_id)"
+  name_field=""
+  [ -n "$herdr_name" ] && name_field="\"name\":\"$herdr_name\","
+  printf '{"agent":"%s","agent_session":{"agent":"%s","kind":"id","source":"herdr:%s","value":"%s"},"agent_status":"%s","completion_seq":12,"cwd":"/work/project","focused":false,"foreground_cwd":"/work/project","interactive_ready":true,%s"pane_id":"%s","revision":3,"state_change_seq":12,"tab_id":"%s","terminal_id":"term_fake","terminal_title":"✳ Claude","terminal_title_stripped":"Claude","workspace_id":"%s"}' \
+    "${kind:-claude}" "${kind:-claude}" "${kind:-claude}" "$(agent_file "$name" session)" "$(agent_file "$name" status)" \
+    "$name_field" "${pane_id:-$workspace_id:p1}" "$(agent_file "$name" tab_id || printf '%s:t1' "$workspace_id")" "$workspace_id"
+}
+
+agent_info() {
+  printf '{"id":"cli:agent:get","result":{"agent":%s,"type":"agent_info"}}\n' "$(agent_object "$1")"
+}
+
+require_agent() {
+  [ -d "$world/agents/$1" ] || herdr_error agent_not_found "agent target $1 not found"
+}
+
+status_matches() {
+  printf ' %s ' "$2" | grep -q " $1 "
+}
+
+wait_for_status() {
+  name="$1"
+  wanted="$2"
+  deadline="$3"
+  while :; do
+    require_agent "$name"
+    current="$(agent_file "$name" status)"
+    if status_matches "$current" "$wanted"; then
+      return 0
+    fi
+    if [ -n "$deadline" ] && [ "$(date +%s)" -ge "$deadline" ]; then
+      return 1
+    fi
+    sleep 0.1
+  done
+}
+
+deadline_from_timeout() {
+  timeout_ms="$(option --timeout)"
+  [ -n "$timeout_ms" ] && printf '%s' $(( $(date +%s) + (timeout_ms + 999) / 1000 ))
+}
+
+start_turn() {
+  name="$1"
+  turn_seconds="$(agent_file "$name" turn_seconds)"
+  touch "$world/agents/$name/turn"
+  (
+    sleep "${FAKE_HERDR_DETECTION_DELAY:-0.4}"
+    echo working > "$world/agents/$name/status"
+    sleep "${turn_seconds:-1}"
+    rm -f "$world/agents/$name/turn"
+    [ "$(agent_file "$name" status)" = "working" ] && echo idle > "$world/agents/$name/status"
+  ) </dev/null >/dev/null 2>&1 &
+}
+
+case "$command" in
+  "workspace get")
+    parse "" "" "$@"
+    require_positionals 1
+    workspace_id="$(positional 1)"
+    [ -f "$world/workspaces/$workspace_id" ] || herdr_error workspace_not_found "workspace $workspace_id not found"
+    printf '{"id":"cli:workspace:get","result":{"type":"workspace_info","workspace":{"active_tab_id":"%s:t1","agent_status":"idle","focused":false,"label":"%s","number":%s,"pane_count":2,"tab_count":2,"workspace_id":"%s"}}}\n' \
+      "$workspace_id" "$(cut -f2 "$world/workspaces/$workspace_id")" "$(cut -f1 "$world/workspaces/$workspace_id")" "$workspace_id"
+    ;;
+  "agent list")
+    parse "" "" "$@"
+    require_positionals 0
+    separator=""
+    printf '{"id":"cli:agent:list","result":{"agents":['
+    for directory in "$world"/agents/*; do
+      [ -d "$directory" ] || continue
+      printf '%s%s' "$separator" "$(agent_object "$(basename "$directory")")"
+      separator=","
+    done
+    printf ']}}\n'
+    ;;
+  "agent get")
+    parse "" "" "$@"
+    require_positionals 1
+    require_agent "$(positional 1)"
+    agent_info "$(positional 1)"
+    ;;
+  "agent wait")
+    parse "" "--until --timeout" "$@"
+    require_positionals 1
+    name="$(positional 1)"
+    wait_for_status "$name" "${until_states:-idle done blocked}" "$(deadline_from_timeout)" || herdr_error timeout "agent $name did not reach the requested state"
+    agent_info "$name"
+    ;;
+  "agent prompt")
+    parse "--wait" "--until --timeout" "$@"
+    require_positionals 2
+    name="$(positional 1)"
+    text="$(positional 2)"
+    require_agent "$name"
+    status="$(agent_file "$name" status)"
+    [ "$status" = "blocked" ] && herdr_error agent_blocked "agent $name is blocked"
+    [ -f "$world/agents/$name/turn" ] && status="busy"
+    printf '%s|%s\n' "$status" "$text" >> "$world/agents/$name/prompts"
+    if [ "$text" = "/clear" ]; then
+      [ -f "$world/agents/$name/ignores_clear" ] || echo "session-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')" > "$world/agents/$name/session"
+    else
+      start_turn "$name"
+    fi
+    if [ -n "$(option --wait)" ]; then
+      caller_deadline="$(deadline_from_timeout)"
+      stall_deadline=$(( $(date +%s) + 5 ))
+      if [ -n "$caller_deadline" ] && [ "$caller_deadline" -lt "$stall_deadline" ]; then
+        wait_for_status "$name" "working blocked" "$caller_deadline" || herdr_error timeout "agent $name did not reach the requested state"
+      else
+        wait_for_status "$name" "working blocked" "$stall_deadline" || herdr_error agent_prompt_stalled "agent $name did not start working"
+      fi
+      if ! status_matches "$current" "${until_states:-idle done blocked}"; then
+        wait_for_status "$name" "${until_states:-idle done blocked}" "$caller_deadline" || herdr_error timeout "agent $name did not reach the requested state"
+      fi
+      agent_info "$name"
+    else
+      echo '{"id":"cli:agent:prompt","result":{"type":"agent_prompted"}}'
+    fi
+    ;;
+  "tab list")
+    parse "" "--workspace" "$@"
+    require_positionals 0
+    workspace_id="$(option --workspace)"
+    printf '{"id":"cli:tab:list","result":{"tabs":[{"agent_status":"idle","focused":false,"label":"worktree","number":2,"pane_count":1,"tab_id":"%s:t2","workspace_id":"%s"},{"agent_status":"idle","focused":true,"label":"claude","number":1,"pane_count":2,"tab_id":"%s:t1","workspace_id":"%s"}],"type":"tab_list"}}\n' \
+      "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id"
+    ;;
+  "pane list")
+    parse "" "--workspace" "$@"
+    require_positionals 0
+    workspace_id="$(option --workspace)"
+    printf '{"id":"cli:pane:list","result":{"panes":[{"agent_status":"unknown","cwd":"/elsewhere","focused":false,"pane_id":"%s:p9","revision":1,"tab_id":"%s:t2","workspace_id":"%s"},{"agent_status":"unknown","cwd":"/work/project","focused":true,"pane_id":"%s:p1","revision":1,"tab_id":"%s:t1","workspace_id":"%s"}],"type":"pane_list"}}\n' \
+      "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id"
+    ;;
+  "pane split")
+    parse "--current --focus --no-focus" "--pane --direction --ratio --cwd --env --right-click" "$@"
+    printf 'pane split %s\n' "$*" >> "$world/splits"
+    anchor="$(positional 1)"
+    printf '{"id":"cli:pane:split","result":{"pane":{"agent_status":"unknown","cwd":"%s","focused":false,"pane_id":"%s:p2","revision":0,"tab_id":"%s:t1","workspace_id":"%s"},"type":"pane_info"}}\n' \
+      "$(option --cwd)" "${anchor%%:*}" "${anchor%%:*}" "${anchor%%:*}"
+    ;;
+  "agent start")
+    parse "" "--kind --pane --timeout" "$@"
+    require_positionals 1
+    name="$(positional 1)"
+    pane="$(option --pane)"
+    [ -n "$(option --kind)" ] && [ -n "$pane" ] || usage_error "the following required arguments were not provided: --kind <KIND> --pane <ID>"
+    printf '%s\n' "$(printf '%s' "$*" | sed "s/^$name //")" >> "$world/starts"
+    if [ -f "$world/start_error" ]; then
+      herdr_error "$(cat "$world/start_error")" "agent start failed"
+    fi
+    mkdir -p "$world/agents/$name"
+    echo "${pane%%:*}" > "$world/agents/$name/workspace_id"
+    echo "$pane" > "$world/agents/$name/pane_id"
+    echo idle > "$world/agents/$name/status"
+    echo session-initial > "$world/agents/$name/session"
+    agent_info "$name"
+    ;;
+  "plugin list")
+    parse "--json" "--plugin" "$@"
+    require_positionals 0
+    count=0
+    [ -f "$world/plugin_links" ] && count=1
+    printf '%s plugins installed:\n' "$count"
+    [ -f "$world/plugin_links" ] && printf -- '- heraldr (Heraldr) enabled [local:%s]\n' "$(tail -n 1 "$world/plugin_links" | sed 's/.* //')"
+    exit 0
+    ;;
+  "plugin link")
+    parse "--disabled --enabled" "" "$@"
+    require_positionals 1
+    printf 'plugin link %s\n' "$*" >> "$world/plugin_links"
+    ;;
+  *)
+    echo "fake-herdr: unsupported $command $*" >&2
+    exit 2
+    ;;
+esac
