@@ -91,6 +91,7 @@ Local overrides (not synced):
 | `dotfiles-health` | Check dependencies and configuration |
 | `dotfiles-diff` | Compare local vs repo dotfiles |
 | `dotfiles-test` | Lint, smoke and behaviour tests of the repository |
+| `herdr-dispatch enqueue --cwd <path>` | Queue a prompt (stdin) to a herdr workspace's `-main`, one at a time per agent |
 | `kill_port <port>` | Kill process on port |
 | `tat` | Attach to tmux session (named after directory) |
 | `wt <name>` | Create git worktree with branch |
@@ -178,7 +179,7 @@ Checks: git, zsh, nvim, tmux, rbenv, pyenv, nvm, symlinks, SSH, GPG
 dotfiles-test          # lint + smoke + behaviour tests
 dotfiles-test lint     # shell conventions and shellcheck
 dotfiles-test smoke    # --help, zsh/vim startup, statusline, install dry run
-dotfiles-test tests    # install.sh, migration, upload-assets, gh-media-log, tidy-commits
+dotfiles-test tests    # install.sh, migration, upload-assets, gh-media-log, tidy-commits, herdr-dispatch...
 ```
 
 Needs `bats-core` and `shellcheck` (in the Brewfile). Tests run in a

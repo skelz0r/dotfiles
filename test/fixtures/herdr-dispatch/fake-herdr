@@ -137,6 +137,20 @@ case "$command" in
     printf '{"id":"cli:workspace:get","result":{"type":"workspace_info","workspace":{"active_tab_id":"%s:t1","agent_status":"idle","focused":false,"label":"%s","number":%s,"pane_count":2,"tab_count":2,"workspace_id":"%s"}}}\n' \
       "$workspace_id" "$(cut -f2 "$world/workspaces/$workspace_id")" "$(cut -f1 "$world/workspaces/$workspace_id")" "$workspace_id"
     ;;
+  "workspace list")
+    parse "" "" "$@"
+    require_positionals 0
+    separator=""
+    printf '{"id":"cli:workspace:list","result":{"type":"workspace_list","workspaces":['
+    for file in "$world"/workspaces/*; do
+      [ -f "$file" ] || continue
+      workspace_id="$(basename "$file")"
+      printf '%s{"active_tab_id":"%s:t1","agent_status":"idle","focused":false,"label":"%s","number":%s,"pane_count":2,"tab_count":2,"workspace_id":"%s"}' \
+        "$separator" "$workspace_id" "$(cut -f2 "$file")" "$(cut -f1 "$file")" "$workspace_id"
+      separator=","
+    done
+    printf ']}}\n'
+    ;;
   "agent list")
     parse "" "" "$@"
     require_positionals 0
@@ -197,6 +211,7 @@ case "$command" in
     parse "" "--workspace" "$@"
     require_positionals 0
     workspace_id="$(option --workspace)"
+    [ -f "$world/unreadable_$workspace_id" ] && herdr_error internal "tabs of $workspace_id unreadable"
     printf '{"id":"cli:tab:list","result":{"tabs":[{"agent_status":"idle","focused":false,"label":"worktree","number":2,"pane_count":1,"tab_id":"%s:t2","workspace_id":"%s"},{"agent_status":"idle","focused":true,"label":"claude","number":1,"pane_count":2,"tab_id":"%s:t1","workspace_id":"%s"}],"type":"tab_list"}}\n' \
       "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id"
     ;;
@@ -204,8 +219,9 @@ case "$command" in
     parse "" "--workspace" "$@"
     require_positionals 0
     workspace_id="$(option --workspace)"
-    printf '{"id":"cli:pane:list","result":{"panes":[{"agent_status":"unknown","cwd":"/elsewhere","focused":false,"pane_id":"%s:p9","revision":1,"tab_id":"%s:t2","workspace_id":"%s"},{"agent_status":"unknown","cwd":"/work/project","focused":true,"pane_id":"%s:p1","revision":1,"tab_id":"%s:t1","workspace_id":"%s"}],"type":"pane_list"}}\n' \
-      "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id"
+    first_cwd="$(cut -s -f3 "$world/workspaces/$workspace_id" 2>/dev/null)"
+    printf '{"id":"cli:pane:list","result":{"panes":[{"agent_status":"unknown","cwd":"/elsewhere","focused":false,"pane_id":"%s:p9","revision":1,"tab_id":"%s:t2","workspace_id":"%s"},{"agent_status":"unknown","cwd":"%s","focused":true,"pane_id":"%s:p1","revision":1,"tab_id":"%s:t1","workspace_id":"%s"}],"type":"pane_list"}}\n' \
+      "$workspace_id" "$workspace_id" "$workspace_id" "${first_cwd:-/work/project}" "$workspace_id" "$workspace_id" "$workspace_id"
     ;;
   "pane split")
     parse "--current --focus --no-focus" "--pane --direction --ratio --cwd --env --right-click" "$@"
@@ -221,14 +237,20 @@ case "$command" in
     pane="$(option --pane)"
     [ -n "$(option --kind)" ] && [ -n "$pane" ] || usage_error "the following required arguments were not provided: --kind <KIND> --pane <ID>"
     printf '%s\n' "$(printf '%s' "$*" | sed "s/^$name //")" >> "$world/starts"
-    if [ -f "$world/start_error" ]; then
-      herdr_error "$(cat "$world/start_error")" "agent start failed"
-    fi
+    start_error="$(cat "$world/start_error" 2>/dev/null)"
+    case "$start_error" in
+      "" | agent_not_ready) ;;
+      *) herdr_error "$start_error" "agent start failed" ;;
+    esac
     mkdir -p "$world/agents/$name"
     echo "${pane%%:*}" > "$world/agents/$name/workspace_id"
     echo "$pane" > "$world/agents/$name/pane_id"
-    echo idle > "$world/agents/$name/status"
     echo session-initial > "$world/agents/$name/session"
+    if [ "$start_error" = agent_not_ready ]; then
+      echo blocked > "$world/agents/$name/status"
+      herdr_error agent_not_ready "agent $name did not become ready"
+    fi
+    echo idle > "$world/agents/$name/status"
     agent_info "$name"
     ;;
   "plugin list")

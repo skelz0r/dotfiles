@@ -1,0 +1,533 @@
+#!/usr/bin/env bash
+#
+# herdr-dispatch - Queue prompts to herdr agents, sent one at a time per agent
+#
+# Bash 3.2 compatible (macOS /bin/bash). Callers run it through its
+# shebang or /bin/bash, never /bin/sh: the detached runner relaunches
+# this very file with the same interpreter, wherever the file lives.
+#
+
+[ -n "${BASH_VERSION:-}" ] || { echo "herdr-dispatch needs bash" >&2; exit 2; }
+
+set -euo pipefail
+
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.cargo/bin"
+export PATH
+unset CDPATH
+
+VERSION="1.0.0"
+JOB_FORMAT=1
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+STATE_DIR="${HERDR_DISPATCH_STATE_DIR:-$HOME/.local/state/herdr-dispatch}"
+JOBS_DIR="$STATE_DIR/jobs"
+LOCKS_DIR="$STATE_DIR/locks"
+SENT_RETENTION_MINUTES=60
+FAILED_RETENTION_MINUTES=1440
+CLEAR_TIMEOUT_SECONDS="${HERDR_DISPATCH_CLEAR_TIMEOUT_SECONDS:-20}"
+PROMPT_START_TIMEOUT_MS=10000
+STALLED_PROMPT_GRACE_MS=30000
+PIDLESS_LOCK_STALE_MINUTES=1
+START_TIMEOUT_MS=60000
+
+AGENT_NAME_PATTERN='^[a-z][a-z0-9_-]{0,31}$'
+PANE_ID_PATTERN='^[A-Za-z0-9]+:[A-Za-z0-9]+$'
+WORKSPACE_ID_PATTERN='^[A-Za-z0-9_-]+$'
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") COMMAND [ARGS]
+
+Queue prompts to herdr agents. Each agent has its own queue: a prompt
+goes out only once the agent is idle or done, after a /clear, one at a
+time, in arrival order. A missing -main is started in tab 1 of its
+workspace.
+
+Commands:
+  enqueue TARGET [OPTIONS]   Queue the prompt read on stdin, print the job id
+  run AGENT|PANE_ID          Process a queue (started detached by enqueue)
+  status                     List jobs as TSV: job_id, workspace_id, agent,
+                             state (queued|sending|sent|failed), error
+  workspace-for PATH         Print the id of the workspace whose tab 1
+                             first pane has PATH as cwd (~ is Home)
+  version                    Print the script version and its job format
+
+Targets of enqueue (one of):
+  --workspace ID             The -main of this workspace
+  --cwd PATH                 The -main of the workspace found by workspace-for
+
+Options of enqueue:
+  --pane PANE_ID             The unnamed Claude of this pane instead of the -main
+  --label LABEL              Workspace label naming a -main to create
+                             (default: read from herdr)
+  --keep-context             Do not send /clear before the prompt
+  -h, --help                 Show this help message
+
+{{job_id}} in the prompt is replaced by the job id.
+
+Exit codes: 0 ok, 1 herdr unreadable, 2 refused (usage, unknown or
+ambiguous target, empty prompt). Nothing is queued when refused.
+
+State: \$HERDR_DISPATCH_STATE_DIR (default ~/.local/state/herdr-dispatch).
+EOF
+}
+
+paint() {
+  local color="$1"
+  shift
+  if [[ -t 2 ]]; then
+    echo -e "${color}$*${NC}" >&2
+  else
+    echo "$*" >&2
+  fi
+}
+
+refuse() {
+  paint "$RED" "$*"
+  exit 2
+}
+
+fail_usage() {
+  paint "$RED" "$*"
+  paint "$YELLOW" "see $(basename "$0") --help"
+  exit 2
+}
+
+json_value() {
+  plutil -extract "$1" raw -o - - 2>/dev/null
+}
+
+valid_agent_name() {
+  [[ "$1" =~ $AGENT_NAME_PATTERN ]]
+}
+
+valid_pane_id() {
+  [[ "$1" =~ $PANE_ID_PATTERN ]]
+}
+
+valid_queue_target() {
+  valid_agent_name "$1" || valid_pane_id "$1"
+}
+
+lock_name() {
+  printf '%s' "$1" | tr ':' '@'
+}
+
+agent_name_for_label() {
+  local slug
+  [[ "$1" != "~" ]] || { printf 'home-main'; return; }
+  slug="$(printf '%s' "$1" | perl -CS -MUnicode::Normalize -0777 -pe '$_ = NFD($_)' | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz' | LC_ALL=C tr -cd 'abcdefghijklmnopqrstuvwxyz0123456789_ -' | sed 's/^ *//; s/ *$//; s/ /-/g')"
+  case "$slug" in
+    [abcdefghijklmnopqrstuvwxyz]*) ;;
+    *) slug="w-$slug" ;;
+  esac
+  printf '%s-main' "$(printf '%s' "$slug" | cut -c1-27)"
+}
+
+main_agents_of() {
+  local agents index agent_workspace name
+  agents="$(herdr agent list)" || return 1
+  index=0
+  while agent_workspace="$(printf '%s' "$agents" | json_value "result.agents.$index.workspace_id")"; do
+    name="$(printf '%s' "$agents" | json_value "result.agents.$index.name" || true)"
+    if [[ "$agent_workspace" == "$1" ]]; then
+      case "$name" in *-main) printf '%s\n' "$name" ;; esac
+    fi
+    index=$((index + 1))
+  done
+}
+
+main_agent_for() {
+  local mains named
+  mains="$(main_agents_of "$1")" || { paint "$RED" "unreadable herdr agents"; return 1; }
+  named="$(agent_name_for_label "$2")"
+  case "$(printf '%s' "$mains" | grep -c . || true)" in
+    0) printf '%s' "$named" ;;
+    1) printf '%s' "$mains" ;;
+    *)
+      if printf '%s\n' "$mains" | grep -qx "$named"; then
+        printf '%s' "$named"
+      else
+        paint "$RED" "several -main agents in $1: $(printf '%s' "$mains" | tr '\n' ' ')"
+        return 2
+      fi
+      ;;
+  esac
+}
+
+workspace_label() {
+  local workspace label
+  workspace="$(herdr workspace get "$1" 2>&1)" || { paint "$RED" "workspace not found: $1"; return 2; }
+  label="$(printf '%s' "$workspace" | json_value result.workspace.label)" || { paint "$RED" "workspace without label: $1"; return 2; }
+  printf '%s' "$label"
+}
+
+first_tab_id() {
+  local tabs index number
+  tabs="$(herdr tab list --workspace "$1")" || return 1
+  index=0
+  while number="$(printf '%s' "$tabs" | json_value "result.tabs.$index.number")"; do
+    if [[ "$number" == "1" ]]; then
+      printf '%s' "$tabs" | json_value "result.tabs.$index.tab_id"
+      return
+    fi
+    index=$((index + 1))
+  done
+  return 1
+}
+
+first_pane_of_tab() {
+  local panes index tab_id
+  panes="$(herdr pane list --workspace "$1")" || return 1
+  index=0
+  while tab_id="$(printf '%s' "$panes" | json_value "result.panes.$index.tab_id")"; do
+    if [[ "$tab_id" == "$2" ]]; then
+      printf '%s' "$panes" | json_value "result.panes.$index.$3"
+      return
+    fi
+    index=$((index + 1))
+  done
+  return 1
+}
+
+expand_home() {
+  local tilde="~"
+  case "$1" in
+    "$tilde") printf '%s' "$HOME" ;;
+    "$tilde"/*) printf '%s/%s' "$HOME" "${1#"$tilde"/}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+canonical_dir() {
+  (cd "$1" 2> /dev/null && pwd -P) || printf '%s' "$1"
+}
+
+workspace_for() {
+  local target workspaces index workspace_id number tab_id cwd home_id="" matches=()
+  target="$(expand_home "$1")"
+  [[ -d "$target" ]] || { paint "$RED" "no such directory: $target"; return 2; }
+  target="$(canonical_dir "$target")"
+  workspaces="$(herdr workspace list)" || { paint "$RED" "unreadable herdr workspaces"; return 1; }
+  index=0
+  while workspace_id="$(printf '%s' "$workspaces" | json_value "result.workspaces.$index.workspace_id")"; do
+    number="$(printf '%s' "$workspaces" | json_value "result.workspaces.$index.number" || true)"
+    [[ "$number" != "1" ]] || home_id="$workspace_id"
+    index=$((index + 1))
+    [[ "$target" != "$(canonical_dir "$HOME")" ]] || continue
+    tab_id="$(first_tab_id "$workspace_id")" || { paint "$RED" "unreadable tab 1 of herdr workspace $workspace_id"; return 1; }
+    cwd="$(first_pane_of_tab "$workspace_id" "$tab_id" cwd)" || { paint "$RED" "unreadable panes of herdr workspace $workspace_id"; return 1; }
+    [[ "$(canonical_dir "$cwd")" != "$target" ]] || matches+=("$workspace_id")
+  done
+  if [[ "$target" == "$(canonical_dir "$HOME")" ]]; then
+    [[ -n "$home_id" ]] || { paint "$RED" "no Home workspace (number 1) in herdr"; return 2; }
+    printf '%s\n' "$home_id"
+    return
+  fi
+  case "${#matches[@]}" in
+    0) paint "$RED" "no herdr workspace has its tab 1 in $target"; return 2 ;;
+    1) printf '%s\n' "${matches[0]}" ;;
+    *) paint "$RED" "several herdr workspaces have their tab 1 in $target: ${matches[*]}"; return 2 ;;
+  esac
+}
+
+next_sequence() {
+  local sequence
+  mkdir -p "$LOCKS_DIR"
+  until mkdir "$LOCKS_DIR/sequence" 2> /dev/null; do
+    if [[ -n "$(find "$LOCKS_DIR/sequence" -maxdepth 0 -mmin +"$PIDLESS_LOCK_STALE_MINUTES" 2> /dev/null)" ]]; then
+      rmdir "$LOCKS_DIR/sequence" 2> /dev/null || true
+    fi
+    sleep 0.05
+  done
+  sequence=$(( $(cat "$STATE_DIR/sequence" 2> /dev/null || echo 0) + 1 ))
+  printf '%s' "$sequence" > "$STATE_DIR/sequence"
+  rmdir "$LOCKS_DIR/sequence"
+  printf '%012d' "$sequence"
+}
+
+launch_runner() {
+  (
+    trap '' HUP
+    exec "$BASH" "$SELF" run "$1"
+  ) < /dev/null > /dev/null 2>&1 &
+}
+
+create_job() {
+  local workspace_id="$1" agent="$2" label="$3" clear="$4" job_id job_dir
+  valid_queue_target "$agent" || refuse "invalid agent name: $agent"
+  [[ -n "$label" ]] || refuse "invalid label"
+
+  job_id="$(date -u +%Y%m%d%H%M%S)-$(next_sequence)-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+  job_dir="$JOBS_DIR/$job_id"
+  mkdir -p "$job_dir.tmp"
+  sed "s/{{job_id}}/$job_id/g" > "$job_dir.tmp/prompt"
+  if [[ ! -s "$job_dir.tmp/prompt" ]]; then
+    rm -rf "$job_dir.tmp"
+    refuse "empty prompt"
+  fi
+  printf '%s' "$JOB_FORMAT" > "$job_dir.tmp/format"
+  printf '%s' "$workspace_id" > "$job_dir.tmp/workspace_id"
+  printf '%s' "$agent" > "$job_dir.tmp/agent"
+  printf '%s' "$label" > "$job_dir.tmp/label"
+  printf '%s' "$clear" > "$job_dir.tmp/clear"
+  printf 'queued' > "$job_dir.tmp/state"
+  mv "$job_dir.tmp" "$job_dir"
+
+  launch_runner "$agent"
+  echo "$job_id"
+}
+
+enqueue() {
+  local workspace_id="" cwd="" pane="" label="" clear=clear has_label=false agent status
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --workspace) [[ $# -ge 2 ]] || fail_usage "--workspace needs an id"; workspace_id="$2"; shift 2 ;;
+      --cwd) [[ $# -ge 2 ]] || fail_usage "--cwd needs a path"; cwd="$2"; shift 2 ;;
+      --pane) [[ $# -ge 2 ]] || fail_usage "--pane needs a pane id"; pane="$2"; shift 2 ;;
+      --label) [[ $# -ge 2 ]] || fail_usage "--label needs a label"; label="$2"; has_label=true; shift 2 ;;
+      --keep-context) clear=keep; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) fail_usage "unknown enqueue argument: $1" ;;
+    esac
+  done
+  [[ -n "$workspace_id" || -n "$cwd" ]] || fail_usage "enqueue needs --workspace or --cwd"
+  [[ -z "$workspace_id" || -z "$cwd" ]] || fail_usage "enqueue takes --workspace or --cwd, not both"
+  [[ -z "$pane" ]] || ! $has_label || fail_usage "--label names a -main, not a pane"
+  ! $has_label || [[ -n "$label" ]] || refuse "invalid label"
+
+  if [[ -n "$cwd" ]]; then
+    status=0
+    workspace_id="$(workspace_for "$cwd")" || status=$?
+    [[ "$status" -eq 0 ]] || exit "$status"
+  fi
+  [[ "$workspace_id" =~ $WORKSPACE_ID_PATTERN ]] || refuse "invalid workspace: $workspace_id"
+
+  if [[ -n "$pane" ]]; then
+    valid_pane_id "$pane" || refuse "invalid pane: $pane"
+    create_job "$workspace_id" "$pane" "$pane" "$clear"
+    return
+  fi
+
+  if ! $has_label; then
+    status=0
+    label="$(workspace_label "$workspace_id")" || status=$?
+    [[ "$status" -eq 0 ]] || exit "$status"
+  fi
+  status=0
+  agent="$(main_agent_for "$workspace_id" "$label")" || status=$?
+  [[ "$status" -eq 0 ]] || exit "$status"
+  create_job "$workspace_id" "$agent" "$label" "$clear"
+}
+
+set_state() {
+  printf '%s' "$2" > "$1/state.tmp" && mv "$1/state.tmp" "$1/state"
+}
+
+fail_job() {
+  printf '%s' "$2" > "$1/error"
+  set_state "$1" failed
+}
+
+acquire_lock() {
+  local lock="$LOCKS_DIR/$1" holder
+  mkdir -p "$LOCKS_DIR"
+  while :; do
+    if mkdir "$lock" 2> /dev/null; then
+      echo $$ > "$lock/pid"
+      return 0
+    fi
+    holder="$(cat "$lock/pid" 2> /dev/null || true)"
+    if [[ -n "$holder" ]]; then
+      ! kill -0 "$holder" 2> /dev/null || return 1
+      break
+    fi
+    [[ -z "$(find "$lock" -maxdepth 0 -mmin +"$PIDLESS_LOCK_STALE_MINUTES" 2> /dev/null)" ]] || break
+    sleep 0.2
+  done
+  rm -rf "$lock"
+  mkdir "$lock" 2> /dev/null || return 1
+  echo $$ > "$lock/pid"
+}
+
+release_lock() {
+  rm -rf "${LOCKS_DIR:?}/$1"
+}
+
+next_job_for() {
+  local job_dir
+  for job_dir in "$JOBS_DIR"/*; do
+    [[ -d "$job_dir" ]] || continue
+    case "$job_dir" in *.tmp) continue ;; esac
+    [[ "$(cat "$job_dir/agent" 2> /dev/null || true)" == "$1" ]] || continue
+    [[ "$(cat "$job_dir/state" 2> /dev/null || true)" == "queued" ]] || continue
+    echo "$job_dir"
+    return 0
+  done
+  return 1
+}
+
+agent_field() {
+  herdr agent get "$1" 2> /dev/null | json_value "result.agent.$2"
+}
+
+start_agent() {
+  local job_dir="$1" workspace_id="$2" agent="$3" label="$4"
+  local tab_id anchor_pane cwd split pane_id remote_control_name started
+
+  tab_id="$(first_tab_id "$workspace_id")" || { fail_job "$job_dir" "tab 1 not found in $workspace_id"; return 1; }
+  anchor_pane="$(first_pane_of_tab "$workspace_id" "$tab_id" pane_id)" || { fail_job "$job_dir" "no pane in $tab_id"; return 1; }
+  cwd="$(first_pane_of_tab "$workspace_id" "$tab_id" cwd)" || cwd="$HOME"
+  split="$(herdr pane split "$anchor_pane" --direction down --cwd "$cwd" --no-focus 2>&1)" || { fail_job "$job_dir" "pane split: $split"; return 1; }
+  pane_id="$(printf '%s' "$split" | json_value result.pane.pane_id)" || { fail_job "$job_dir" "pane split without pane_id"; return 1; }
+
+  remote_control_name="$(printf '%s' "$label" | sed 's/^~$/home/')—main"
+  if ! started="$(herdr agent start "$agent" --kind claude --pane "$pane_id" --timeout "$START_TIMEOUT_MS" -- --dangerously-skip-permissions --remote-control "$remote_control_name" 2>&1)"; then
+    case "$started" in
+      *agent_not_ready*) return 0 ;;
+    esac
+    fail_job "$job_dir" "agent start: $started"
+    return 1
+  fi
+}
+
+wait_for_clear() {
+  local previous_session="$2" waited=0 current_session
+  while [[ "$waited" -lt "$CLEAR_TIMEOUT_SECONDS" ]]; do
+    sleep 1
+    waited=$((waited + 1))
+    current_session="$(agent_field "$1" agent_session.value || true)"
+    if [[ -n "$current_session" && "$current_session" != "$previous_session" ]]; then
+      return 0
+    fi
+  done
+  [[ -z "$previous_session" ]]
+}
+
+check_pane_target() {
+  local pane pane_workspace pane_name
+  pane="$(herdr agent get "$2" 2> /dev/null || true)"
+  [[ "$(printf '%s' "$pane" | json_value result.agent.agent || true)" == "claude" ]] || { fail_job "$1" "no Claude left in pane $2"; return 1; }
+  pane_workspace="$(printf '%s' "$pane" | json_value result.agent.workspace_id || true)"
+  [[ "$pane_workspace" == "$3" ]] || { fail_job "$1" "pane $2 belongs to workspace $pane_workspace"; return 1; }
+  pane_name="$(printf '%s' "$pane" | json_value result.agent.name || true)"
+  [[ -z "$pane_name" ]] || { fail_job "$1" "pane $2 is agent $pane_name: target it by name"; return 1; }
+}
+
+process_job() {
+  local job_dir="$1" format agent workspace_id label clear agent_workspace mains waited session_before cleared prompted
+  format="$(cat "$job_dir/format" 2> /dev/null || true)"
+  if [[ "$format" != "$JOB_FORMAT" ]]; then
+    fail_job "$job_dir" "job format ${format:-missing} unknown to herdr-dispatch $VERSION ($SELF), which reads format $JOB_FORMAT: update it"
+    return 1
+  fi
+  agent="$(cat "$job_dir/agent")"
+  workspace_id="$(cat "$job_dir/workspace_id")"
+  label="$(cat "$job_dir/label")"
+  clear="$(cat "$job_dir/clear" 2> /dev/null || echo clear)"
+
+  agent_workspace="$(agent_field "$agent" workspace_id || true)"
+  if valid_pane_id "$agent"; then
+    check_pane_target "$job_dir" "$agent" "$workspace_id" || return 1
+  elif [[ -z "$agent_workspace" ]]; then
+    mains="$(main_agents_of "$workspace_id")" || { fail_job "$job_dir" "unreadable herdr agents"; return 1; }
+    [[ -z "$mains" ]] || { fail_job "$job_dir" "$agent is gone, the -main of $workspace_id is now $(printf '%s' "$mains" | tr '\n' ' '): resend the request"; return 1; }
+    start_agent "$job_dir" "$workspace_id" "$agent" "$label" || return 1
+  elif [[ "$agent_workspace" != "$workspace_id" ]]; then
+    fail_job "$job_dir" "agent $agent belongs to workspace $agent_workspace"
+    return 1
+  fi
+
+  waited="$(herdr agent wait "$agent" --until idle --until "done" 2>&1)" || { fail_job "$job_dir" "agent wait: $waited"; return 1; }
+
+  if valid_pane_id "$agent"; then
+    check_pane_target "$job_dir" "$agent" "$workspace_id" || return 1
+  fi
+
+  set_state "$job_dir" sending
+  if [[ "$clear" == "clear" ]]; then
+    session_before="$(agent_field "$agent" agent_session.value || true)"
+    cleared="$(herdr agent prompt "$agent" "/clear" 2>&1)" || { fail_job "$job_dir" "/clear: $cleared"; return 1; }
+    wait_for_clear "$agent" "$session_before" || { fail_job "$job_dir" "/clear without a new session after ${CLEAR_TIMEOUT_SECONDS}s"; return 1; }
+    sleep 1
+  fi
+
+  if ! prompted="$(herdr agent prompt "$agent" "$(cat "$job_dir/prompt")" --wait --until working --until blocked --timeout "$PROMPT_START_TIMEOUT_MS" 2>&1)"; then
+    case "$prompted" in
+      *agent_prompt_stalled*) herdr agent wait "$agent" --until working --until blocked --timeout "$STALLED_PROMPT_GRACE_MS" > /dev/null 2>&1 || true ;;
+      *) fail_job "$job_dir" "prompt: $prompted"; return 1 ;;
+    esac
+  fi
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$job_dir/sent_at"
+  set_state "$job_dir" sent
+}
+
+remove_jobs_in_state() {
+  local state="$1" minutes="$2" state_file
+  find "$JOBS_DIR" -mindepth 2 -maxdepth 2 -name state -mmin +"$minutes" -exec grep -lx "$state" {} + 2> /dev/null | while read -r state_file; do
+    rm -rf "$(dirname "$state_file")"
+  done || true
+}
+
+prune_jobs() {
+  [[ -d "$JOBS_DIR" ]] || return 0
+  remove_jobs_in_state sent "$SENT_RETENTION_MINUTES"
+  remove_jobs_in_state failed "$FAILED_RETENTION_MINUTES"
+}
+
+run_queue() {
+  local agent="$1" queue_lock job_dir
+  valid_queue_target "$agent" || refuse "invalid agent name: $agent"
+  queue_lock="$(lock_name "$agent")"
+  while acquire_lock "$queue_lock"; do
+    while job_dir="$(next_job_for "$agent")"; do
+      process_job "$job_dir" || true
+    done
+    release_lock "$queue_lock"
+    next_job_for "$agent" > /dev/null || break
+  done
+  prune_jobs
+}
+
+print_status() {
+  local job_dir error
+  prune_jobs
+  [[ -d "$JOBS_DIR" ]] || return 0
+  for job_dir in "$JOBS_DIR"/*; do
+    [[ -d "$job_dir" ]] || continue
+    case "$job_dir" in *.tmp) continue ;; esac
+    error=""
+    [[ ! -f "$job_dir/error" ]] || error="$(tr '\t\n' '  ' < "$job_dir/error")"
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$(basename "$job_dir")" \
+      "$(cat "$job_dir/workspace_id" 2> /dev/null || true)" \
+      "$(cat "$job_dir/agent" 2> /dev/null || true)" \
+      "$(cat "$job_dir/state" 2> /dev/null || true)" \
+      "$error"
+  done
+}
+
+print_version() {
+  printf 'herdr-dispatch %s\njob-format %s\n' "$VERSION" "$JOB_FORMAT"
+}
+
+main() {
+  [[ $# -ge 1 ]] || fail_usage "missing command"
+  local command="$1"
+  shift
+  case "$command" in
+    enqueue) enqueue "$@" ;;
+    run) [[ $# -eq 1 ]] || fail_usage "run takes an agent or a pane id"; run_queue "$1" ;;
+    status) [[ $# -eq 0 ]] || fail_usage "status takes no argument"; print_status ;;
+    workspace-for) [[ $# -eq 1 ]] || fail_usage "workspace-for takes a path"; workspace_for "$1" || exit $? ;;
+    version|--version) print_version ;;
+    -h|--help|help) usage ;;
+    *) fail_usage "unknown command: $command" ;;
+  esac
+}
+
+main "$@"
