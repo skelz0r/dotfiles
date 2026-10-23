@@ -34,8 +34,10 @@ page is held, not collapsed into a fraction of a second). Consequences:
    ```bash
    AGENT_BROWSER_STREAM_PORT=9223 agent-browser open <url> --headed
    ```
-   For `*.superdocu.local`, use the `agent-browser-local` skill's wrapper
-   (`--executable-path`) so TLS/DNS work; pass the same `AGENT_BROWSER_STREAM_PORT`.
+   When the project's verify skill opens the browser itself (self-signed
+   TLS, local DNS, login), open through it with `--headed` and the same
+   `AGENT_BROWSER_STREAM_PORT`; `--headed` only applies when the session
+   starts, so close an already open one first.
 
 2. **Dry run first**: drive the whole scenario once without recording to find
    selectors and confirm it works (`agent-browser snapshot -i`). When an
