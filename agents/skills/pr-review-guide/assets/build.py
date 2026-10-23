@@ -2,7 +2,9 @@
 """Builds index.html from GUIDE.md. Edit GUIDE.md, then run `python3 build.py`.
 
 index.html is overwritten on each run: never edit it by hand. Requires pandoc
-(3.x, for commonmark_x). `--check-urls` also fetches every external link.
+(3.x, for commonmark_x). `--check-urls` also fetches every external link; links into
+a private repository are checked with `gh` (the pinned commit is pushed), since
+they answer 404 to an anonymous request.
 
 GUIDE.md syntax, on top of CommonMark:
   front matter       title, repo (owner/name), sha (40 hex), plus optional kicker,
@@ -531,9 +533,27 @@ def check_output(page):
             warn(f"image without alt text: {img[:80]}")
 
 
-def check_urls(page):
+def private_repo_urls(urls, repo, sha):
+    """Links into a private repository answer 404 anonymously: check the commit is pushed with gh instead."""
+    own = {url for url in urls if url.startswith(f"https://github.com/{repo}/")}
+    if not own:
+        return set()
+    try:
+        visibility = subprocess.run(["gh", "repo", "view", repo, "--json", "visibility", "-q", ".visibility"],
+                                    capture_output=True, text=True, timeout=30).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    if visibility not in ("PRIVATE", "INTERNAL"):
+        return set()
+    pushed = subprocess.run(["gh", "api", f"repos/{repo}/commits/{sha}", "--silent"], capture_output=True, timeout=30)
+    if pushed.returncode:
+        warn(f"commit {sha[:10]} is not on GitHub: push the branch before publishing")
+    return own
+
+
+def check_urls(page, repo, sha):
     urls = {html.unescape(u).split("#")[0] for u in re.findall(r'(?:href|src)="(https?://[^"]+)"', page)}
-    for url in sorted(urls):
+    for url in sorted(urls - private_repo_urls(urls, repo, sha)):
         status = None
         for method in ("HEAD", "GET"):
             try:
@@ -662,7 +682,7 @@ def main():
 """
     check_output(page)
     if "--check-urls" in sys.argv:
-        check_urls(page)
+        check_urls(page, meta["repo"], meta["sha"])
     OUTPUT.write_text(page, encoding="utf-8")
     for message in WARNINGS:
         print(f"warning: {message}", file=sys.stderr)

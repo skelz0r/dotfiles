@@ -100,7 +100,7 @@ Then look at every tab as described in `static-page`.
 ### 7. Publish
 
 Before the upload, `python3 build.py --check-urls` (every external link
-answers 200). Then publish as described in `static-page`, into the
+answers 200; links into a private repository are checked with `gh`). Then publish as described in `static-page`, into the
 `<slug>-<suffix>` folder it records, with `--except build.py --except GUIDE.md`, and offer to add the URL to the
 PR description.
 

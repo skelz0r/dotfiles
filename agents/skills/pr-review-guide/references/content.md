@@ -81,6 +81,13 @@ Artefacts, all real:
   server, a fixture replayed. Freeze the clock or the fixture when the
   payload depends on it. Truncate explicitly with `…`. No personal data, no
   token, no internal URL that should not leak.
+  When the project has an isolated end-to-end harness (`bin/qa` with a
+  throwaway database and fake external APIs), copy it to the scratchpad,
+  keep its helpers, replace its main block by the guide's case, and
+  save each payload to a file. Between steps, wait for a `go-<step>` file:
+  meanwhile the server is up for the browser screenshots of that state.
+  Run the copy from the project directory, so its Ruby or Node version
+  file applies. Check it dropped its database afterwards.
 - **Generated documentation** (OpenAPI, JSON schema, config): the exact
   excerpt of the generated file.
 - **Screens**: screenshots of the real application (see below). When the
