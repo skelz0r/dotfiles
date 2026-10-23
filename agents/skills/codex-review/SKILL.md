@@ -74,12 +74,15 @@ Read `references/prompt-template.md` and fill it in. Non-negotiable parts:
 ### 4. Run it
 
 ```bash
-scripts/codex-review.sh <prompt-file> [effort] [model]
+~/.claude/skills/codex-review/scripts/codex-review.sh <prompt-file> [effort] [model]
 ```
 
 Read-only sandbox is pinned in the script. Do not remove it: a typical `~/.codex/config.toml` runs
 `danger-full-access` with `approval_policy = "never"`, which inherited would let a review rewrite the
 working tree.
+
+Call the scripts by their absolute path from the reviewed project, never after a `cd` into the
+skill: both refuse to run inside the repository that holds them.
 
 Run it in the background — `xhigh` takes minutes. The report is the last block of stdout, printed
 twice (streamed, then as the final message).
@@ -177,10 +180,10 @@ the passes, the fixed findings and the ones left with their reason.
 Record as you go, never reconstruct afterwards:
 
 ```bash
-scripts/agentic-review start --reviewer Codex --effort xhigh --scope "whole branch, focus on <hypothesis>"
-scripts/agentic-review finding --kind bug --severity P1 --title "<defect, one line>" --open
-scripts/agentic-review finding --id f1 --fixed "<the fix>" --commit <fixup sha>
-scripts/agentic-review finding --id f2 --left "<why it stays>" --verdict pre-existing
+~/.claude/skills/codex-review/scripts/agentic-review start --reviewer Codex --effort xhigh --scope "whole branch, focus on <hypothesis>"
+~/.claude/skills/codex-review/scripts/agentic-review finding --kind bug --severity P1 --title "<defect, one line>" --open
+~/.claude/skills/codex-review/scripts/agentic-review finding --id f1 --fixed "<the fix>" --commit <fixup sha>
+~/.claude/skills/codex-review/scripts/agentic-review finding --id f2 --left "<why it stays>" --verdict pre-existing
 ```
 
 - `start` right before running Codex: it snapshots the diff the pass reads (per-file patch-ids of
@@ -206,15 +209,15 @@ autosquashed, run a short confirmation pass on them before publishing:
 
 ```bash
 git range-diff <base> <head reviewed> HEAD     # the fixes, as Codex must read them
-scripts/agentic-review start --reviewer Codex --effort medium --scope "confirmation: fixes of Codex 1"
-scripts/agentic-review check                   # exit 1 and the unreviewed files when stale
+~/.claude/skills/codex-review/scripts/agentic-review start --reviewer Codex --effort medium --scope "confirmation: fixes of Codex 1"
+~/.claude/skills/codex-review/scripts/agentic-review check                   # exit 1 and the unreviewed files when stale
 ```
 
 Publish only at the end of the triage, after pushing:
 
 ```bash
-scripts/agentic-review publish --dry-run
-scripts/agentic-review publish [--note "<what changed since the last pass, when stale>"]
+~/.claude/skills/codex-review/scripts/agentic-review publish --dry-run
+~/.claude/skills/codex-review/scripts/agentic-review publish [--note "<what changed since the last pass, when stale>"]
 ```
 
 It refuses a pull request opened by someone else or a local HEAD that differs from the pushed one.

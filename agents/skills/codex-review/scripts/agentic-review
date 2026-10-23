@@ -695,9 +695,19 @@ def parser():
     return root
 
 
+def ensure_outside_own_repository():
+    own_root = run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--show-toplevel"],
+                   check=False).stdout.strip()
+    current_root = git("rev-parse", "--show-toplevel", check=False).strip()
+    if own_root and own_root == current_root:
+        raise Failure(f"run from the reviewed project, not from {own_root} that holds this script: "
+                      f"cd to the project and call {Path(__file__).resolve()}")
+
+
 def main():
     args = parser().parse_args()
     try:
+        ensure_outside_own_repository()
         return args.handler(args) or 0
     except Failure as failure:
         print(f"agentic-review: {failure}", file=sys.stderr)
