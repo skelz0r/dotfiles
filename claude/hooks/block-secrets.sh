@@ -87,7 +87,7 @@ check_command() {
   inspected="$(write_forms_removed <<< "$command")"$'\n'"$(embedded_reads <<< "$command")"
   for directory in "${PROTECTED_DIRECTORIES[@]}"; do
     in_command="(^|[^[:alnum:]_.-])$directory(${QUOTE}*/|[[:space:]]*\$|[[:space:]]*[;|&)<>])"
-    quoted_word="(^|[[:space:]=(])${QUOTE}([^\"'[:space:]]*/)?$directory${QUOTE}${END_OF_WORD}"
+    quoted_word="(^|[[:space:]=(])${QUOTE}([^\"']*/)?$directory${QUOTE}${END_OF_WORD}"
     if grep -Eq -e "$in_command" -e "$quoted_word" <<< "$inspected"; then
       refuse "this command reads a path under a $directory/ directory" "$directory"
     fi

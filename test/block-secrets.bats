@@ -151,6 +151,11 @@ END"
   assert_blocked Bash command 'head 0<> "config/secrets/prod.env"'
 }
 
+@test "a quoted protected directory whose path holds spaces is blocked" {
+  assert_blocked Bash command 'rg . "my project/sandbox/pii"'
+  assert_blocked Bash command "cd 'my app/config/secrets' && cat prod.env"
+}
+
 @test "a read of secrets/ followed by a long script is still blocked" {
   local script
   script="cat secrets/prod.env"$'\n'"$(printf 'printf x\n%.0s' $(seq 4000))"
