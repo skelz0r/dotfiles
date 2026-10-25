@@ -5,6 +5,7 @@
 #
 
 set -euo pipefail
+set -o errtrace
 
 usage() {
   cat << USAGE
@@ -32,6 +33,8 @@ REDIRECTION="[0-9]*>[>|]?[[:space:]]*(\"[^\"]*\"|'[^']*'|[^[:space:];|&<>]+)"
 
 refuse() {
   local reason="$1" directory="${2:-}"
+  trap - ERR
+  set +e
   echo "Blocked: $reason." >&2
   case "$directory" in
     secrets) cat >&2 << MESSAGE
@@ -67,7 +70,7 @@ write_forms_removed() {
 }
 
 embedded_reads() {
-  grep -oE '[$][(][^)]*[)]|`[^`]*`|<>?[[:space:]]*[^[:space:];|&<>]+' || true
+  grep -oE '[$][(][^)]*[)]|`[^`]*`|<>?[[:space:]]*[^[:space:];|&<>]+' || [[ $? -eq 1 ]]
 }
 
 check_paths() {
@@ -82,15 +85,20 @@ check_paths() {
 }
 
 check_command() {
-  local command="$1" inspected directory in_command quoted_word
+  local command="$1" stripped embedded directory in_command quoted_word match_status
   [[ "$command" =~ $GIT_CRYPT_KEY ]] && refuse "git-crypt ${BASH_REMATCH[1]} reveals the git-crypt key" secrets
-  inspected="$(write_forms_removed <<< "$command")"$'\n'"$(embedded_reads <<< "$command")"
+  stripped="$(write_forms_removed <<< "$command")"
+  embedded="$(embedded_reads <<< "$command")"
   for directory in "${PROTECTED_DIRECTORIES[@]}"; do
     in_command="(^|[^[:alnum:]_.-])$directory(${QUOTE}*/|[[:space:]]*\$|[[:space:]]*[;|&)<>])"
     quoted_word="(^|[[:space:]=(])${QUOTE}([^\"']*/)?$directory${QUOTE}${END_OF_WORD}"
-    if grep -Eq -e "$in_command" -e "$quoted_word" <<< "$inspected"; then
-      refuse "this command reads a path under a $directory/ directory" "$directory"
-    fi
+    match_status=0
+    grep -Eq -e "$in_command" -e "$quoted_word" <<< "$stripped"$'\n'"$embedded" || match_status=$?
+    case "$match_status" in
+      0) refuse "this command reads a path under a $directory/ directory" "$directory" ;;
+      1) ;;
+      *) refuse "the hook itself failed, so the tool call could not be checked" ;;
+    esac
   done
   return 0
 }

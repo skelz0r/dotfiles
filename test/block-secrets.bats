@@ -156,6 +156,16 @@ END"
   assert_blocked Bash command "cd 'my app/config/secrets' && cat prod.env"
 }
 
+@test "a hook whose text tools fail blocks the tool call" {
+  local tool
+  for tool in sed grep; do
+    stub "$tool" "exit 73"
+    run "$HOOK" <<< "$(tool_call Bash command "cat sandbox/pii/export.csv")"
+    assert_equal "$status" 2
+    rm "$STUB_DIR/$tool"
+  done
+}
+
 @test "a read of secrets/ followed by a long script is still blocked" {
   local script
   script="cat secrets/prod.env"$'\n'"$(printf 'printf x\n%.0s' $(seq 4000))"
