@@ -102,6 +102,49 @@ END"
   done
 }
 
+@test "reading personal data under a pii/ directory is blocked" {
+  assert_blocked Read file_path "/Users/me/project/sandbox/pii/export.csv"
+  assert_blocked Grep path "sandbox/pii"
+  assert_blocked Grep glob "**/pii/**"
+  assert_blocked Glob pattern "sandbox/pii/*.json"
+  assert_blocked Bash command "cat sandbox/pii/access_logs.json"
+  assert_blocked Bash command "head -n 20 sandbox/pii/export.csv | cut -d, -f1"
+  assert_blocked Bash command 'echo "$(cat sandbox/pii/export.csv)"'
+  assert_blocked Bash command "wc -l < sandbox/pii/export.csv"
+  assert_blocked Bash command "ls sandbox/pii"
+}
+
+@test "asking the local model about a pii/ file from Claude is blocked" {
+  assert_blocked Bash command 'ask-local "which IP has the most 429?" sandbox/pii/access_logs.json'
+  assert_blocked Bash command 'ask-local "which IP has the most 429?" < sandbox/pii/access_logs.json'
+  assert_blocked Bash command 'cat sandbox/pii/access_logs.json | ask-local "which IP has the most 429?"'
+}
+
+@test "copying query rows to the terminal while saving them under pii/ is blocked" {
+  assert_blocked Bash command 'query.sh "SELECT ip FROM access_logs" | tee sandbox/pii/ips.json'
+}
+
+@test "the refusal for pii/ explains how to analyse personal data" {
+  run "$HOOK" <<< "$(tool_call Read file_path "sandbox/pii/export.csv")"
+  assert_equal "$status" 2
+  assert_contains "$output" "personal data"
+  assert_contains "$output" "ask-local"
+}
+
+@test "writing personal data under a pii/ directory is allowed" {
+  assert_allowed Write file_path "/Users/me/project/sandbox/pii/export.csv"
+  assert_allowed Bash command "mkdir -p sandbox/pii"
+  assert_allowed Bash command '~/.claude/skills/metabase/scripts/query.sh "SELECT ip, status FROM access_logs LIMIT 1000" > sandbox/pii/access_logs.json'
+  assert_allowed Bash command 'query.sh "SELECT count(*) FROM access_logs WHERE status = 429 GROUP BY day" > "sandbox/pii/429 per day.json" && echo done'
+}
+
+@test "piping data outside pii/ to the local model and unrelated pii names are allowed" {
+  assert_allowed Bash command 'query.sh "SELECT status, count(*) FROM access_logs GROUP BY status" | ask-local "summarize"'
+  assert_allowed Bash command "cd ~/dotfiles/worktrees/pii-local-analysis && git status"
+  assert_allowed Read file_path "docs/pii.md"
+  assert_allowed Read file_path "app/models/pii_scrubber.rb"
+}
+
 @test "a read of secrets/ followed by a long script is still blocked" {
   local script
   script="cat secrets/prod.env"$'\n'"$(printf 'printf x\n%.0s' $(seq 4000))"
