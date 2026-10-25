@@ -61,12 +61,13 @@ trap 'refuse "the hook itself failed, so the tool call could not be checked"' ER
 
 write_forms_removed() {
   sed -E \
+    -e 's/<>/</g' \
     -e "s/$REDIRECTION//g" \
     -e 's/(^[[:space:]]*|[;|&(][[:space:]]*)(mkdir|touch|git[[:space:]]+add)([^;|&)]*)/\1/g'
 }
 
 embedded_reads() {
-  grep -oE '[$][(][^)]*[)]|`[^`]*`|<[[:space:]]*[^[:space:];|&<>]+' || true
+  grep -oE '[$][(][^)]*[)]|`[^`]*`|<>?[[:space:]]*[^[:space:];|&<>]+' || true
 }
 
 check_paths() {

@@ -145,6 +145,12 @@ END"
   assert_allowed Read file_path "app/models/pii_scrubber.rb"
 }
 
+@test "a read through a read-write redirection is blocked" {
+  assert_blocked Bash command "cat <> sandbox/pii/export.csv"
+  assert_blocked Bash command "touch marker <> sandbox/pii/export.csv"
+  assert_blocked Bash command 'head 0<> "config/secrets/prod.env"'
+}
+
 @test "a read of secrets/ followed by a long script is still blocked" {
   local script
   script="cat secrets/prod.env"$'\n'"$(printf 'printf x\n%.0s' $(seq 4000))"
