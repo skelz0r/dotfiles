@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+#
+# ask-local - Ask a local ollama model a one-off question about a file or stdin
+#
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+OLLAMA_URL="http://127.0.0.1:11434"
+DEFAULT_MODEL="qwen3.5:35b-a3b"
+BYTES_PER_TOKEN=2
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS] <question> [file]
+       <command> | $(basename "$0") [OPTIONS] <question>
+
+Ask a model running in the local ollama ($OLLAMA_URL) a one-off
+question about a file or stdin, without agent nor tools. Meant for
+personal data that must not leave the machine: the data never goes
+further than this computer, and cloud models are refused.
+
+The model reads rows but miscounts them: compute counts and sums with
+SQL, awk or duckdb, and ask the model what needs reading.
+
+Arguments:
+  question    What to ask about the data
+  file        File holding the data (default: stdin)
+
+Options:
+  -m, --model NAME   Model to use (default: \$ASK_LOCAL_MODEL, else
+                     $DEFAULT_MODEL)
+  -c, --ctx TOKENS   Context window (default: the model's maximum)
+  -t, --think        Let the model think before answering (slower)
+  -h, --help         Show this help message
+
+Examples:
+  query.sh "SELECT ..." | $(basename "$0") "which IP has the most 429?"
+  $(basename "$0") "list the duplicated emails" sandbox/pii/export.csv
+EOF
+  exit 0
+}
+
+error() { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
+info() { [[ -t 2 ]] && echo -e "${BLUE}[INFO]${NC} $*" >&2; return 0; }
+
+MODEL="${ASK_LOCAL_MODEL:-$DEFAULT_MODEL}"
+NUM_CTX=""
+THINK=false
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h|--help) usage ;;
+    -m|--model) [[ -n "${2:-}" ]] || error "--model needs a name"; MODEL="$2"; shift 2 ;;
+    -c|--ctx) [[ "${2:-}" =~ ^[0-9]+$ ]] || error "--ctx needs a number of tokens"; NUM_CTX="$2"; shift 2 ;;
+    -t|--think) THINK=true; shift ;;
+    --) shift; POSITIONAL+=("$@"); break ;;
+    -*) error "Unknown option: $1 (use --help)" ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+[[ "${#POSITIONAL[@]}" -ge 1 && "${#POSITIONAL[@]}" -le 2 ]] || error "Expected a question and at most one file (use --help)"
+QUESTION="${POSITIONAL[0]}"
+[[ -n "$QUESTION" ]] || error "The question is empty"
+INPUT_FILE="${POSITIONAL[1]:-}"
+
+if [[ -n "$INPUT_FILE" ]]; then
+  [[ -f "$INPUT_FILE" && -r "$INPUT_FILE" ]] || error "Cannot read $INPUT_FILE"
+elif [[ -t 0 ]]; then
+  error "No data: pass a file or pipe the data on stdin (use --help)"
+fi
+
+[[ "$MODEL" =~ [:-]cloud$ ]] && error "$MODEL is an ollama cloud model: the data would leave the machine"
+
+command -v jq > /dev/null || error "jq is missing (brew install jq)"
+command -v curl > /dev/null || error "curl is missing"
+
+curl -sf --max-time 2 "$OLLAMA_URL/api/version" > /dev/null \
+  || error "ollama does not answer on $OLLAMA_URL: start it with 'ollama serve'"
+
+MODEL_INFO="$(curl -s "$OLLAMA_URL/api/show" -d "$(jq -n --arg model "$MODEL" '{model: $model}')")"
+MODEL_ERROR="$(jq -r '.error // empty' <<< "$MODEL_INFO")"
+[[ -z "$MODEL_ERROR" ]] || error "$MODEL: $MODEL_ERROR (installed models: ollama list)"
+[[ "$(jq -r '.remote_host // empty' <<< "$MODEL_INFO")" == "" ]] || error "$MODEL runs on a remote host: the data would leave the machine"
+
+MODEL_MAX_CTX="$(jq -r '[.model_info // {} | to_entries[] | select(.key | endswith(".context_length")) | .value][0] // empty' <<< "$MODEL_INFO")"
+NUM_CTX="${NUM_CTX:-${MODEL_MAX_CTX:-32768}}"
+
+DATA_FILE="$(mktemp)"
+trap 'rm -f "$DATA_FILE"' EXIT
+if [[ -n "$INPUT_FILE" ]]; then
+  cat "$INPUT_FILE" > "$DATA_FILE"
+else
+  cat > "$DATA_FILE"
+fi
+
+DATA_BYTES="$(wc -c < "$DATA_FILE" | tr -d ' ')"
+[[ "$DATA_BYTES" -gt 0 ]] || error "The data is empty"
+ESTIMATED_TOKENS=$((DATA_BYTES / BYTES_PER_TOKEN))
+if [[ "$ESTIMATED_TOKENS" -ge "$NUM_CTX" ]]; then
+  error "About $ESTIMATED_TOKENS tokens of data for a context of $NUM_CTX: filter or aggregate it first, or raise --ctx"
+fi
+
+SYSTEM_PROMPT="Answer the question using only the data provided between <data> tags. \
+Be concise and exact. If the data does not hold the answer, say so instead of guessing."
+
+REQUEST="$(jq -n \
+  --arg model "$MODEL" \
+  --arg system "$SYSTEM_PROMPT" \
+  --arg question "$QUESTION" \
+  --rawfile data "$DATA_FILE" \
+  --argjson num_ctx "$NUM_CTX" \
+  --argjson think "$THINK" \
+  '{
+    model: $model,
+    stream: false,
+    think: $think,
+    options: {num_ctx: $num_ctx},
+    messages: [
+      {role: "system", content: $system},
+      {role: "user", content: ($question + "\n\n<data>\n" + $data + "\n</data>")}
+    ]
+  }')"
+
+info "Asking $MODEL (about $ESTIMATED_TOKENS tokens of data, context $NUM_CTX)..."
+
+RESPONSE="$(curl -s "$OLLAMA_URL/api/chat" --data-binary @- <<< "$REQUEST")" \
+  || error "ollama stopped answering on $OLLAMA_URL"
+RESPONSE_ERROR="$(jq -r '.error // empty' <<< "$RESPONSE")"
+[[ -z "$RESPONSE_ERROR" ]] || error "$MODEL: $RESPONSE_ERROR"
+
+PROMPT_TOKENS="$(jq -r '.prompt_eval_count // 0' <<< "$RESPONSE")"
+if [[ "$PROMPT_TOKENS" -ge $((NUM_CTX * 98 / 100)) ]]; then
+  warn "The prompt filled $PROMPT_TOKENS of $NUM_CTX tokens: the data was probably truncated, the answer may be wrong"
+fi
+
+jq -r '.message.content' <<< "$RESPONSE"
