@@ -59,9 +59,12 @@ Commands:
 Targets of enqueue (one of):
   --workspace ID             The -main of this workspace
   --cwd PATH                 The -main of the workspace found by workspace-for
+  --home-cwd PATH            The unnamed Claude of the pane of Home (workspace
+                             number 1) whose cwd is PATH; never started
 
 Options of enqueue:
   --pane PANE_ID             The unnamed Claude of this pane instead of the -main
+                             (not with --home-cwd)
   --label LABEL              Workspace label naming a -main to create
                              (default: read from herdr)
   --keep-context             Do not send /clear before the prompt
@@ -235,6 +238,43 @@ workspace_for() {
   esac
 }
 
+home_workspace() {
+  local workspaces index workspace_id number
+  workspaces="$(herdr workspace list)" || { paint "$RED" "unreadable herdr workspaces"; return 1; }
+  index=0
+  while workspace_id="$(printf '%s' "$workspaces" | json_value "result.workspaces.$index.workspace_id")"; do
+    number="$(printf '%s' "$workspaces" | json_value "result.workspaces.$index.number" || true)"
+    [[ "$number" != "1" ]] || { printf '%s\n' "$workspace_id"; return; }
+    index=$((index + 1))
+  done
+  paint "$RED" "no Home workspace (number 1) in herdr"
+  return 2
+}
+
+home_pane_for() {
+  local target home_id agents index agent_workspace kind name cwd matches=()
+  target="$(expand_home "$1")"
+  [[ -d "$target" ]] || { paint "$RED" "no such directory: $target"; return 2; }
+  target="$(canonical_dir "$target")"
+  home_id="$(home_workspace)" || return $?
+  agents="$(herdr agent list)" || { paint "$RED" "unreadable herdr agents"; return 1; }
+  index=0
+  while agent_workspace="$(printf '%s' "$agents" | json_value "result.agents.$index.workspace_id")"; do
+    kind="$(printf '%s' "$agents" | json_value "result.agents.$index.agent" || true)"
+    name="$(printf '%s' "$agents" | json_value "result.agents.$index.name" || true)"
+    cwd="$(printf '%s' "$agents" | json_value "result.agents.$index.cwd" || true)"
+    if [[ "$agent_workspace" == "$home_id" && "$kind" == "claude" && -z "$name" && -n "$cwd" && "$(canonical_dir "$cwd")" == "$target" ]]; then
+      matches+=("$(printf '%s' "$agents" | json_value "result.agents.$index.pane_id")")
+    fi
+    index=$((index + 1))
+  done
+  case "${#matches[@]}" in
+    0) paint "$RED" "no Claude of Home runs in $target"; return 2 ;;
+    1) printf '%s %s\n' "$home_id" "${matches[0]}" ;;
+    *) paint "$RED" "several Claude of Home run in $target: ${matches[*]}"; return 2 ;;
+  esac
+}
+
 next_sequence() {
   local sequence
   mkdir -p "$LOCKS_DIR"
@@ -283,11 +323,12 @@ create_job() {
 }
 
 enqueue() {
-  local workspace_id="" cwd="" pane="" label="" clear=clear has_label=false agent status
+  local workspace_id="" cwd="" home_cwd="" home_target="" targets pane="" label="" clear=clear has_label=false agent status
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --workspace) [[ $# -ge 2 ]] || fail_usage "--workspace needs an id"; workspace_id="$2"; shift 2 ;;
       --cwd) [[ $# -ge 2 ]] || fail_usage "--cwd needs a path"; cwd="$2"; shift 2 ;;
+      --home-cwd) [[ $# -ge 2 ]] || fail_usage "--home-cwd needs a path"; home_cwd="$2"; shift 2 ;;
       --pane) [[ $# -ge 2 ]] || fail_usage "--pane needs a pane id"; pane="$2"; shift 2 ;;
       --label) [[ $# -ge 2 ]] || fail_usage "--label needs a label"; label="$2"; has_label=true; shift 2 ;;
       --keep-context) clear=keep; shift ;;
@@ -295,11 +336,19 @@ enqueue() {
       *) fail_usage "unknown enqueue argument: $1" ;;
     esac
   done
-  [[ -n "$workspace_id" || -n "$cwd" ]] || fail_usage "enqueue needs --workspace or --cwd"
-  [[ -z "$workspace_id" || -z "$cwd" ]] || fail_usage "enqueue takes --workspace or --cwd, not both"
+  targets="${workspace_id:+w}${cwd:+c}${home_cwd:+h}"
+  [[ "${#targets}" -eq 1 ]] || fail_usage "enqueue takes one of --workspace, --cwd or --home-cwd"
+  [[ -z "$home_cwd" ]] || { [[ -z "$pane" ]] && ! $has_label; } || fail_usage "--home-cwd finds its pane: no --pane nor --label"
   [[ -z "$pane" ]] || ! $has_label || fail_usage "--label names a -main, not a pane"
   ! $has_label || [[ -n "$label" ]] || refuse "invalid label"
 
+  if [[ -n "$home_cwd" ]]; then
+    status=0
+    home_target="$(home_pane_for "$home_cwd")" || status=$?
+    [[ "$status" -eq 0 ]] || exit "$status"
+    workspace_id="${home_target%% *}"
+    pane="${home_target#* }"
+  fi
   if [[ -n "$cwd" ]]; then
     status=0
     workspace_id="$(workspace_for "$cwd")" || status=$?

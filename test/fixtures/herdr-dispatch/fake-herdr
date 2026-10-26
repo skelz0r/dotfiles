@@ -74,11 +74,12 @@ agent_object() {
   herdr_name="$(agent_file "$name" name)"
   case "$name" in *:*) pane_id="$name" ;; *) herdr_name="$name"; pane_id="$(agent_file "$name" pane_id)" ;; esac
   workspace_id="$(agent_file "$name" workspace_id)"
+  cwd="$(agent_file "$name" cwd)"
   name_field=""
   [ -n "$herdr_name" ] && name_field="\"name\":\"$herdr_name\","
-  printf '{"agent":"%s","agent_session":{"agent":"%s","kind":"id","source":"herdr:%s","value":"%s"},"agent_status":"%s","completion_seq":12,"cwd":"/work/project","focused":false,"foreground_cwd":"/work/project","interactive_ready":true,%s"pane_id":"%s","revision":3,"state_change_seq":12,"tab_id":"%s","terminal_id":"term_fake","terminal_title":"✳ Claude","terminal_title_stripped":"Claude","workspace_id":"%s"}' \
+  printf '{"agent":"%s","agent_session":{"agent":"%s","kind":"id","source":"herdr:%s","value":"%s"},"agent_status":"%s","completion_seq":12,"cwd":"%s","focused":false,"foreground_cwd":"%s","interactive_ready":true,%s"pane_id":"%s","revision":3,"state_change_seq":12,"tab_id":"%s","terminal_id":"term_fake","terminal_title":"✳ Claude","terminal_title_stripped":"Claude","workspace_id":"%s"}' \
     "${kind:-claude}" "${kind:-claude}" "${kind:-claude}" "$(agent_file "$name" session)" "$(agent_file "$name" status)" \
-    "$name_field" "${pane_id:-$workspace_id:p1}" "$(agent_file "$name" tab_id || printf '%s:t1' "$workspace_id")" "$workspace_id"
+    "${cwd:-/work/project}" "${cwd:-/work/project}" "$name_field" "${pane_id:-$workspace_id:p1}" "$(agent_file "$name" tab_id || printf '%s:t1' "$workspace_id")" "$workspace_id"
 }
 
 agent_info() {

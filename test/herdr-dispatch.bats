@@ -470,6 +470,63 @@ idle|For Home"
   assert_equal "$(job_states)" ""
 }
 
+add_claude_in() {
+  add_agent "$1" "${1%%:*}" "$3"
+  echo "$2" > "$FAKE_HERDR_WORLD/agents/$1/cwd"
+}
+
+@test "--home-cwd sends to the Claude of Home running in that path, after a /clear" {
+  mkdir -p "$BATS_TEST_TMPDIR/projects/acme" "$BATS_TEST_TMPDIR/projects/other"
+  add_workspace wA 1 '🏠 Home' "$HOME"
+  add_claude_in wA:p5 "$BATS_TEST_TMPDIR/projects/acme" working
+  printf 'From ags' | "$DISPATCH" enqueue --home-cwd "$BATS_TEST_TMPDIR/projects/other/../acme" > /dev/null
+  sleep 2
+  assert_equal "$(prompts_of wA:p5)" ""
+  set_status wA:p5 idle
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(dispatch_status | cut -f2-4)" "wA	wA:p5	sent"
+  assert_equal "$(prompts_of wA:p5)" "idle|/clear
+idle|From ags"
+  assert_missing "$FAKE_HERDR_WORLD/splits" "$FAKE_HERDR_WORLD/starts"
+}
+
+@test "--home-cwd never targets a Claude outside Home, a named agent or another agent, and starts none" {
+  mkdir -p "$BATS_TEST_TMPDIR/projects/acme"
+  add_workspace wA 1 '🏠 Home' "$HOME"
+  add_workspace wB 2 'Acme' "$BATS_TEST_TMPDIR/projects/acme"
+  add_claude_in wB:p1 "$BATS_TEST_TMPDIR/projects/acme" idle
+  add_claude_in wA:p7 "$BATS_TEST_TMPDIR/projects/acme" idle
+  echo codex > "$FAKE_HERDR_WORLD/agents/wA:p7/kind"
+  add_claude_in wA:p8 "$BATS_TEST_TMPDIR/projects/acme" idle
+  echo acme-main > "$FAKE_HERDR_WORLD/agents/wA:p8/name"
+  run bash -c "echo x | '$DISPATCH' enqueue --home-cwd '$BATS_TEST_TMPDIR/projects/acme'"
+  assert_equal "$status" 2
+  assert_contains "$output" "no Claude of Home runs in"
+  assert_equal "$(job_states)" ""
+  assert_missing "$FAKE_HERDR_WORLD/splits" "$FAKE_HERDR_WORLD/starts"
+}
+
+@test "--home-cwd with two Claude of Home in that path is refused rather than picked" {
+  mkdir -p "$BATS_TEST_TMPDIR/projects/acme"
+  add_workspace wA 1 '🏠 Home' "$HOME"
+  add_claude_in wA:p5 "$BATS_TEST_TMPDIR/projects/acme" idle
+  add_claude_in wA:p6 "$BATS_TEST_TMPDIR/projects/acme" idle
+  run bash -c "echo x | '$DISPATCH' enqueue --home-cwd '$BATS_TEST_TMPDIR/projects/acme'"
+  assert_equal "$status" 2
+  assert_contains "$output" "several Claude of Home run in"
+  assert_equal "$(job_states)" ""
+}
+
+@test "--home-cwd combined with another target, a pane or a label is refused without a job" {
+  run bash -c "echo x | '$DISPATCH' enqueue --home-cwd /tmp --cwd /tmp"
+  assert_equal "$status" 2
+  run bash -c "echo x | '$DISPATCH' enqueue --home-cwd /tmp --pane wA:p1"
+  assert_equal "$status" 2
+  run bash -c "echo x | '$DISPATCH' enqueue --home-cwd /tmp --label Acme"
+  assert_equal "$status" 2
+  assert_equal "$(job_states)" ""
+}
+
 @test "a job of an unknown format is marked failed, never sent" {
   add_agent home-main w1 idle
   mkdir -p "$HERDR_DISPATCH_STATE_DIR/locks/home-main"
