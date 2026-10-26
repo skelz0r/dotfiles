@@ -15,7 +15,17 @@ Be extremely concise. Sacrifice grammar for concision.
 - Comments on Linear/GitHub issues follow the same style as commits and PR
   descriptions: short prose paragraphs, conclusions first, only the key
   facts (ids, volumes, link to the PR)
-- No headings, tables, bold or checklists: must not look AI-generated
+- Short or medium ticket or comment (up to ~5 paragraphs, one topic): no
+  headings, tables, bold or checklists, must not look AI-generated
+- Dense ticket (several topics, decisions taken and open, figures, a
+  rollout plan): light layout so a reader new to the topic can scan it,
+  e.g. a 2-3 line summary first, `##` sections (decisions, open
+  questions, plan), lists for enumerations, a table only for figures
+  compared side by side, bold only on the key term of a list item. Ten
+  paragraphs of raw prose were judged unreadable
+- Either way stay concise, precise, synthetic: layout structures the
+  content, it never pads it; when a ticket keeps growing, split it into
+  sub-issues instead
 
 ## Checks
 
