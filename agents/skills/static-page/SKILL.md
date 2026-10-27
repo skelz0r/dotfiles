@@ -131,11 +131,19 @@ been shared.
   then offer the next step of the skill.
 - **A report tied to a pull request** (the branch's own PR, or the PR the
   work follows up): amend its description without asking, with
-  `gh pr edit <n> --body-file`. Add a line linking the report (URL only:
-  the password goes to the user, never into the PR), and remove from the
-  description the images the report now carries (screenshots, charts,
-  tables pasted as images), so they live in one place. Show the user the
-  new description.
+  `gh pr edit <n> --body-file`. Add a line linking the report, and
+  remove from the description the images the report now carries
+  (screenshots, charts, tables pasted as images), so they live in one
+  place. Show the user the new description.
+- **Password in GitHub text**: on a private repository
+  (`gh repo view --json visibility`), every PR description, PR comment
+  or issue comment that links a protected page gives the direct link
+  (`…/#k=<password>`) and the password in clear, each time, so a reader
+  never has to ask for it: `Guide : <url>/#k=<pw> (mot de passe : <pw>)`.
+  On a public repository, give only the URL there and the password to
+  the user. The server keeps only a hash: on a republish, take the
+  password from the conversation or from the text where it was written
+  before, otherwise ask the user rather than replace it.
 
 To iterate, edit the source, rebuild and republish to the same folder
 (the one in `.assets-folder`).
