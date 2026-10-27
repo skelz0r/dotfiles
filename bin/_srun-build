@@ -46,11 +46,7 @@ echo "Bundle ID: $BUNDLE_ID" >&2
 echo "App: $APP_NAME" >&2
 
 echo "Building on $HOST..." >&2
-ssh "$HOST" "
-  security list-keychains -d user -s ~/Library/Keychains/ci.keychain-db ~/Library/Keychains/login.keychain-db
-  security unlock-keychain -p ci ~/Library/Keychains/ci.keychain-db
-  cd ~/work/$PROJECT && ./bin/build-ios $BUILD_TYPE
-"
+ssh "$HOST" "cd ~/work/$PROJECT && ~/dotfiles/bin/with-ci-keychain ./bin/build-ios $BUILD_TYPE"
 
 case "$BUILD_TYPE" in
   simulator)

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") <command> [args...]
+
+Run a command that signs iOS builds (xcodebuild, codesign) with the CI
+keychain first in the search list and unlocked, then restore the order
+login then CI.
+
+From a session without a usable keychain (herdr runs as a LaunchDaemon,
+launchctl managername = System, codesign fails with
+errSecInternalComponent), the command is re-run through ssh localhost,
+in the current directory. Environment variables do not cross ssh: pass
+them as arguments (build settings) or let the command read them.
+EOF
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+[[ $# -eq 0 ]] && { usage; exit 1; }
+
+CI_KEYCHAIN="$HOME/Library/Keychains/ci.keychain-db"
+LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+CI_KEYCHAIN_PASSWORD="ci"
+
+if [[ "$(launchctl managername)" == "System" ]]; then
+  self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  exec ssh -o BatchMode=yes localhost \
+    "cd $(printf '%q' "$PWD") && exec $(printf '%q' "$self") $(printf '%q ' "$@")"
+fi
+
+restore_keychain_order() {
+  security list-keychains -d user -s "$LOGIN_KEYCHAIN" "$CI_KEYCHAIN"
+}
+trap restore_keychain_order EXIT
+
+security list-keychains -d user -s "$CI_KEYCHAIN" "$LOGIN_KEYCHAIN"
+security unlock-keychain -p "$CI_KEYCHAIN_PASSWORD" "$CI_KEYCHAIN"
+
+"$@"
