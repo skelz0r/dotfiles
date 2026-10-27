@@ -9,6 +9,9 @@ Be extremely concise. Sacrifice grammar for concision.
 - No emojis unless asked
 - No unnecessary praise or filler
 - Direct answers, skip preambles
+- End any turn that reports on long-running or delegated work with a
+  short status: **Goal**, **Done**, **Next**, **Needs you** (or
+  "nothing")
 
 ## Tickets / issues comments
 
