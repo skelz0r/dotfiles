@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << EOF2
+Usage: $(basename "$0")
+
+Install the herdr server as a LaunchDaemon from the plist next to this
+script, then reload it. Needs sudo. Reloading restarts herdr: every tab
+and the processes running in them are killed, run it from Terminal.app,
+not from a herdr tab.
+EOF2
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+
+SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/com.skelz0r.herdr.plist"
+TARGET=/Library/LaunchDaemons/com.skelz0r.herdr.plist
+
+plutil -lint "$SOURCE"
+mkdir -p "$HOME/Library/Logs/herdr"
+sudo install -m 644 -o root -g wheel "$SOURCE" "$TARGET"
+sudo launchctl bootout system/com.skelz0r.herdr || true
+sudo launchctl bootstrap system "$TARGET"
+sudo launchctl print system/com.skelz0r.herdr | grep -E 'state|pid'

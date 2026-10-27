@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/skelz0r</string>
+		<key>LANG</key>
+		<string>en_US.UTF-8</string>
+		<key>PATH</key>
+		<string>/Users/skelz0r/bin:/Users/skelz0r/.bin:/Users/skelz0r/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>SHELL</key>
+		<string>/bin/zsh</string>
+		<key>USER</key>
+		<string>skelz0r</string>
+	</dict>
+	<key>GroupName</key>
+	<string>staff</string>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>com.skelz0r.herdr</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/herdr</string>
+		<string>server</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>SessionCreate</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/skelz0r/Library/Logs/herdr/server.err</string>
+	<key>StandardOutPath</key>
+	<string>/Users/skelz0r/Library/Logs/herdr/server.log</string>
+	<key>UserName</key>
+	<string>skelz0r</string>
+	<key>WorkingDirectory</key>
+	<string>/Users/skelz0r</string>
+</dict>
+</plist>
