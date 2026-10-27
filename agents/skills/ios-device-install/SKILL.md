@@ -25,6 +25,11 @@ how to get the build onto the phone.
    `-destination generic/platform=iOS`: the product is
    `<derived data>/Build/Products/Debug-iphoneos/<Name>.app`. A simulator
    build is refused.
+   On ch405, wrap the build in `~/dotfiles/bin/with-ci-keychain`: from a
+   herdr tab (a LaunchDaemon, no GUI session) `codesign` cannot sign
+   otherwise, and the wrapper re-runs the build through `ssh localhost`
+   (see the `dev-ios` skill, *Signing from herdr*). The install itself
+   runs from herdr without it.
 2. Install:
 
    ```bash

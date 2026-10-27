@@ -51,15 +51,31 @@ The UDID (different from CoreDevice UUID) is visible in Xcode > Window > Devices
 
 ## Code Signing & Keychain
 
-ch405 uses a dedicated CI keychain (`ci.keychain-db`). `_srun-build` unlocks it automatically.
+ch405 signs with a dedicated CI keychain (`ci.keychain-db`, password `ci`,
+a machine keychain). Any command that signs for the device goes through
+`~/dotfiles/bin/with-ci-keychain <command...>`: it puts the CI keychain
+first in the search list (with login first, the development certificate
+fails with `errSecInternalComponent` while distribution passes), unlocks
+it, runs the command and restores the order login then CI. `_srun-build`,
+local_events `bin/run-ios-device` and `bin/deploy-testflight` use it.
 
-For manual builds via SSH, unlock it first (ask user for password):
-```bash
-security list-keychains -d user -s ~/Library/Keychains/ci.keychain-db ~/Library/Keychains/login.keychain-db
-security unlock-keychain -p <password> ~/Library/Keychains/ci.keychain-db
-```
+### Signing from herdr
 
-Without unlocking the keychain, codesign fails with `errSecInternalComponent`.
+herdr runs as a LaunchDaemon (`config/herdr/com.skelz0r.herdr.plist`,
+`launchctl managername` = `System`), outside the GUI session: its tabs,
+Claude included, have neither the login keychain nor the Xcode account.
+`xcodebuild` fails with `0 valid identities found`, `No Accounts`, `No
+signing certificate "iOS Development" found`; with `SessionCreate` in the
+plist the identities show up but `codesign` still fails with
+`errSecInternalComponent` / `unable to build chain to self-signed root`.
+Unlocking, reordering or `set-key-partition-list` do not help, nor does
+`codesign --keychain`.
+
+A session opened by `ssh localhost` (`Background`) signs fine, so
+`with-ci-keychain` re-runs the command through `ssh localhost`, in the
+current directory, when `managername` is `System`. Environment variables
+do not cross that hop: pass build settings as `xcodebuild` arguments.
+`devicectl` (install, launch) works from herdr directly.
 
 ## Provisioning Profiles
 
@@ -77,8 +93,7 @@ Profiles are cached in `~/Library/Developer/Xcode/UserData/Provisioning Profiles
 5. Clean and rebuild:
    ```bash
    rm -rf ~/Library/Developer/Xcode/DerivedData/Morris-*
-   security unlock-keychain -p <password> ~/Library/Keychains/ci.keychain-db
-   xcodebuild -project ios/Morris.xcodeproj -scheme Morris -allowProvisioningUpdates \
+   ~/dotfiles/bin/with-ci-keychain xcodebuild -project ios/Morris.xcodeproj -scheme Morris -allowProvisioningUpdates \
      -destination "generic/platform=iOS" -configuration Debug CODE_SIGN_STYLE=Automatic build
    ```
 6. Update device UUID in the 3 config locations (see above)
