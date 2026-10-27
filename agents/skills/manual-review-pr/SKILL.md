@@ -271,8 +271,9 @@ Give the URL. Do not link it from the PR unless asked.
 ## 8. TL;DR for the PR review
 
 Along with the URL, draft the comment the user will post with their
-review: the page link first, then a few short prose paragraphs on what
-does not suit them, conclusions only, in the decisions' order of
+review: the page link first (on a private repository, the direct link
+and the password, as `static-page` states), then a few short prose
+paragraphs on what does not suit them, conclusions only, in the decisions' order of
 weight: what to rework in the design, the bugs, then the product points,
 with what is not blocking flagged as such. It says what is wrong and
 why, not how to fix it: no option name or DSL from the page, which
