@@ -62,20 +62,21 @@ local_events `bin/run-ios-device` and `bin/deploy-testflight` use it.
 ### Signing from herdr
 
 herdr runs as a LaunchDaemon (`config/herdr/com.skelz0r.herdr.plist`,
-`launchctl managername` = `System`), outside the GUI session: its tabs,
-Claude included, have neither the login keychain nor the Xcode account.
-`xcodebuild` fails with `0 valid identities found`, `No Accounts`, `No
-signing certificate "iOS Development" found`; with `SessionCreate` in the
-plist the identities show up but `codesign` still fails with
-`errSecInternalComponent` / `unable to build chain to self-signed root`.
-Unlocking, reordering or `set-key-partition-list` do not help, nor does
-`codesign --keychain`.
+installed by `config/herdr/install-daemon`), outside the GUI session.
 
-A session opened by `ssh localhost` (`Background`) signs fine, so
-`with-ci-keychain` re-runs the command through `ssh localhost`, in the
-current directory, when `managername` is `System`. Environment variables
-do not cross that hop: pass build settings as `xcodebuild` arguments.
-`devicectl` (install, launch) works from herdr directly.
+- With `SessionCreate` in the plist (the versioned one), tabs run in a
+  `Background` session (`launchctl managername`) and see the login and CI
+  keychains. A bare `codesign` still fails with `errSecInternalComponent`
+  / `unable to build chain to self-signed root` while login is first;
+  `with-ci-keychain` puts CI first and signs in place.
+- Without it (`managername` = `System`), tabs have neither keychain nor
+  Xcode account: `0 valid identities found`, `No Accounts`, `No signing
+  certificate "iOS Development" found`. `with-ci-keychain` then re-runs
+  the command through `ssh localhost` (a `Background` session), in the
+  current directory with the same PATH; other environment variables do
+  not cross that hop, so pass build settings as `xcodebuild` arguments.
+
+`devicectl` (install, launch) works from herdr either way.
 
 ## Provisioning Profiles
 

@@ -93,7 +93,7 @@ Local overrides (not synced):
 | `dotfiles-test` | Lint, smoke and behaviour tests of the repository |
 | `herdr-dispatch enqueue --cwd <path>` | Queue a prompt (stdin) to a herdr workspace's `-main`, one at a time per agent |
 | `config/herdr/install-daemon` | Install the herdr server LaunchDaemon (sudo, restarts herdr) |
-| `with-ci-keychain <cmd...>` | Run an iOS signing command with the CI keychain, through `ssh localhost` from herdr |
+| `with-ci-keychain <cmd...>` | Run an iOS signing command with the CI keychain first, works from herdr |
 | `kill_port <port>` | Kill process on port |
 | `tat` | Attach to tmux session (named after directory) |
 | `wt <name>` | Create git worktree with branch |

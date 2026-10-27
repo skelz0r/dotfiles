@@ -10,10 +10,10 @@ Run a command that signs iOS builds (xcodebuild, codesign) with the CI
 keychain first in the search list and unlocked, then restore the order
 login then CI.
 
-From a session without a usable keychain (herdr runs as a LaunchDaemon,
-launchctl managername = System, codesign fails with
-errSecInternalComponent), the command is re-run through ssh localhost,
-in the current directory and with the same PATH. Other environment
+From a session without the user keychains (herdr as a LaunchDaemon
+without SessionCreate, launchctl managername = System), the command is
+re-run through ssh localhost, in the current directory and with the
+same PATH. Other environment
 variables do not cross ssh: pass them as arguments (build settings) or
 let the command read them.
 EOF
