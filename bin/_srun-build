@@ -28,11 +28,12 @@ fi
 
 echo "Detecting project info on $HOST..." >&2
 
-PBXPROJ="\$HOME/work/$PROJECT/ios/*.xcodeproj/project.pbxproj"
+PBXPROJ=$(ssh "$HOST" "cat \$HOME/work/$PROJECT/ios/*.xcodeproj/project.pbxproj" | sed 's/\$([A-Z_]*)//g')
+DEV_BUNDLE_LINE='PRODUCT_BUNDLE_IDENTIFIER.*\.dev"?;'
 
-BUNDLE_ID=$(ssh "$HOST" "grep -E 'PRODUCT_BUNDLE_IDENTIFIER.*\.dev;' $PBXPROJ | grep -v -E 'widget|Widget|ShareExtension|Tests' | head -1 | sed 's/.*= //' | tr -d ';\" '")
+BUNDLE_ID=$(grep -E "$DEV_BUNDLE_LINE" <<< "$PBXPROJ" | grep -v -E 'widget|Widget|ShareExtension|Tests' | head -1 | sed 's/.*= //' | tr -d ';" ')
 
-PRODUCT_NAME=$(ssh "$HOST" "grep -A2 'PRODUCT_BUNDLE_IDENTIFIER.*\.dev;' $PBXPROJ | grep PRODUCT_NAME | grep -v TARGET_NAME | head -1 | sed 's/.*= //' | tr -d ';\"'")
+PRODUCT_NAME=$(grep -E -A2 "$DEV_BUNDLE_LINE" <<< "$PBXPROJ" | grep PRODUCT_NAME | grep -v TARGET_NAME | head -1 | sed 's/.*= //' | tr -d ';"')
 
 if [[ -z "$BUNDLE_ID" ]] || [[ -z "$PRODUCT_NAME" ]]; then
   echo "Error: Could not detect dev build config" >&2
@@ -46,7 +47,7 @@ echo "Bundle ID: $BUNDLE_ID" >&2
 echo "App: $APP_NAME" >&2
 
 echo "Building on $HOST..." >&2
-ssh "$HOST" "cd ~/work/$PROJECT && ~/dotfiles/bin/with-ci-keychain ./bin/build-ios $BUILD_TYPE"
+ssh "$HOST" "cd ~/work/$PROJECT && PATH=/opt/homebrew/bin:\$PATH ~/dotfiles/bin/with-ci-keychain ./bin/build-ios $BUILD_TYPE"
 
 case "$BUILD_TYPE" in
   simulator)

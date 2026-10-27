@@ -13,8 +13,9 @@ login then CI.
 From a session without a usable keychain (herdr runs as a LaunchDaemon,
 launchctl managername = System, codesign fails with
 errSecInternalComponent), the command is re-run through ssh localhost,
-in the current directory. Environment variables do not cross ssh: pass
-them as arguments (build settings) or let the command read them.
+in the current directory and with the same PATH. Other environment
+variables do not cross ssh: pass them as arguments (build settings) or
+let the command read them.
 EOF
 }
 
@@ -28,7 +29,7 @@ CI_KEYCHAIN_PASSWORD="ci"
 if [[ "$(launchctl managername)" == "System" ]]; then
   self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
   exec ssh -o BatchMode=yes localhost \
-    "cd $(printf '%q' "$PWD") && exec $(printf '%q' "$self") $(printf '%q ' "$@")"
+    "cd $(printf '%q' "$PWD") && PATH=$(printf '%q' "$PATH") exec $(printf '%q' "$self") $(printf '%q ' "$@")"
 fi
 
 restore_keychain_order() {
