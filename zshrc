@@ -107,6 +107,8 @@ else
   compinit -C
 fi
 
+command -v ags >/dev/null && source <(ags completion zsh)
+
 # Aliases
 if [[ -f "$HOME/.aliases" ]]; then
   source "$HOME/.aliases"
