@@ -25,6 +25,8 @@ VERDICTS = ["wrong", "intentional", "pre-existing", "deferred"]
 PROOFS = ["cited", "walked", "ran", "reproduced"]
 EXECUTED_PROOFS = ["ran", "reproduced"]
 HIGH_STAKES_SEVERITIES = ["P0", "P1"]
+HUMAN_KINDS = ["product"]
+HUMAN_VERDICTS = ["intentional"]
 STATE_VERSION = 1
 
 DESCRIPTION = """\
@@ -52,6 +54,7 @@ examples:
   agentic-review finding --id f3 --fixed "..."
   agentic-review decision --axis "..." --problem "..." --decision kept --why "..."
   agentic-review check
+  agentic-review gate --require "Local CI"
   agentic-review publish --dry-run
 """
 
@@ -540,6 +543,55 @@ def command_check(args):
     return 0 if result["covered"] else 1
 
 
+def gate_reasons(state, pull, result, required):
+    if not state["passes"]:
+        return ["no pass recorded"]
+    reasons = []
+    if not result["covered"]:
+        reasons.append(f"stale: {len(result['changed'])} files unreviewed, run a confirmation pass on the fixes")
+    first_pass = state["passes"][0]["id"]
+    for finding in state["findings"]:
+        label = f"{finding['id']} {kind_cell(finding)} \"{finding['title']}\""
+        if finding["status"] == "open":
+            reasons.append(f"{label}: not triaged")
+        if high_stakes(finding):
+            reasons.append(f"{label}: security, P0 and P1 wait for a human")
+        if finding["kind"] in HUMAN_KINDS or finding.get("verdict") in HUMAN_VERDICTS:
+            reasons.append(f"{label}: a product or intentional choice waits for a human")
+        if finding["pass"] != first_pass:
+            reasons.append(f"{label}: raised after the first pass, the fixes did not converge")
+    if pull["headRefOid"] != result["head"]:
+        reasons.append(f"pull request head {short(pull['headRefOid'])} differs from local HEAD "
+                       f"{short(result['head'])}: push or pull first")
+    checks = json.loads(gh("pr", "checks", str(pull["number"]), "--json", "name,bucket") or "[]")
+    for check in checks:
+        if check["bucket"] not in ("pass", "skipping"):
+            reasons.append(f"check {check['name']}: {check['bucket']}")
+    reported = {check["name"] for check in checks}
+    for name in [STATUS_CONTEXT, *required]:
+        if name not in reported:
+            reasons.append(f"check {name}: missing")
+    return reasons
+
+
+def command_gate(args):
+    state = load_state(args)
+    pull = find_pull_request(args.pr)
+    if pull is None:
+        raise Failure(f"no pull request for {current_branch()}")
+    base = resolve_base(args, pull)
+    result = coverage(state, base) if state["passes"] else {"covered": False, "head": "", "changed": []}
+    reasons = gate_reasons(state, pull, result, args.require)
+    if reasons:
+        print(f"#{pull['number']} waits for a human:")
+        for reason in dict.fromkeys(reasons):
+            print(f"  - {reason}")
+        return 1
+    print(f"#{pull['number']} can be merged without a human: every finding is fixed or cleared, "
+          "the fixes passed a confirmation pass, the checks are green")
+    return 0
+
+
 def command_show(args):
     state = load_state(args)
     if args.json:
@@ -677,6 +729,12 @@ def parser():
 
     check = add("check", "tell whether a pass covers HEAD (exit 1 when stale)", command_check)
     check.add_argument("--base")
+
+    gate = add("gate", "tell whether an agent may merge the pull request without a human "
+               "(exit 1 with the reasons otherwise)", command_gate)
+    gate.add_argument("--base")
+    gate.add_argument("--require", action="append", default=[], metavar="CHECK",
+                      help="check that must be green, repeatable, e.g. \"Local CI\"")
 
     show = add("show", "print the comment as it would be published", command_show)
     show.add_argument("--base")

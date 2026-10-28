@@ -227,3 +227,16 @@ changes are trivial: the comment's "Not reviewed" row tells the reviewer what wa
 from `success` to `failure` posts a one-line notice, since editing a comment notifies nobody.
 Never put secrets or production data in titles and reasons: the comment is visible to anyone who
 can read the repository.
+
+When the project lets an agent merge without a human, `gate` is the check that decides:
+
+```bash
+~/.claude/skills/codex-review/scripts/agentic-review gate --require "<CI status the project needs>"
+```
+
+It exits 0 only when every finding is fixed or cleared as `wrong`, `pre-existing` or `deferred`;
+none is security, P0, P1, `product` or `intentional` (a human arbitrates those, fixed or not); only
+the first pass raised findings, so the confirmation pass on the fixes found nothing; the status is
+published and covers the head; and every check of the pull request is green. Otherwise it lists
+what waits for a human. A stale status blocks it even after a one-line fix: run the short
+confirmation pass instead of leaving it stale.
