@@ -96,6 +96,13 @@ if command -v ccusage >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
   fi
 fi
 
+if [[ -n "${HERDR_PANE_ID:-}" ]] && command -v herdr >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  herdr_agent_name=$(herdr agent get "$HERDR_PANE_ID" 2>/dev/null | jq -r '.result.agent.name // empty' || true)
+  if [[ "$herdr_agent_name" == *-main ]]; then
+    printf '\033[1;97;41m DISPATCH %s - ne pas taper ici \033[0m ' "$herdr_agent_name"
+  fi
+fi
+
 # Build the status line with the new order: model name (red), daily usage (yellow), directory name (clearer blue)
 # Model info in red
 if command -v tput >/dev/null 2>&1; then
