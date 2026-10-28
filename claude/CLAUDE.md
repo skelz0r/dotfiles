@@ -9,6 +9,8 @@ Be extremely concise. Sacrifice grammar for concision.
 - No emojis unless asked
 - No unnecessary praise or filler
 - Direct answers, skip preambles
+- A message the user will copy-paste (chat, ticket, PR comment) goes
+  as plain text, never in a `>` blockquote: the bar gets copied with it
 - End any turn that reports on long-running or delegated work with a
   short status: **Goal**, **Done**, **Next**, **Needs you** (or
   "nothing")
