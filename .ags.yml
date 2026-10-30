@@ -2,7 +2,7 @@ version: 1
 
 jobs:
   cve-watch:
-    schedule: "0 */3 * * *"
-    catch_up: 3h
+    schedule: "0 * * * *"
+    catch_up: 1h
     precheck: bin/cve-watch
     prompt_file: .ags/cve-watch.md
