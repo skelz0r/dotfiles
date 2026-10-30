@@ -84,9 +84,28 @@ the inventory found, no placeholders:
   3. Drive the app by hand only for what the suite cannot see: real
      background workers, the mail as delivered, rendering on realistic
      data, third-party sandboxes, devices. Check the side effects (mail,
-     job, row, file, outbound call), not only the screen.
+     job, row, file, outbound call), not only the screen, and the JS
+     errors a clean screen hides: agent-browser records `console.error`,
+     uncaught errors and unhandled rejections from the session start,
+     across navigations, so run `agent-browser errors --clear` and
+     `agent-browser console --clear` before the journey, then
+     `agent-browser --json errors` and `agent-browser --json console`
+     (keep `type: error`) after it. Without `--json`, `console` prints
+     only `Done` (0.5).
 
   For an iOS simulator, the driver is argent (see below).
+
+- **Evidence**: where screenshots and logs go; cleanup never deletes them.
+- **Findings**: what to do when the QA finds a bug.
+  - Replay it before fixing: the same command or journey from the same
+    starting state, then shrink it to the smallest case that still
+    fails. Another input or a new regression test is not that replay:
+    a fix "verified" on a case that never failed proves nothing.
+  - Fix by severity tier: quick = critical + high, standard (default)
+    = + medium, exhaustive = + low and cosmetic. Issues below the tier,
+    or not fixable from this code (third-party widget, infrastructure),
+    are listed as deferred in the report, not fixed.
+- **Cleanup**: stop what this run started, never by process name.
 
 ### Driving an iOS simulator with argent
 
@@ -120,8 +139,6 @@ What the Morris trial established (SwiftUI, argent 0.29):
   their children are present: name in the skill the ids that do show.
 - Walking a long list is many calls: script the read-scroll-tap loop
   instead of issuing calls one by one.
-- **Evidence**: where screenshots and logs go; cleanup never deletes them.
-- **Cleanup**: stop what this run started, never by process name.
 
 ## 3. Write `bin/qa`
 
@@ -135,9 +152,13 @@ names). Selection, simplest first:
   or controller name, accessibility identifier, i18n key;
 - fallback: the whole E2E directory of the area touched, and `--all`.
 
-It prints which tests it picked and why, so a missed link is visible. A
-coverage-based selector is more exact but needs a map to build and keep
-fresh: only when the heuristic keeps missing.
+It prints which tests it picked and why, so a missed link is visible.
+Make the selected tests fail on a JS error rather than ask the agent to
+look for one: Cuprite `js_errors: true`, a Playwright `pageerror`
+listener that fails the test, or the suite's equivalent.
+
+A coverage-based selector is more exact but needs a map to build and
+keep fresh: only when the heuristic keeps missing.
 
 When the project already has an equivalent (`bin/qa`, a UI test runner
 that picks tests from the diff), keep it and only fill what is missing.
