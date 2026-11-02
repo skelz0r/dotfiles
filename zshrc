@@ -107,8 +107,6 @@ else
   compinit -C
 fi
 
-command -v ags >/dev/null && source <(ags completion zsh)
-
 # Aliases
 if [[ -f "$HOME/.aliases" ]]; then
   source "$HOME/.aliases"
@@ -159,6 +157,8 @@ fi
 if command -v entire > /dev/null; then
   source <(entire completion zsh)
 fi
+
+command -v ags >/dev/null && source <(ags completion zsh)
 
 # Optional local tools
 if [[ -f "$HOME/tools/agent-vm/agent-vm.sh" ]]; then
