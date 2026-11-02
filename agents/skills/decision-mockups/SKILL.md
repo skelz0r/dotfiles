@@ -46,8 +46,9 @@ page.
 - Material for a meeting with another team: the mockups make the cost each
   option asks of them visible.
 
-Not for: a single design to polish (use frontend-design), or a choice with
-no visible or tangible difference between options.
+Not for: a single design to polish (use frontend-design), variants of one
+screen drawn with the app's real CSS to feel them (use ui-variants), or a
+choice with no visible or tangible difference between options.
 
 ## Workflow
 
