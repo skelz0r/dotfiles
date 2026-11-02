@@ -15,6 +15,13 @@ a cookie keeps it unlocked for 30 days. A direct link ending in
 `.keys/<sha256 of the password>`; the nearest `.keys` wins, down to 3
 folder levels.
 
+Clients on the tailnet (`geo $tailnet_client` in
+`/etc/nginx/conf.d/tailnet.conf`) skip the password: from this machine a
+protected folder answers 200 without it. That is not a broken protection;
+test anonymous access from outside the tailnet, as `publish.sh` does.
+Deleting an upload because a protected folder "looked public" from here
+was a mistake once.
+
 Wraps `upload-assets` (dotfiles `bin/upload-assets`) with a staging step that
 strips image metadata and detects overwrites. Scripts below live in this
 skill's base directory. To build an HTML page to publish here, see the
@@ -152,8 +159,11 @@ Sets or removes the password, uploads with `upload-assets`, checks every
 URL answers HTTP 200 with the key, and that one anonymous request per
 folder is locked out (401, or 429 once nginx rate limits the unlock
 page that only locked requests reach), deletes the
-staging dir on success and keeps it on failure for a retry. Prints the
-access, with the password and the direct link when it set one.
+staging dir on success and keeps it on failure for a retry. The
+anonymous request goes from the server to its public address, outside
+the tailnet. Prints the access, with the password and the direct link
+when it set one; on failure the files are already online, and the
+password it set is still printed.
 
 ### 5. Report
 

@@ -52,6 +52,11 @@ http_status() {
   curl -s -o /dev/null -I -w '%{http_code}' "$@"
 }
 
+anonymous_status() {
+  local host="${BASE_URL#https://}"
+  ssh "$REMOTE" "ip=\$(getent ahostsv4 '$host' | awk 'NR == 1 { print \$1 }') && curl -s -o /dev/null -I -w '%{http_code}' --resolve '$host:443:'\"\$ip\" '$1'"
+}
+
 is_locked() {
   case "$1" in
     401 | 429) return 0 ;;
@@ -66,7 +71,7 @@ while IFS= read -r encoded_path; do
   url="$BASE_URL/$folder/$encoded_path"
   if [ -n "$protected_by" ] && [ "$anonymous_probed" = false ]; then
     anonymous_probed=true
-    anonymous_status=$(http_status "$url")
+    anonymous_status=$(anonymous_status "$url")
     if ! is_locked "$anonymous_status"; then
       echo "NOT PROTECTED ($anonymous_status): $url" >&2
       failures=$((failures + 1))
@@ -90,7 +95,7 @@ while IFS= read -r encoded_path; do
 done < <(cd "$stage" && find . -type f ! -path './.*' | sed 's|^\./||' | sort | jq -Rr 'split("/") | map(@uri) | join("/")')
 
 if [ "${#entries[@]}" -eq 0 ]; then
-  anonymous_status=$(http_status "$BASE_URL/$folder/")
+  anonymous_status=$(anonymous_status "$BASE_URL/$folder/")
   if [ -n "$protected_by" ] && ! is_locked "$anonymous_status"; then
     echo "NOT PROTECTED ($anonymous_status): $BASE_URL/$folder/" >&2
     failures=$((failures + 1))
@@ -102,6 +107,7 @@ fi
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures URL(s) not served as expected, staging dir kept at $stage" >&2
+  [ -z "$password" ] || echo "password set on the folder: $password" >&2
   exit 1
 fi
 
