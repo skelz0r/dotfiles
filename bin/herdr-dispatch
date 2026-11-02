@@ -43,8 +43,9 @@ usage() {
 Usage: $(basename "$0") COMMAND [ARGS]
 
 Queue prompts to herdr agents. Each agent has its own queue: a prompt
-goes out only once the agent is idle or done, after a /clear, one at a
-time, in arrival order. A missing -main is started in tab 1 of its
+goes out only once the agent is idle or done, after a Ctrl+C that
+wipes any draft left in its input and a /clear, one at a time, in
+arrival order. A missing -main is started in tab 1 of its
 workspace.
 
 Commands:
@@ -467,6 +468,17 @@ check_pane_target() {
   [[ -z "$pane_name" ]] || { fail_job "$1" "pane $2 is agent $pane_name: target it by name"; return 1; }
 }
 
+wipe_input() {
+  local pane wiped
+  if valid_pane_id "$2"; then
+    pane="$2"
+  else
+    pane="$(agent_field "$2" pane_id)" || { fail_job "$1" "no pane found for $2"; return 1; }
+  fi
+  wiped="$(herdr pane send-keys "$pane" C-c 2>&1)" || { fail_job "$1" "wipe input: $wiped"; return 1; }
+  sleep 1
+}
+
 process_job() {
   local job_dir="$1" format agent workspace_id label clear agent_workspace mains waited session_before cleared prompted
   format="$(cat "$job_dir/format" 2> /dev/null || true)"
@@ -498,6 +510,7 @@ process_job() {
   fi
 
   set_state "$job_dir" sending
+  wipe_input "$job_dir" "$agent" || return 1
   if [[ "$clear" == "clear" ]]; then
     session_before="$(agent_field "$agent" agent_session.value || true)"
     cleared="$(herdr agent prompt "$agent" "/clear" 2>&1)" || { fail_job "$job_dir" "/clear: $cleared"; return 1; }

@@ -349,6 +349,23 @@ idle|After the trust question"
   assert_equal "$(dispatch_status | cut -f5)" "/clear without a new session after 2s"
 }
 
+@test "a draft left in the input of the Claude is wiped instead of being sent with the /clear" {
+  add_agent home-main w1 idle
+  printf 'Ne pas me supprimer.' > "$FAKE_HERDR_WORLD/agents/home-main/draft"
+  enqueue_main w1 '~' "Bump the dependencies"
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(prompts_of home-main)" "idle|/clear
+idle|Bump the dependencies"
+}
+
+@test "a draft left in the input of a pane is wiped even when the context is kept" {
+  add_agent wB:pG wB idle
+  printf 'half typed' > "$FAKE_HERDR_WORLD/agents/wB:pG/draft"
+  enqueue_pane wB wB:pG keep "Go on"
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(prompts_of wB:pG)" "idle|Go on"
+}
+
 @test "the queue of an agent resumes after a dead runner that held its lock" {
   add_agent home-main w1 idle
   dead_pid="$(sh -c 'echo $$')"

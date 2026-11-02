@@ -82,6 +82,16 @@ agent_object() {
     "${cwd:-/work/project}" "${cwd:-/work/project}" "$name_field" "${pane_id:-$workspace_id:p1}" "$(agent_file "$name" tab_id || printf '%s:t1' "$workspace_id")" "$workspace_id"
 }
 
+agent_of_pane() {
+  for directory in "$world"/agents/*; do
+    [ -d "$directory" ] || continue
+    candidate="$(basename "$directory")"
+    case "$candidate" in *:*) candidate_pane="$candidate" ;; *) candidate_pane="$(agent_file "$candidate" pane_id)"; candidate_pane="${candidate_pane:-$(agent_file "$candidate" workspace_id):p1}" ;; esac
+    [ "$candidate_pane" = "$1" ] && { printf '%s' "$candidate"; return 0; }
+  done
+  return 1
+}
+
 agent_info() {
   printf '{"id":"cli:agent:get","result":{"agent":%s,"type":"agent_info"}}\n' "$(agent_object "$1")"
 }
@@ -186,6 +196,10 @@ case "$command" in
     status="$(agent_file "$name" status)"
     [ "$status" = "blocked" ] && herdr_error agent_blocked "agent $name is blocked"
     [ -f "$world/agents/$name/turn" ] && status="busy"
+    if [ -f "$world/agents/$name/draft" ]; then
+      text="$(cat "$world/agents/$name/draft")$text"
+      rm -f "$world/agents/$name/draft"
+    fi
     printf '%s|%s\n' "$status" "$text" >> "$world/agents/$name/prompts"
     if [ "$text" = "/clear" ]; then
       [ -f "$world/agents/$name/ignores_clear" ] || echo "session-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')" > "$world/agents/$name/session"
@@ -207,6 +221,20 @@ case "$command" in
     else
       echo '{"id":"cli:agent:prompt","result":{"type":"agent_prompted"}}'
     fi
+    ;;
+  "pane send-keys")
+    parse "" "" "$@"
+    [ "$positional_count" -ge 2 ] || usage_error "expected a pane and at least one key"
+    pane="$(positional 1)"
+    name="$(agent_of_pane "$pane")" || herdr_error pane_not_found "pane $pane not found"
+    index=2
+    while [ "$index" -le "$positional_count" ]; do
+      key="$(positional "$index")"
+      printf '%s\n' "$key" >> "$world/agents/$name/keys"
+      [ "$key" = "C-c" ] && rm -f "$world/agents/$name/draft"
+      index=$((index + 1))
+    done
+    echo '{"id":"cli:pane:send_keys","result":{"type":"ok"}}'
     ;;
   "tab list")
     parse "" "--workspace" "$@"
