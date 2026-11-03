@@ -1,13 +1,14 @@
 ---
 name: manual-review-pr
-description: Review a pull request together with the user at the design level — a quick local pass (or a Codex pass when the PR is large), the main design findings ranked, then a conversation where the user's own remarks are checked against the code and challenged, alternatives explored and decisions recorded with their justification, ending with a design review page (overview, final target, one sub-tab per solution, product decisions, minor notes) published on assets.delmai.re (in public when the repository is), plus a short TL;DR to post with the review. Never posts anything on the PR unless asked. Use when the user runs /manual-review-pr <url>, says "je relis la PR …", "fais toi aussi une passe et challenge mes points", "relis cette PR avec moi", "review de conception", "on discute de la PR avant que je commente", or wants a shareable summary of a review discussion or a TL;DR of their review to post on the PR.
+description: Review a pull request together with the user at the design level — a quick local pass (or a Codex pass when the PR is large), the main design findings ranked, then a conversation where the user's own remarks are checked against the code and challenged, alternatives explored and decisions recorded with their justification, ending with the review comment to post (sections chosen with the user, every code mention linked at the head commit) and, when an axis leaves the author several options, a design review page (overview, final target, one sub-tab per solution, product decisions, minor notes) published on assets.delmai.re (in public when the repository is). Never posts anything on the PR unless asked, then posts exactly the validated file with the review state the user chose. Use when the user runs /manual-review-pr <url>, says "je relis la PR …", "fais toi aussi une passe et challenge mes points", "relis cette PR avec moi", "review de conception", "on discute de la PR avant que je commente", or wants a shareable summary of a review discussion, a TL;DR or a full message of their review to post on the PR ("propose-moi un message", "poste-le en request changes").
 ---
 
 # Manual PR review
 
 A review done with the user, not for them: the agent brings facts and a
-second opinion, the user decides, and the page at the end records the
-target design and every decision with its justification. Line-level
+second opinion, the user decides, and the comment (with the page when
+there is one) records the target design and every decision with its
+justification. Line-level
 nitpicks are not the point; where responsibilities live is.
 
 **Never post on the PR** (comment, review, suggestion, label), not even at
@@ -54,7 +55,10 @@ git log --format='--- %s%n%n%b' "origin/<base>..<headRefOid>"
   local pass cannot be independent (the user's conclusions are already
   in the conversation): launch the `codex-review` skill on the range in
   the background and do the local pass meanwhile; triage its findings
-  into the same list.
+  into the same list. Launch it at the start, unasked: on PR #639 of
+  apistration (a student status attestation, so a costly area) the first
+  answer went out without it and offered it as an option, and the user
+  had to ask for the pass that then found the bug reproduced in code.
 
 The threshold is a starting point: adjust it when a review shows it was
 wrong, and record the change here.
@@ -185,7 +189,13 @@ hand the author. A fact left unproven is said so.
   - **minor notes**, kept even when the user waves them off ("for the
     record").
 
-Offer the page when the axes have converged; build it when asked.
+The page is optional. Offer it when the axes have converged and at least
+one of them leaves the author several viable options, or when the fix
+will be handed to someone (the author, an agent) who needs constraints
+and options rather than a verdict; build it when asked. When every point
+is a bug, a question or a direction the user settled, the comment of
+step 8 can go alone, and gets the page link added on top if the page is
+built later.
 
 ## 6. The page
 
@@ -268,25 +278,57 @@ Access follows the repository, without asking:
 
 Give the URL. Do not link it from the PR unless asked.
 
-## 8. TL;DR for the PR review
+## 8. The review comment
 
-Along with the URL, draft the comment the user will post with their
-review: the page link first (on a private repository, the direct link
-and the password, as `static-page` states), then a few short prose
-paragraphs on what does not suit them, conclusions only, in the decisions' order of
-weight: what to rework in the design, the bugs, then the product points,
-with what is not blocking flagged as such. It says what is wrong and
-why, not how to fix it: no option name or DSL from the page, which
-would anchor the author on one solution. No headings, bold, tables or
-checklists, nothing that looks generated; the user's language. Same
-leak check as a public page: the PR comment is as public as the
-repository.
+Draft the comment the user will post with their review, with or without
+a page: the page link first when there is one (on a private repository,
+the direct link and the password, as `static-page` states).
 
-Show it in the conversation and wait for the user's go. Then, only when
-asked, post it or amend the review they already submitted, keeping its
+Content:
+
+- Everything the conversation covered, in the decisions' order of
+  weight: what to rework in the design, the bugs, then the product
+  points, with what is not blocking flagged as such. Minor notes the user
+  waved off stay, introduced as such ("Pour mémoire", "on peut s'en
+  passer"): the author reads them as optional instead of discovering
+  them later.
+- What is wrong and why, not how to fix it: no option name or DSL from
+  the page, which would anchor the author on one solution. A direction
+  the user settled is stated as a direction with its binding constraint
+  (e.g. "centralize the source in the organizer; an EAJE attestation
+  without a known regime must keep showing *origine non communiquée*"),
+  quoting their justification; only unsettled options stay out.
+- Every piece of code mentioned links to the PR's head commit with its
+  lines, and the comment adds links for context: where the value comes
+  from, who else uses it, where the responsibility already lives. Build
+  each link with `scripts/pin-link <owner/repo> <sha> <path> <pattern>
+  [end-pattern]`, which fails when the pattern is not at that commit,
+  instead of counting lines by hand.
+- The user's language; nothing that looks generated. Same leak check as
+  a public page: the PR comment is as public as the repository.
+
+Layout follows density:
+
+- Short review (one topic, a few points): short prose paragraphs, no
+  headings, bold or lists.
+- Dense review: one `##` section per family of points, a bold title on
+  its own line for each point, then short paragraphs separated by blank
+  lines. The families are the user's when they named them (Technique /
+  Produit on #639, but Données, Usagers, Sécurité... as fit); when they
+  did not and the grouping is not obvious, ask. No tables or checklists.
+
+Write the draft to a file in the scratchpad from the first version, show
+it from that file, edit that file on every round, and post that file
+with `--body-file` / `body=@`: the user validates exactly what gets
+posted. Re-wording while posting, even to tighten it, posts a text the
+user never read.
+
+Wait for the user's go. Then, only when asked, post it with the state
+they chose, or amend the review they already submitted, keeping its
 state:
 
 ```bash
+gh pr review <n> --request-changes --body-file <file>   # or --approve / --comment
 gh api repos/<owner>/<repo>/pulls/<n>/reviews --jq '.[] | select(.user.login == "<user>") | {id, state, body}'
 gh api -X PUT repos/<owner>/<repo>/pulls/<n>/reviews/<id> -F body=@<file>
 ```
