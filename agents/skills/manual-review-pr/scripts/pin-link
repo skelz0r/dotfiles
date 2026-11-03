@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Print a GitHub link to the lines matching a pattern in a file at a commit.
+#
+# Usage: pin-link <owner/repo> <sha> <path> <pattern> [end-pattern]
+#   pattern      fixed string, first matching line is the start
+#   end-pattern  fixed string, first match at or after the start ends the range
+# Fails when the file or a pattern is not found at that commit.
+set -euo pipefail
+
+REPO=${1:?usage: pin-link <owner/repo> <sha> <path> <pattern> [end-pattern]}
+SHA=${2:?sha required}
+FILE=${3:?path required}
+START_PATTERN=${4:?pattern required}
+END_PATTERN=${5:-}
+
+CONTENT=$(git show "${SHA}:${FILE}") || { echo "pin-link: ${FILE} not found at ${SHA}" >&2; exit 1; }
+
+START=$(grep -nF -- "$START_PATTERN" <<<"$CONTENT" | head -1 | cut -d: -f1 || true)
+[[ -n "$START" ]] || { echo "pin-link: '${START_PATTERN}' not found in ${FILE} at ${SHA}" >&2; exit 1; }
+
+ANCHOR="#L${START}"
+if [[ -n "$END_PATTERN" ]]; then
+  OFFSET=$(tail -n "+${START}" <<<"$CONTENT" | grep -nF -- "$END_PATTERN" | head -1 | cut -d: -f1 || true)
+  [[ -n "$OFFSET" ]] || { echo "pin-link: '${END_PATTERN}' not found after line ${START} in ${FILE}" >&2; exit 1; }
+  END=$((START + OFFSET - 1))
+  [[ "$END" == "$START" ]] || ANCHOR="#L${START}-L${END}"
+fi
+
+echo "https://github.com/${REPO}/blob/${SHA}/${FILE}${ANCHOR}"
