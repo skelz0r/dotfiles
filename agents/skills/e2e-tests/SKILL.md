@@ -56,6 +56,10 @@ the smallest screen, gestures, and the sensitive flows of the project
   (debounce, autoplay, retry) is injected short through the test
   configuration, never waited for in full.
   Seen: `sleep(6)` after an injected 2 s delay, in four tests.
+  A wait that runs to its timeout is a sleep too: an optional alert
+  waited for "just in case", a negative assertion on a 3 s wait. An
+  event the app plans on a timer (notification, polling) is triggered
+  by the test or by a lifecycle event, not by a shorter delay.
 - **Two items prove "each".** To check that every card of a list acts
   on its own item, the first and one neighbour are enough; iterating
   over all of them multiplies the open/close round trips.
@@ -75,11 +79,18 @@ the smallest screen, gestures, and the sensitive flows of the project
 
 ## Auditing a slow suite
 
-1. **Measure where the time goes**, on the latest green run: per-test
-   durations, per-worker totals (shard balance), and the fixed cost per
-   test (launch, data reset, sign-in) as a share of the total. For
-   XCUITest, `ios-e2e-tests` ships a script. A large fixed share means
-   merging tests pays more than speeding any single one up.
+0. **Check the E2E run at all** where they should: the local CI, the
+   pre-push step. Seen: Heraldr's local CI skipped its UI test target,
+   only a manual QA command played it.
+1. **Measure where the time goes**, on at least two passes (a shared
+   machine moved the same test from 72 s to 53 s): per-test durations,
+   per-worker totals (shard balance), and the fixed costs per test as a
+   share of the total: launch, data reset, sign-in, but also
+   screenshots (light and dark) and waits that ran to their timeout.
+   For XCUITest, `ios-e2e-tests` ships a script. A large launch share
+   means merging tests pays more than speeding any single one up; a
+   large capture or wait share means fixing the helper pays more than
+   merging.
 2. **Classify each test**, slowest first:
    - *merge*: tests replaying the same setup to check steps of one
      journey;
@@ -93,10 +104,14 @@ the smallest screen, gestures, and the sensitive flows of the project
    simulator, browser crash), with the machine load of each. A test
    failing alone on a calm machine is really flaky; one failing only
    under load is too tight. Keep the artifacts of red runs (`.xcresult`,
-   traces, screenshots): names alone do not give the cause.
+   traces, screenshots): names alone do not give the cause. When the
+   runner only records green runs, say so instead of concluding "no
+   flaky test", and make it record the red ones.
 4. **Estimate the gain** as simulator (or browser) seconds removed,
    divided by the number of workers, plus the fixed start-up of the
    step. Merged journeys get longer: estimate them, then measure.
+   Seen: Heraldr, 28 tests estimated from 552 s down to 348 s of
+   simulator, measured 343 s (16 tests), wall 237–309 s down to 182 s.
 5. **Workers last.** Each worker costs cores (a simulator is about 3)
    and slots shared with other worktrees; the gain shrinks with each
    one (3 → 4 saved ~60 s, 4 → 5 ~37 s on a 75-test iOS suite) while
