@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Submit a PR review, with optional inline comments, pinned to the PR head.
+#
+# Usage: post-review [--dry-run] <owner/repo> <pr> <APPROVE|REQUEST_CHANGES|COMMENT> <body-file> [inline ...]
+#   inline  <path>:<line>=<comment-file> or <path>:<start>-<end>=<comment-file>
+#           lines of the file at the PR head, on the new side of the diff
+#   --dry-run  print the JSON payload instead of posting it
+# Fails when a file is missing, the event is unknown, or the body is empty.
+set -euo pipefail
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+  DRY_RUN=true
+  shift
+fi
+
+REPO=${1:?usage: post-review [--dry-run] <owner/repo> <pr> <event> <body-file> [inline ...]}
+PR=${2:?pr number required}
+EVENT=${3:?event required}
+BODY_FILE=${4:?body file required}
+shift 4
+
+case "$EVENT" in
+  APPROVE|REQUEST_CHANGES|COMMENT) ;;
+  *) echo "post-review: unknown event '$EVENT'" >&2; exit 1 ;;
+esac
+
+[[ -s "$BODY_FILE" ]] || { echo "post-review: body file missing or empty: $BODY_FILE" >&2; exit 1; }
+
+HEAD_SHA=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+
+COMMENTS='[]'
+for spec in "$@"; do
+  location=${spec%%=*}
+  comment_file=${spec#*=}
+  path=${location%:*}
+  range=${location##*:}
+  [[ "$location" != "$spec" && "$path" != "$location" ]] || { echo "post-review: bad inline spec '$spec'" >&2; exit 1; }
+  [[ -s "$comment_file" ]] || { echo "post-review: comment file missing or empty: $comment_file" >&2; exit 1; }
+  start=${range%-*}
+  end=${range#*-}
+  [[ "$start" =~ ^[0-9]+$ && "$end" =~ ^[0-9]+$ ]] || { echo "post-review: bad line range '$range'" >&2; exit 1; }
+
+  COMMENTS=$(jq --arg path "$path" --argjson start "$start" --argjson end "$end" --rawfile body "$comment_file" \
+    '. + [{path: $path, line: $end, side: "RIGHT", body: $body}
+          + (if $start < $end then {start_line: $start, start_side: "RIGHT"} else {} end)]' <<<"$COMMENTS")
+done
+
+PAYLOAD=$(jq -n --arg commit "$HEAD_SHA" --arg event "$EVENT" --rawfile body "$BODY_FILE" --argjson comments "$COMMENTS" \
+  '{commit_id: $commit, event: $event, body: $body, comments: $comments}')
+
+if $DRY_RUN; then
+  echo "$PAYLOAD"
+  exit 0
+fi
+
+gh api -X POST "repos/${REPO}/pulls/${PR}/reviews" --input - --jq '{state, html_url, commit_id}' <<<"$PAYLOAD"
