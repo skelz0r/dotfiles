@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Run an adversarial code review of a diff, commit or branch through the Codex CLI (a different model family), sizing the reasoning effort to the complexity of the change, then triage the findings and publish a proof of review (status and comment) on one's own pull request. Use when the user asks to review something with Codex, wants a second opinion or an external/independent review of code just written, says "review avec codex", "codex review", "fais relire ça", "double-check this diff", or asks to cross-check a change before opening or merging a PR, or to show reviewers which agentic reviews a PR went through ("publie la review sur la PR", "agentic review status").
+description: Run an adversarial code review of a diff, commit or branch through the Codex CLI (a different model family), sizing the reasoning effort to the complexity of the change, then triage the findings and publish a proof of review (status and comment) on one's own pull request. Use when the user asks to review something with Codex, wants a second opinion or an external/independent review of code just written, says "review avec codex", "codex review", "fais relire ça", "double-check this diff", or asks to cross-check a change before opening or merging a PR, or to show reviewers which agentic reviews a PR went through ("publie la review sur la PR", "agentic review status"), or to request a human reviewer on one's pull request ("ouvre une PR et request une review à X"), which waits for the review loops.
 ---
 
 # Codex review
@@ -217,8 +217,14 @@ Publish only at the end of the triage, after pushing:
 
 ```bash
 ~/.claude/skills/codex-review/scripts/agentic-review publish --dry-run
-~/.claude/skills/codex-review/scripts/agentic-review publish [--note "<what changed since the last pass, when stale>"]
+~/.claude/skills/codex-review/scripts/agentic-review publish [--note "<what changed since the last pass, when stale>"] [--request-reviewer <login>]
 ```
+
+A human reviewer is requested here, through `--request-reviewer`, never when the pull request is
+opened: GitHub notifies them at once, and the passes that follow rewrite what they would read. "Open
+a PR and request a review from X" means `gh pr create` without `--reviewer`, the review loops, then
+`publish --request-reviewer X`. On PR 645 the reviewer was requested at `gh pr create`, then two
+passes found nine defects and rewrote the commit.
 
 It refuses a pull request opened by someone else or a local HEAD that differs from the pushed one.
 Before the pull request exists, the state stays in the git dir of the worktree and `publish` says

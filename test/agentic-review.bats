@@ -73,6 +73,23 @@ review_branch() {
   assert_equal "$(write_calls)" ""
 }
 
+@test "the human reviewer is requested only after the review is posted" {
+  review_branch
+
+  run agentic_review publish --request-reviewer un3x --request-reviewer alice
+  assert_equal "$status" 0
+  assert_contains "$output" "review requested from un3x, alice"
+  assert_contains "$(stub_calls gh | tail -n 1)" "pulls/12/requested_reviewers -f reviewers[]=un3x -f reviewers[]=alice"
+}
+
+@test "a dry run requests no reviewer" {
+  review_branch
+
+  run agentic_review publish --dry-run --request-reviewer un3x
+  assert_contains "$output" "[dry-run] request a review from un3x"
+  assert_equal "$(stub_calls gh | grep requested_reviewers || true)" ""
+}
+
 @test "the branch reviewed as is is covered, with the findings in the status" {
   review_branch
 

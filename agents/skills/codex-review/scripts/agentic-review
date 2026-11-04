@@ -668,6 +668,8 @@ def command_publish(args):
         print(f"[dry-run] status {status} on {short(head)}, context \"{STATUS_CONTEXT}\": {description}")
         if notify:
             print("[dry-run] post a short comment: the review went from success to failure")
+        if args.request_reviewer:
+            print(f"[dry-run] request a review from {', '.join(args.request_reviewer)}")
         return 0
 
     published = publish_comment(pull, comment, body)
@@ -680,6 +682,11 @@ def command_publish(args):
     state["published"].update(comment_id=published["id"], comment_url=published["url"])
     bump(state)
     print(f"{status}: {description}\n{published['url']}")
+    if args.request_reviewer:
+        reviewers = [arg for login in args.request_reviewer for arg in ("-f", f"reviewers[]={login}")]
+        gh("api", "-X", "POST", f"repos/{pull['repo']}/pulls/{pull['number']}/requested_reviewers",
+           *reviewers, "--silent")
+        print(f"review requested from {', '.join(args.request_reviewer)}")
     return 0
 
 
@@ -750,6 +757,8 @@ def parser():
     publish.add_argument("--base")
     publish.add_argument("--note", help="what changed since the last pass, shown in the Not reviewed row")
     publish.add_argument("--dry-run", action="store_true", help="print what would be posted, post nothing")
+    publish.add_argument("--request-reviewer", action="append", default=[], metavar="LOGIN",
+                         help="request a human review once the status and comment are posted (repeatable)")
     return root
 
 
