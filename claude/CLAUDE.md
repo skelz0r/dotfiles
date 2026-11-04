@@ -129,6 +129,20 @@ cannot see.
 - Do not repair a breaking test that only mirrors the implementation:
   propose deleting it
 
+## Local CI and heavy steps
+
+- Every project and worktree shares this machine: a heavy step (local
+  CI, test suite, iOS simulators, large build) runs through
+  `ci-slot run -w <cores> -n <label> -- <command>`, never bare. Heavy
+  steps started side by side by several agents were what made the
+  local CI slow and flaky
+- Weight: the cores the step keeps busy (rspec workers, about 3 per
+  simulator, 1 for a lint). `ci-slot status` shows what runs and what
+  waits
+- A project's `local-ci` keeps the wait out of its timeout with
+  `--wait-file`; a project with a heavy local CI not yet on `ci-slot`
+  is a gap to raise
+
 ## Personal data
 
 - Never put my email, name, phone, address or any personal identifier in
