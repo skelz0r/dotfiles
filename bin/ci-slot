@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+#
+# ci-slot - Share the CPU of this machine between the local CI runs of
+# every project and worktree
+#
+
+[[ -n "${BASH_VERSION:-}" ]] || { echo "ci-slot needs bash" >&2; exit 2; }
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+STATE_DIR="${CI_SLOT_STATE_DIR:-$HOME/.local/state/ci-slot}"
+HOLDERS_DIR="$STATE_DIR/holders"
+QUEUE_DIR="$STATE_DIR/queue"
+LOCK_DIR="$STATE_DIR/lock"
+POLL_SECONDS="${CI_SLOT_POLL_SECONDS:-1}"
+WAITING_NOTICE_SECONDS=60
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") COMMAND [ARGS]
+
+Share the CPU of this machine between the heavy steps of the local CI
+of every project and worktree. Each step asks for a weight (about the
+cores it keeps busy) and runs once the weights already running leave
+room for it, in arrival order.
+
+Commands:
+  run [OPTIONS] -- COMMAND...   Wait for room, run COMMAND, give the room
+                                back when it exits; exits with its status
+  status                        Print the capacity, the running steps and
+                                the waiting ones
+  capacity                      Print the capacity
+
+Options of run:
+  -w, --weight N        Cores the step keeps busy (default: 1). A weight
+                        above the capacity runs alone
+  -n, --name NAME       Label shown by status (default: COMMAND)
+  --wait-file PATH      Write "<wait start epoch>" when waiting starts,
+                        then "<wait start epoch> <acquired epoch>", so
+                        a caller can keep the wait out of its timeout
+  -h, --help            Show this help message
+
+A run started from within another run (CI_SLOT_HELD set) does not wait:
+the outer run already holds the room.
+
+A step waits while the 1 minute load stays above CI_SLOT_MAX_LOAD, so
+heavy work started outside ci-slot (Xcode builds, dev servers) is
+counted too.
+
+Environment:
+  CI_SLOT_CAPACITY     Total weight (default: 7/8 of the cores)
+  CI_SLOT_MAX_LOAD     1 minute load above which nothing starts
+                       (default: twice the cores, 0 disables)
+  CI_SLOT_STATE_DIR    State (default: ~/.local/state/ci-slot)
+
+Exit codes: the status of COMMAND, 2 on a usage error.
+EOF
+}
+
+die_usage() {
+  echo -e "${RED}[ERROR]${NC} $*" >&2
+  exit 2
+}
+
+cpu_count() {
+  if command -v sysctl > /dev/null 2>&1 && sysctl -n hw.ncpu > /dev/null 2>&1; then
+    sysctl -n hw.ncpu
+  else
+    getconf _NPROCESSORS_ONLN
+  fi
+}
+
+capacity() {
+  local cores
+  cores="$(cpu_count)"
+  local default=$((cores * 7 / 8))
+  ((default >= 1)) || default=1
+  echo "${CI_SLOT_CAPACITY:-$default}"
+}
+
+max_load() {
+  echo "${CI_SLOT_MAX_LOAD:-$(($(cpu_count) * 2))}"
+}
+
+load_1min() {
+  if [[ -r /proc/loadavg ]]; then
+    cut -d' ' -f1 /proc/loadavg
+  else
+    sysctl -n vm.loadavg | tr -d '{}' | awk '{print $1}'
+  fi
+}
+
+load_too_high() {
+  local limit
+  limit="$(max_load)"
+  [[ "$limit" != "0" ]] || return 1
+  awk -v load="$(load_1min)" -v limit="$limit" 'BEGIN { exit !(load > limit) }'
+}
+
+alive() {
+  kill -0 "$1" 2> /dev/null
+}
+
+take_lock() {
+  mkdir -p "$STATE_DIR"
+  while ! mkdir "$LOCK_DIR" 2> /dev/null; do
+    local owner
+    owner="$(cat "$LOCK_DIR/pid" 2> /dev/null || true)"
+    [[ "$owner" != "$$" ]] || return 0
+    if [[ -n "$owner" ]] && ! alive "$owner"; then
+      rm -rf "$LOCK_DIR"
+      continue
+    fi
+    sleep 0.05
+  done
+  echo "$$" > "$LOCK_DIR/pid"
+}
+
+release_lock() {
+  rm -rf "$LOCK_DIR"
+}
+
+field() {
+  sed -n "s/^$2=//p" "$1" 2> /dev/null | head -1
+}
+
+drop_dead_entries() {
+  local entry
+  for entry in "$HOLDERS_DIR"/* "$QUEUE_DIR"/*; do
+    [[ -f "$entry" ]] || continue
+    alive "$(field "$entry" pid)" || rm -f "$entry"
+  done
+}
+
+used_weight() {
+  local total=0 entry
+  for entry in "$HOLDERS_DIR"/*; do
+    [[ -f "$entry" ]] || continue
+    total=$((total + $(field "$entry" weight)))
+  done
+  echo "$total"
+}
+
+next_ticket() {
+  local counter="$STATE_DIR/counter" value
+  value="$(cat "$counter" 2> /dev/null || echo 0)"
+  value=$((value + 1))
+  echo "$value" > "$counter"
+  printf '%012d' "$value"
+}
+
+first_in_queue() {
+  local entry
+  for entry in "$QUEUE_DIR"/*; do
+    [[ -f "$entry" ]] || continue
+    basename "$entry"
+    return
+  done
+}
+
+write_entry() {
+  {
+    echo "pid=$$"
+    echo "weight=$WEIGHT"
+    echo "name=$NAME"
+    echo "since=$(date +%s)"
+    echo "cwd=$PWD"
+  } > "$1"
+}
+
+TICKET=""
+HOLDING=false
+
+leave() {
+  [[ -n "$TICKET" ]] || return 0
+  take_lock
+  rm -f "$QUEUE_DIR/$TICKET" "$HOLDERS_DIR/$TICKET"
+  release_lock
+  TICKET=""
+}
+
+try_acquire() {
+  local used
+  take_lock
+  drop_dead_entries
+  used="$(used_weight)"
+  if [[ "$(first_in_queue)" == "$TICKET" ]] &&
+    { ((used == 0)) || ((used + WEIGHT <= $(capacity))); } &&
+    { ((used == 0)) || ! load_too_high; }; then
+    mv "$QUEUE_DIR/$TICKET" "$HOLDERS_DIR/$TICKET"
+    HOLDING=true
+  fi
+  release_lock
+  [[ "$HOLDING" == true ]]
+}
+
+wait_for_room() {
+  local started notified_at
+  started="$(date +%s)"
+  notified_at=0
+  [[ -z "$WAIT_FILE" ]] || echo "$started" > "$WAIT_FILE"
+
+  mkdir -p "$HOLDERS_DIR" "$QUEUE_DIR"
+  take_lock
+  TICKET="$(next_ticket)"
+  write_entry "$QUEUE_DIR/$TICKET"
+  release_lock
+
+  until try_acquire; do
+    if (($(date +%s) - notified_at >= WAITING_NOTICE_SECONDS)); then
+      echo -e "${YELLOW}[ci-slot]${NC} $NAME waits for $WEIGHT of $(capacity) (in use: $(used_weight), load: $(load_1min)), see ci-slot status" >&2
+      notified_at="$(date +%s)"
+    fi
+    sleep "$POLL_SECONDS"
+  done
+
+  [[ -z "$WAIT_FILE" ]] || echo "$started $(date +%s)" > "$WAIT_FILE"
+  local waited=$(($(date +%s) - started))
+  ((waited == 0)) || echo -e "${BLUE}[ci-slot]${NC} $NAME started after waiting ${waited}s" >&2
+}
+
+run_command() {
+  WEIGHT=1
+  NAME=""
+  WAIT_FILE=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -w | --weight) [[ $# -ge 2 ]] || die_usage "$1 needs a value"; WEIGHT="$2"; shift 2 ;;
+      -n | --name) [[ $# -ge 2 ]] || die_usage "$1 needs a value"; NAME="$2"; shift 2 ;;
+      --wait-file) [[ $# -ge 2 ]] || die_usage "$1 needs a value"; WAIT_FILE="$2"; shift 2 ;;
+      -h | --help) usage; exit 0 ;;
+      --) shift; break ;;
+      *) die_usage "Unknown option: $1" ;;
+    esac
+  done
+  [[ $# -gt 0 ]] || die_usage "run needs a command after --"
+  [[ "$WEIGHT" =~ ^[1-9][0-9]*$ ]] || die_usage "--weight must be a positive integer"
+  [[ -n "$NAME" ]] || NAME="$*"
+  NAME="$(printf '%s' "$NAME" | tr '\n' ' ')"
+
+  if [[ -n "${CI_SLOT_HELD:-}" ]]; then
+    exec "$@"
+  fi
+
+  local limit
+  limit="$(capacity)"
+  ((WEIGHT <= limit)) || WEIGHT="$limit"
+
+  trap leave EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  wait_for_room
+
+  local status=0
+  CI_SLOT_HELD=1 CI_SLOT_WEIGHT="$WEIGHT" "$@" || status=$?
+  exit "$status"
+}
+
+status_command() {
+  mkdir -p "$HOLDERS_DIR" "$QUEUE_DIR"
+  take_lock
+  drop_dead_entries
+  release_lock
+
+  local now entry
+  now="$(date +%s)"
+  echo "capacity: $(capacity), in use: $(used_weight), load: $(load_1min) (max $(max_load))"
+  echo "running:"
+  for entry in "$HOLDERS_DIR"/*; do
+    [[ -f "$entry" ]] || continue
+    printf '  %3s  %5ss  pid %-7s %s  (%s)\n' "$(field "$entry" weight)" "$((now - $(field "$entry" since)))" \
+      "$(field "$entry" pid)" "$(field "$entry" name)" "$(field "$entry" cwd)"
+  done
+  echo "waiting:"
+  for entry in "$QUEUE_DIR"/*; do
+    [[ -f "$entry" ]] || continue
+    printf '  %3s  %5ss  pid %-7s %s  (%s)\n' "$(field "$entry" weight)" "$((now - $(field "$entry" since)))" \
+      "$(field "$entry" pid)" "$(field "$entry" name)" "$(field "$entry" cwd)"
+  done
+}
+
+case "${1:-}" in
+  run) shift; run_command "$@" ;;
+  status) status_command ;;
+  capacity) capacity ;;
+  -h | --help) usage ;;
+  "") usage >&2; exit 2 ;;
+  *) die_usage "Unknown command: $1" ;;
+esac
