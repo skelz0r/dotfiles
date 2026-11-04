@@ -17,11 +17,20 @@ accounts, fixtures and runner.
 ```
 
 Reads the raw xcodebuild output of each worker: duration per test,
-slowest first, the time at which the marker step happened (set it on
-the last step of the sign-in to get the setup cost), simulator seconds
-per worker (shard balance) and the share of time spent before the
-marker. On Morris: 18.7 s per test, 8.2 s of it before the first
-assertion, 42 % of the suite.
+slowest first, the time at which the marker step ended (set it on the
+last step of the sign-in to get the setup cost), the time spent
+launching the app, switching between light and dark, and in waits that
+ran to their timeout, simulator seconds per worker or clone (shard
+balance) and the share of each. On Morris: 18.7 s per test, 8.2 s of it
+before the first assertion, 42 % of the suite. On Heraldr the launch
+was only 17 %: light and dark captures took 29 %, waits for alerts
+already accepted 5 %, so the levers were elsewhere.
+
+The activity timeline only exists in a serial run: a native parallel
+run (`-parallel-testing-enabled`) only logs `Test case '…' passed on
+'Clone 2 of …' (19.7 seconds)`, interleaved (a line can be lost). Take
+fixed costs from a serial run, shard balance from a parallel one, and
+at least two passes of each on a shared machine.
 
 ## The base class
 
@@ -59,6 +68,22 @@ only, and the tests set them per class:
 A new condition the test needs gets a new flag read in one config type,
 not a real system dialog.
 
+- **Permissions** the simulator can grant are granted by the runner
+  before the run, `xcrun simctl privacy <udid> grant microphone
+  <bundle id>` (also photos, location, contacts, calendar…), and
+  inherited by the parallel clones. Notifications and speech
+  recognition have no service there: for those, wait for the expected
+  element and dismiss the alert only if it shows. Seen: 2 to 3 s waited
+  at every dictation step for a microphone alert accepted long before.
+- **System events on a timer** (a local notification standing for a
+  push, a polling tick) are triggered by the test or by a lifecycle
+  event, never by a delay from launch: Heraldr's fake Mac scheduled a
+  question 12 s after launch, each test waited for it and raced it
+  under load; it now delivers it 2 s after the app enters the
+  background, each time, under a new identifier (adding a request with
+  the identifier of a delivered notification replaces it silently, no
+  banner).
+
 ## Writing steps
 
 - **Identifiers**: `accessibilityIdentifier` on every element a test
@@ -88,8 +113,14 @@ not a real system dialog.
   `app.wait(for: .runningBackground, timeout:)`.
 - **Other apps** (Photos, share extension): drive them with their own
   `XCUIApplication(bundleIdentifier:)`; tap their cells by coordinates.
+- **Sheets with detents** (`.medium`, `.large`): one drag down from
+  large only shrinks to medium. Drag from the navigation bar until the
+  screen below is hittable again, at most three times.
 - **Evidence**: `XCTAttachment(screenshot:)` with
-  `lifetime = .keepAlways` at each meaningful step, named.
+  `lifetime = .keepAlways` at each meaningful step, named. Light and
+  dark captures: setting `XCUIDevice.shared.appearance` waits for the
+  app to idle, about 2 s; shoot the current look, switch, shoot the
+  other and stay there, never switch back.
 
 ## Running
 
@@ -103,9 +134,16 @@ not a real system dialog.
   load, capped number of tests per shard), each worker with its own
   server, database and simulator, launched with
   `xcodebuild test-without-building -only-testing:` after one build.
+- **Native parallel testing** (`-parallel-testing-worker-count`) deals
+  whole classes to clones, not tests: the heaviest class bounds the
+  wall (Heraldr: 247 s on one clone, 74 s on another), and creating the
+  clones costs about 60 s per run. Merging tests into one class makes
+  it heavier: keep classes of comparable weight.
 - **Workers**: about 3 cores each; run the step through `ci-slot` with
   that weight. Beyond 3 or 4 workers, the gain is small and the
   contention with other worktrees grows.
-- **Red runs**: keep the `.xcresult` of failing workers. The test name
-  in a summary file does not say whether it timed out on a server call,
-  an animation or a crash.
+- **Red runs**: keep the `.xcresult` of failing workers, and record
+  every run in the durations history with its status and failing
+  tests. The test name in a summary file does not say whether it timed
+  out on a server call, an animation or a crash; a history that only
+  records green runs cannot tell a flaky test from a stable one.

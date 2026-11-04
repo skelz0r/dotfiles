@@ -1,17 +1,30 @@
 #!/usr/bin/env python3
-"""Per-test durations and setup cost from xcodebuild UI test logs.
+"""Per-test durations and fixed costs from xcodebuild UI test logs.
 
 usage: xcuitest-timings [--marker REGEX] [--top N] LOG [LOG...]
 
 Reads the plain xcodebuild output of UI test runs (one log per worker or
-shard) and prints, slowest first, each test's duration and the time at
-which its first line matching --marker appeared in the XCTest activity
-timeline ("t = 7.85s Type '111111' into ..."). With a marker set on the
-last step of the sign-in, that time is the fixed cost each test pays
-before checking anything.
+shard, or one log of a native parallel run) and prints, slowest first:
 
-Ends with the totals: tests, simulator seconds, seconds per worker log
-(shard balance), and the share of simulator time spent before the marker.
+  total    duration of the test
+  setup    time at which the step matching --marker ended (the first
+           step of the same or a higher level after it started), e.g.
+           "Type '111111'" for the last step of a sign-in
+  launch   time spent in "Launch <app>" steps (cold launches)
+  look     time spent switching between light and dark appearance
+           ("Setting appearance mode to ...", screenshots in both looks)
+  vain     time spent in waits that ran to their timeout: an optional
+           system alert that never showed, a negative assertion
+           (XCTAssertFalse(waitForExistence(3))), both hidden sleeps
+
+The activity timeline ("t = 7.85s ...") only exists in serial runs:
+with xcodebuild's native parallel testing (-parallel-testing-enabled),
+the log only holds "Test case 'Class.test()' passed on 'Clone 2 of ...'
+(19.7 seconds)" lines, so only durations and per-clone totals are
+printed. Measure fixed costs on a serial run.
+
+Ends with the totals: tests, simulator seconds, seconds per worker log or
+per clone (shard balance), and the share of each fixed cost.
 """
 
 import argparse
@@ -21,64 +34,104 @@ from collections import defaultdict
 
 STARTED = re.compile(r"Test Case '-\[(\S+) (\w+)\]' started")
 FINISHED = re.compile(r"Test Case '-\[(\S+) (\w+)\]' (passed|failed) \((\d+\.\d+) seconds\)")
-ACTIVITY = re.compile(r"^\s+t =\s+(\d+\.\d+)s (.*)")
+PARALLEL = re.compile(r"Test case '(\w+)\.(\w+)\(\)' (passed|failed) on '(Clone \d+)[^']*' \((\d+\.\d+) seconds\)")
+ACTIVITY = re.compile(r"^\s+t =\s+(\d+\.\d+)s( *)(.*)")
+WAIT = re.compile(r"^Waiting (\d+(?:\.\d+)?)s for ")
+
+
+def step_end(activities, index, finish):
+    _, depth, _ = activities[index]
+    return next((time for time, other, _ in activities[index + 1 :] if other <= depth), finish)
+
+
+def costs(activities, finish, marker):
+    setup = launch = look = vain = 0.0
+    marked = None
+    for index, (time, depth, text) in enumerate(activities):
+        end = step_end(activities, index, finish)
+        if marker and marked is None and marker.search(text):
+            marked = end
+        if text.startswith("Launch "):
+            launch += end - time
+        if text.startswith("Setting appearance mode to") and index > 0 and activities[index - 1][2] != "Set Up":
+            look += end - time
+        wait = WAIT.match(text)
+        if wait and end - time >= float(wait.group(1)) - 0.05:
+            vain += end - time
+    setup = marked
+    return setup, launch, look, vain
 
 
 def parse(paths, marker):
     results = []
-    per_log = defaultdict(float)
+    per_worker = defaultdict(float)
     for path in paths:
         current = None
-        marker_time = None
+        activities = []
         with open(path, errors="replace") as log:
             for line in log:
+                parallel = PARALLEL.search(line)
+                if parallel:
+                    duration = float(parallel.group(5))
+                    name = f"{parallel.group(1)}/{parallel.group(2)}"
+                    results.append((duration, None, 0.0, 0.0, 0.0, parallel.group(3), name))
+                    per_worker[f"{path} {parallel.group(4)}"] += duration
+                    continue
                 started = STARTED.search(line)
                 if started:
                     current = f"{started.group(1).split('.')[-1]}/{started.group(2)}"
-                    marker_time = None
+                    activities = []
                     continue
                 activity = ACTIVITY.match(line)
-                if activity and current and marker and marker_time is None and marker.search(activity.group(2)):
-                    marker_time = float(activity.group(1))
+                if activity and current:
+                    activities.append((float(activity.group(1)), len(activity.group(2)), activity.group(3)))
                     continue
                 finished = FINISHED.search(line)
                 if finished and current:
                     duration = float(finished.group(4))
-                    results.append((duration, marker_time, finished.group(3), current, path))
-                    per_log[path] += duration
+                    results.append((duration, *costs(activities, duration, marker), finished.group(3), current))
+                    per_worker[path] += duration
                     current = None
-    return results, per_log
+    return results, per_worker
+
+
+def seconds(value):
+    return f"{value:6.1f}" if value else "     -"
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("logs", nargs="+", metavar="LOG")
-    parser.add_argument("--marker", help="regex of the activity line ending the setup, e.g. \"Type '111111'\"")
+    parser.add_argument("--marker", help="regex of the step ending the setup, e.g. \"Type '111111'\"")
     parser.add_argument("--top", type=int, default=0, help="only print the N slowest tests")
     args = parser.parse_args()
 
     marker = re.compile(args.marker) if args.marker else None
-    results, per_log = parse(args.logs, marker)
+    results, per_worker = parse(args.logs, marker)
     if not results:
         sys.exit("no 'Test Case ... passed|failed (n seconds)' line found: pass the raw xcodebuild output")
 
-    results.sort(reverse=True)
+    results.sort(key=lambda result: -result[0])
     shown = results[: args.top] if args.top else results
-    for duration, marker_time, status, name, _ in shown:
-        setup = f"{marker_time:6.1f}" if marker_time is not None else "     -"
+    print("  total  setup launch   look   vain  test")
+    for duration, setup, launch, look, vain, status, name in shown:
         flag = "" if status == "passed" else "  FAILED"
-        print(f"{duration:7.1f} {setup}  {name}{flag}")
+        print(f"{duration:7.1f} {seconds(setup)} {seconds(launch)} {seconds(look)} {seconds(vain)}  {name}{flag}")
 
-    total = sum(r[0] for r in results)
+    total = sum(result[0] for result in results)
     print(f"\n{len(results)} tests, {total:.0f} s of simulator time, {total / len(results):.1f} s per test")
-    for path, seconds in sorted(per_log.items()):
-        print(f"  {seconds:7.0f} s  {path}")
+    for worker, worker_seconds in sorted(per_worker.items()):
+        print(f"  {worker_seconds:7.0f} s  {worker}")
+    for label, column in (("launching the app", 2), ("switching appearance", 3), ("waits that timed out", 4)):
+        spent = sum(result[column] for result in results)
+        if spent:
+            print(f"{spent:7.0f} s {label}: {spent / total:.0%} of simulator time")
     if marker:
-        marked = [r for r in results if r[1] is not None]
+        marked = [result for result in results if result[1] is not None]
         if marked:
-            setup_total = sum(r[1] for r in marked)
+            setup_total = sum(result[1] for result in marked)
             print(
-                f"{len(marked)} tests reach the marker after {setup_total / len(marked):.1f} s on average: "
+                f"{len(marked)} tests end the marker step after {setup_total / len(marked):.1f} s on average: "
                 f"{setup_total / total:.0%} of simulator time"
             )
 
