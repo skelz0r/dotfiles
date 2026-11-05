@@ -44,7 +44,7 @@ started: a rebase without conflict keeps the coverage, a fix or a
 conflict resolution makes it stale.
 
 The status is failure while a finding is not triaged, or a security,
-P0 or P1 finding is left unfixed without being proven wrong; otherwise
+P0 or P1 finding is left unfixed as intentional; otherwise
 pending when stale (a pass is due), success when covered. Going to
 failure posts a one-line notice.
 """
@@ -514,7 +514,7 @@ def render(state, result, base):
 def blocking(finding):
     if finding["status"] == "open":
         return True
-    return high_stakes(finding) and finding["status"] != "fixed" and finding.get("verdict") != "wrong"
+    return high_stakes(finding) and finding["status"] == "left" and finding.get("verdict") in HUMAN_VERDICTS
 
 
 def review_status(state, result):
@@ -536,9 +536,9 @@ def status_description(state, result):
         noun = "file" if len(result["changed"]) == 1 else "files"
         text = f"Stale: {len(result['changed'])} {noun} unreviewed, a pass is due. {text}"
     untriaged = sum(1 for f in state["findings"] if f["status"] == "open")
-    unfixed = sum(1 for f in state["findings"] if blocking(f) and f["status"] != "open")
+    kept = sum(1 for f in state["findings"] if blocking(f) and f["status"] != "open")
     blocked = [part for part in (f"{untriaged} not triaged" if untriaged else "",
-                                 f"{unfixed} security, P0 or P1 not fixed" if unfixed else "") if part]
+                                 f"{kept} security, P0 or P1 kept on purpose" if kept else "") if part]
     if blocked:
         text = f"Blocked: {', '.join(blocked)}. {text}"
     if len(text) > STATUS_DESCRIPTION_LIMIT:

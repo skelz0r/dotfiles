@@ -209,9 +209,10 @@ Record as you go, never reconstruct afterwards:
 Freshness lives in the status, never in the comment's wording: the status is `success` when a pass
 read exactly the diff of the pushed head (a rebase without conflict keeps it), `pending` with a
 description starting with `Stale:` otherwise (a pass is due, nothing known is wrong). `failure` is
-kept for real blockers, whatever the coverage: a finding not triaged, or a security, P0 or P1 left
-unfixed without being proven `wrong` (a fixed one, a `product` or an `intentional` choice stays for
-`gate` and the human reviewer, not for the status). On superdocu/app every red status had been a
+kept for real blockers, whatever the coverage: a finding not triaged, or a security, P0 or P1 the
+pull request ships on purpose (`intentional`). A fixed one, a `pre-existing` one (already on the
+default branch), a `deferred` one (it has its own ticket) or a `product` choice stays for `gate` and
+the human reviewer, not for the status. On superdocu/app every red status had been a
 stale one after a CHANGELOG or a contract entry. Fixes made after a pass make it stale by design:
 once autosquashed, run a short confirmation pass on them before publishing:
 

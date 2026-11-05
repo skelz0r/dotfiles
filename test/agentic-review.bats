@@ -168,13 +168,22 @@ review_branch() {
   assert_contains "$(status_calls)" "description=Blocked: 1 not triaged."
 }
 
-@test "a P1 left unfixed blocks a covered branch" {
+@test "a P1 kept on purpose blocks a covered branch" {
   agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
-  agentic_review finding --kind bug --severity P1 --title "five is wrong" --left "own ticket" --verdict deferred > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --left "by design" --verdict intentional > /dev/null
 
   run agentic_review publish
   assert_contains "$(status_calls)" "state=failure"
-  assert_contains "$(status_calls)" "description=Blocked: 1 security, P0 or P1 not fixed."
+  assert_contains "$(status_calls)" "description=Blocked: 1 security, P0 or P1 kept on purpose."
+}
+
+@test "a P1 already on the default branch or deferred to its own ticket does not block" {
+  agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --left "on main too" --verdict pre-existing > /dev/null
+  agentic_review finding --kind security --title "leaks five" --left "own ticket" --verdict deferred > /dev/null
+
+  run agentic_review publish
+  assert_contains "$(status_calls)" "state=success"
 }
 
 @test "a fixed P1 does not block a covered branch" {
