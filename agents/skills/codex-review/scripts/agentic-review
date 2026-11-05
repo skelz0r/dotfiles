@@ -42,6 +42,11 @@ A pass covers the head commit when the per-file patch-ids of
 `git diff <merge-base>..HEAD` equal the ones recorded when the pass
 started: a rebase without conflict keeps the coverage, a fix or a
 conflict resolution makes it stale.
+
+The status is failure while a finding is not triaged, or a security,
+P0 or P1 finding is left unfixed without being proven wrong; otherwise
+pending when stale (a pass is due), success when covered. Going to
+failure posts a one-line notice.
 """
 
 EPILOG = """\
@@ -506,6 +511,18 @@ def render(state, result, base):
     return "\n".join(lines)
 
 
+def blocking(finding):
+    if finding["status"] == "open":
+        return True
+    return high_stakes(finding) and finding["status"] != "fixed" and finding.get("verdict") != "wrong"
+
+
+def review_status(state, result):
+    if any(blocking(finding) for finding in state["findings"]):
+        return "failure"
+    return "success" if result["covered"] else "pending"
+
+
 def status_description(state, result):
     groups = {}
     for review in state["passes"]:
@@ -517,7 +534,13 @@ def status_description(state, result):
     text = f"{reviewers}: {fixed} fixed, {left} not fixed"
     if not result["covered"]:
         noun = "file" if len(result["changed"]) == 1 else "files"
-        text = f"Stale: {len(result['changed'])} {noun} unreviewed. {text}"
+        text = f"Stale: {len(result['changed'])} {noun} unreviewed, a pass is due. {text}"
+    untriaged = sum(1 for f in state["findings"] if f["status"] == "open")
+    unfixed = sum(1 for f in state["findings"] if blocking(f) and f["status"] != "open")
+    blocked = [part for part in (f"{untriaged} not triaged" if untriaged else "",
+                                 f"{unfixed} security, P0 or P1 not fixed" if unfixed else "") if part]
+    if blocked:
+        text = f"Blocked: {', '.join(blocked)}. {text}"
     if len(text) > STATUS_DESCRIPTION_LIMIT:
         text = text[:STATUS_DESCRIPTION_LIMIT - 1] + "…"
     return text
@@ -649,11 +672,11 @@ def command_publish(args):
         state["note"] = args.note
     base = resolve_base(args, pull)
     result = coverage(state, base)
-    status = "success" if result["covered"] else "failure"
+    status = review_status(state, result)
     description = status_description(state, result)
     comment = find_comment(pull, login)
     previous_status = state.get("published", {}).get("status")
-    notify = previous_status == "success" and status == "failure"
+    notify = previous_status in ("success", "pending") and status == "failure"
 
     state["published"] = {**state.get("published", {}), "status": status, "sha": head, "at": now_iso()}
     body = render(state, result, base)
@@ -667,7 +690,7 @@ def command_publish(args):
         print(body)
         print(f"[dry-run] status {status} on {short(head)}, context \"{STATUS_CONTEXT}\": {description}")
         if notify:
-            print("[dry-run] post a short comment: the review went from success to failure")
+            print(f"[dry-run] post a short comment: the review went from {previous_status} to failure")
         if args.request_reviewer:
             print(f"[dry-run] request a review from {', '.join(args.request_reviewer)}")
         return 0
@@ -678,7 +701,7 @@ def command_publish(args):
        "-f", f"target_url={published['url']}", "--silent")
     if notify:
         gh("api", f"repos/{pull['repo']}/issues/{pull['number']}/comments", "-f",
-           f"body=The agentic review no longer covers the head commit, see {published['url']}", "--silent")
+           f"body=Agentic review {description} See {published['url']}", "--silent")
     state["published"].update(comment_id=published["id"], comment_url=published["url"])
     bump(state)
     print(f"{status}: {description}\n{published['url']}")

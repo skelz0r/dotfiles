@@ -114,15 +114,15 @@ review_branch() {
   assert_contains "$(status_calls)" "state=success"
 }
 
-@test "code committed after the last pass makes the status stale" {
+@test "code committed after the last pass leaves a pass due, without blocking" {
   review_branch
   sed -i.bak 's/^6$/six/' a.txt && rm a.txt.bak
   git commit -qam "fixup! Spell five"
 
   run agentic_review publish
   assert_equal "$status" 0
-  assert_contains "$(status_calls)" "state=failure"
-  assert_contains "$(status_calls)" "description=Stale: 1 file unreviewed."
+  assert_contains "$(status_calls)" "state=pending"
+  assert_contains "$(status_calls)" "description=Stale: 1 file unreviewed, a pass is due."
   assert_contains "$(cat "$STUB_DIR/comment.md")" "| Not reviewed |"
 }
 
@@ -147,7 +147,7 @@ review_branch() {
   assert_not_contains "$(stub_calls gh)" "api repos/acme/app/issues/12/comments -F"
 }
 
-@test "going from covered to stale posts a short notice, once" {
+@test "going from covered to stale posts no notice" {
   review_branch
   agentic_review publish > /dev/null
   export MOCK_COMMENTS=$'101\thttps://github.com/acme/app/pull/12#issuecomment-101\n'
@@ -155,8 +155,55 @@ review_branch() {
   git commit -qam "fixup! Spell five"
 
   agentic_review publish > /dev/null
+  assert_equal "$(stub_calls gh | grep -c "Agentic review Blocked" || true)" "0"
+}
+
+@test "a finding not triaged blocks a covered branch" {
+  agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --title "five is wrong" > /dev/null
+
+  run agentic_review publish
+  assert_equal "$status" 0
+  assert_contains "$(status_calls)" "state=failure"
+  assert_contains "$(status_calls)" "description=Blocked: 1 not triaged."
+}
+
+@test "a P1 left unfixed blocks a covered branch" {
+  agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --left "own ticket" --verdict deferred > /dev/null
+
+  run agentic_review publish
+  assert_contains "$(status_calls)" "state=failure"
+  assert_contains "$(status_calls)" "description=Blocked: 1 security, P0 or P1 not fixed."
+}
+
+@test "a fixed P1 does not block a covered branch" {
+  agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --fixed "spelled out" > /dev/null
+
+  run agentic_review publish
+  assert_contains "$(status_calls)" "state=success"
+}
+
+@test "a finding not triaged blocks a stale branch too" {
+  agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --title "five is wrong" > /dev/null
+  sed -i.bak 's/^6$/six/' a.txt && rm a.txt.bak
+  git commit -qam "fixup! Spell five"
+
+  run agentic_review publish
+  assert_contains "$(status_calls)" "state=failure"
+}
+
+@test "becoming blocked posts a short notice, once" {
+  review_branch
   agentic_review publish > /dev/null
-  assert_equal "$(stub_calls gh | grep -c "no longer covers the head commit")" "1"
+  export MOCK_COMMENTS=$'101\thttps://github.com/acme/app/pull/12#issuecomment-101\n'
+  agentic_review finding --kind bug --title "six is wrong" > /dev/null
+
+  agentic_review publish > /dev/null
+  agentic_review publish > /dev/null
+  assert_equal "$(stub_calls gh | grep -c "body=Agentic review Blocked: 1 not triaged.")" "1"
 }
 
 @test "a finding left unfixed must say whether it was wrong, intentional, pre-existing or deferred" {

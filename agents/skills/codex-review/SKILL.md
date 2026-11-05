@@ -207,9 +207,13 @@ Record as you go, never reconstruct afterwards:
   where "kept" is a valid decision and the why quotes the author when they settled it.
 
 Freshness lives in the status, never in the comment's wording: the status is `success` when a pass
-read exactly the diff of the pushed head (a rebase without conflict keeps it), `failure` with a
-description starting with `Stale:` otherwise. Fixes made after a pass make it stale by design: once
-autosquashed, run a short confirmation pass on them before publishing:
+read exactly the diff of the pushed head (a rebase without conflict keeps it), `pending` with a
+description starting with `Stale:` otherwise (a pass is due, nothing known is wrong). `failure` is
+kept for real blockers, whatever the coverage: a finding not triaged, or a security, P0 or P1 left
+unfixed without being proven `wrong` (a fixed one, a `product` or an `intentional` choice stays for
+`gate` and the human reviewer, not for the status). On superdocu/app every red status had been a
+stale one after a CHANGELOG or a contract entry. Fixes made after a pass make it stale by design:
+once autosquashed, run a short confirmation pass on them before publishing:
 
 ```bash
 git range-diff <base> <head reviewed> HEAD     # the fixes, as Codex must read them
@@ -234,7 +238,8 @@ It refuses a pull request opened by someone else or a local HEAD that differs fr
 Before the pull request exists, the state stays in the git dir of the worktree and `publish` says
 so; run it again once the pull request is open. Leaving a pull request stale is fine when the last
 changes are trivial: the comment's "Not reviewed" row tells the reviewer what was not read. Going
-from `success` to `failure` posts a one-line notice, since editing a comment notifies nobody.
+from `success` or `pending` to `failure` posts a one-line notice, since editing a comment notifies
+nobody; going stale posts none.
 Never put secrets or production data in titles and reasons: the comment is visible to anyone who
 can read the repository.
 
