@@ -93,9 +93,11 @@ inside the other inherits its variable, so herdr is checked first):
      or direct push for internal tooling as the global CLAUDE.md
      allows — unless the user asked for something else;
    - for every pull request, whatever its kind (feature, bugfix,
-     cleanup, refactoring), an agentic review once the code is
-     finished and pushed, before handing back: the `codex-review`
-     skill, findings triaged and fixed, proof published on the PR.
+     cleanup, refactoring), two proofs once the code is finished and
+     pushed, before handing back: an agentic review through the
+     `codex-review` skill, findings triaged and fixed, its proof of
+     review published; then the proof that the change works through
+     the `pr-proof` skill, rerun at every later push.
      `codex-review` already sizes its effort to the diff, so a typo
      fix costs little, while a "small" bugfix can touch a mail job or
      an access flow. Without the review the user has to ask for it in

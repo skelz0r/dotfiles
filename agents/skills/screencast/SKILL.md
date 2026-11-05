@@ -1,6 +1,6 @@
 ---
 name: screencast
-description: Record agent-browser sessions to video, paced like a human demo (animated cursor, progressive typing, smooth scrolling), or an iOS app in the simulator driven by a temporary XCUITest (see ios.md). Use when user wants to create video demos, record browser automation, capture agent-browser workflows, or film an iOS journey for a pull request ("screencast iOS de la PR", "vidéo du parcours sur le simulateur"). Triggers on requests involving screencasting, video recording, or visual demos of web or iOS interactions, or when a recorded demo looks robotic and should be smoother.
+description: Record agent-browser sessions to video, paced like a human demo (animated cursor, progressive typing, smooth scrolling), or an iOS app in the simulator driven by a temporary XCUITest (see ios.md). Use when user wants to create video demos, record browser automation, capture agent-browser workflows, or film an iOS journey for a pull request ("screencast iOS de la PR", "vidéo du parcours sur le simulateur"). Triggers on requests involving screencasting, video recording, or visual demos of web or iOS interactions, when a recorded demo looks robotic and should be smoother, or when pr-proof requires a screencast because a pull request changes an interaction.
 ---
 
 # Screencast Recording

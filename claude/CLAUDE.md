@@ -83,15 +83,13 @@ cannot see.
   TL;DR (business constraints, edge cases, rejected alternatives) goes
   below in a collapsed `<details><summary>Context</summary>` block: never
   drop a constraint to fit the cap
-- Every PR proves its change works, in one dedicated comment (not the
-  description, not the `codex-review` one), edited on each push and
-  citing the verified head SHA. Strongest proof the diff allows:
-  - UI: screenshots / screencast (`screencast`, attached via `gh-image`)
-  - app journey: project's `verify-<app>` skill or `bin/qa`; missing,
-    propose `create-verify-skill`
-  - backend / lib: CI run link at that SHA plus the added or modified
-    tests that exercise the change; green CI alone proves nothing
-  - large PR: `pr-review-guide` page
+- Every PR proves its change works at each push, through the `pr-proof`
+  skill: it reads the diff, produces every proof it requires
+  (screencast, before/after, review guide, CI and tests) and rewrites
+  one dedicated comment, distinct from the description and from the
+  `codex-review` proof of review
+- A proof the user asked for beyond what the diff requires (a device,
+  a dataset, a journey) goes in the same comment
 - No proof possible: say in that comment what is unverified and why,
   and raise it in "Needs you"
 

@@ -177,6 +177,10 @@ cover the code. `scripts/agentic-review` records them and publishes, on one's ow
 commit status `Agentic review` on the head commit and a single comment, edited at each pass, with
 the passes, the fixed findings and the ones left with their reason.
 
+This is the proof of review: it says what read the code, not that the change works. Once it is
+published, run the `pr-proof` skill, which posts the proof of change (screencast, before/after,
+review guide, CI and tests at the head) in its own comment. Never put either in the other.
+
 Record as you go, never reconstruct afterwards:
 
 ```bash
