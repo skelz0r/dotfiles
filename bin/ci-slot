@@ -106,15 +106,36 @@ alive() {
   kill -0 "$1" 2> /dev/null
 }
 
+LOCK_WITHOUT_PID_ABANDONED_AFTER_POLLS=40
+
+lock_identity() {
+  ls -di "$LOCK_DIR" 2> /dev/null | awk '{print $1}'
+}
+
 take_lock() {
   mkdir -p "$STATE_DIR"
+  local owner identity seen_without_pid="" polls_without_pid=0
   while ! mkdir "$LOCK_DIR" 2> /dev/null; do
-    local owner
     owner="$(cat "$LOCK_DIR/pid" 2> /dev/null || true)"
     [[ "$owner" != "$$" ]] || return 0
-    if [[ -n "$owner" ]] && ! alive "$owner"; then
-      rm -rf "$LOCK_DIR"
-      continue
+    if [[ -n "$owner" ]]; then
+      polls_without_pid=0
+      if ! alive "$owner"; then
+        rm -rf "$LOCK_DIR"
+        continue
+      fi
+    else
+      identity="$(lock_identity)"
+      if [[ -z "$identity" || "$identity" != "$seen_without_pid" ]]; then
+        seen_without_pid="$identity"
+        polls_without_pid=0
+      fi
+      polls_without_pid=$((polls_without_pid + 1))
+      if ((polls_without_pid >= LOCK_WITHOUT_PID_ABANDONED_AFTER_POLLS)); then
+        rm -rf "$LOCK_DIR"
+        polls_without_pid=0
+        continue
+      fi
     fi
     sleep 0.05
   done

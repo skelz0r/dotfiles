@@ -22,6 +22,8 @@ setup() {
 teardown() {
   touch "$WORK"/release-{a,b,c} 2> /dev/null || true
   pkill -f "$WORK" 2> /dev/null || true
+  sleep 0.2
+  pkill -9 -f "$WORK" 2> /dev/null || true
 }
 
 hold() {
@@ -36,6 +38,22 @@ wait_for() {
     [[ "$tries" -lt 100 ]] || return 1
     sleep 0.05
   done
+}
+
+finishes_within() {
+  local seconds="$1" pid tries=0
+  shift
+  "$@" > /dev/null 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2> /dev/null; do
+    tries=$((tries + 1))
+    if [[ "$tries" -gt $((seconds * 20)) ]]; then
+      kill -9 "$pid" 2> /dev/null || true
+      return 1
+    fi
+    sleep 0.05
+  done
+  wait "$pid"
 }
 
 stays_absent() {
@@ -90,6 +108,11 @@ stays_absent() {
   pkill -9 -f "ci-slot run -w 10 -n a" || true
   hold b 10
   wait_for "$WORK/b.started"
+}
+
+@test "a lock left without its pid by a killed run does not block the next runs" {
+  mkdir -p "$CI_SLOT_STATE_DIR/lock"
+  finishes_within 10 "$SLOT" run -w 1 -- true
 }
 
 @test "a run started from within another run does not wait for itself" {
