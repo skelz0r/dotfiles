@@ -11,14 +11,24 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALLED_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+dotfiles_checkout_of_cwd() {
+  local top
+  top="$(git rev-parse --show-toplevel 2> /dev/null)" || return 1
+  [[ -f "$top/bin/dotfiles-test" && -f "$top/test/lint.sh" ]] || return 1
+  echo "$top"
+}
+
+REPO_ROOT="$(dotfiles_checkout_of_cwd || echo "$INSTALLED_ROOT")"
 
 usage() {
   cat << EOF
 Usage: $(basename "$0") [OPTIONS] [SUITE...]
 
 Run the test suites of the dotfiles repository. Without a suite, run
-them all.
+them all. Tests the dotfiles checkout (or worktree) of the current
+directory, else the one this script belongs to.
 
 Suites:
   lint      shell conventions and shellcheck (test/lint.sh)
@@ -58,6 +68,7 @@ done
 [[ "${#SUITES[@]}" -gt 0 ]] || SUITES=(lint smoke tests)
 
 cd "$REPO_ROOT"
+log "Testing $REPO_ROOT"
 
 require() {
   local cmd="$1" hint="$2"
