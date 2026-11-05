@@ -93,6 +93,13 @@ the inventory found, no placeholders:
      (keep `type: error`) after it. Without `--json`, `console` prints
      only `Done` (0.5).
 
+  4. Evidence to publish: a journey whose state changes is filmed
+     (`screencast`), a changed rendering gets before/after captures on
+     the same data, from the commands above. The `pr-proof` skill
+     decides which ones a diff requires and posts them on the PR;
+     the verify skill only says how to produce them in this app
+     (seed, account, viewport, where the mail preview lives).
+
   For an iOS simulator, the driver is argent (see below).
 
 - **Evidence**: where screenshots and logs go; cleanup never deletes them.
