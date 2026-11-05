@@ -252,3 +252,64 @@ to the subject"
   assert_equal "$status" 0
   assert_contains "$(cat "$BATS_TEST_TMPDIR/calls")" "refs/heads/main"
 }
+
+stub_rules() {
+  stub gh "case \"\$*\" in
+  *rules/branches/develop*) echo 1 ;;
+  *) echo 0 ;;
+esac"
+}
+
+push_refs() {
+  local url="$1" remote_ref="$2" local_sha="${3:-1111111111111111111111111111111111111111}"
+  run "$REPO_ROOT/git-hooks/pre-push" origin "$url" \
+    <<< "refs/heads/work $local_sha $remote_ref 2222222222222222222222222222222222222222"
+}
+
+@test "a push to a branch whose ruleset requires a pull request is refused" {
+  stub_rules
+  push_refs git@github.com:datagouv/apistration.git refs/heads/develop
+  assert_equal "$status" 1
+  assert_contains "$output" "datagouv/apistration develop requires a pull request"
+  assert_contains "$(stub_calls gh)" "api repos/datagouv/apistration/rules/branches/develop"
+}
+
+@test "deleting a branch whose ruleset requires a pull request is refused" {
+  stub_rules
+  push_refs https://github.com/datagouv/apistration refs/heads/develop 0000000000000000000000000000000000000000
+  assert_equal "$status" 1
+}
+
+@test "a push to a branch without a pull request rule is accepted" {
+  stub_rules
+  push_refs https://github.com/datagouv/apistration.git refs/heads/feature/new-endpoint
+  assert_equal "$status" 0
+  assert_contains "$(stub_calls gh)" "rules/branches/feature/new-endpoint"
+
+  push_refs ssh://git@github.com/skelz0r/dotfiles.git refs/heads/master
+  assert_equal "$status" 0
+}
+
+@test "a push is refused when gh cannot read the rules" {
+  stub gh "echo 'HTTP 401: Bad credentials' >&2; exit 1"
+  push_refs git@github.com:skelz0r/dotfiles.git refs/heads/master
+  assert_equal "$status" 1
+  assert_contains "$output" "could not read the rules of skelz0r/dotfiles master"
+}
+
+@test "a push is refused when gh is missing" {
+  push_refs git@github.com:skelz0r/dotfiles.git refs/heads/master
+  assert_equal "$status" 1
+  assert_contains "$output" "gh is missing"
+}
+
+@test "tags and non-GitHub remotes are pushed without asking gh" {
+  stub gh "exit 1"
+  run "$REPO_ROOT/git-hooks/pre-push" origin git@github.com:datagouv/apistration.git \
+    <<< "refs/tags/v1 1111111111111111111111111111111111111111 refs/tags/v1 0000000000000000000000000000000000000000"
+  assert_equal "$status" 0
+
+  push_refs git@gitlab.com:team/project.git refs/heads/develop
+  assert_equal "$status" 0
+  assert_equal "$(stub_calls gh)" ""
+}

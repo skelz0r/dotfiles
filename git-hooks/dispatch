@@ -13,6 +13,7 @@ NC='\033[0m'
 HOOK_NAME="$(basename "$0")"
 SUBJECT_MAX=50
 BODY_MAX=72
+GH_TIMEOUT_SECONDS=10
 
 usage() {
   cat << USAGE
@@ -30,10 +31,15 @@ Checks:
   commit-msg    subject of at most $SUBJECT_MAX characters, blank line
                 after it, body lines of at most $BODY_MAX characters
                 (lines holding a URL excepted)
+  pre-push      no branch pushed to a GitHub remote, nor deleted on it,
+                when a ruleset of that branch requires a pull request
+                (gh api repos/<owner>/<repo>/rules/branches/<branch>);
+                refused too when gh cannot answer. Tags, other refs and
+                non-GitHub remotes are not checked
 
-Skipped for merges, cherry-picks and reverts in progress, and for
-fixup!, squash!, amend!, Merge and Revert subjects. Bypass with
-git commit --no-verify.
+Commit checks are skipped for merges, cherry-picks and reverts in
+progress, and for fixup!, squash!, amend!, Merge and Revert subjects.
+Bypass deliberately with git commit --no-verify or git push --no-verify.
 
 Options:
   -h, --help    Show this help message
@@ -136,21 +142,81 @@ check_staged_files() {
   return 0
 }
 
+github_repository() {
+  local url="$1" path
+  case "$url" in
+    git@github.com:*) path="${url#git@github.com:}" ;;
+    ssh://git@github.com/*) path="${url#ssh://git@github.com/}" ;;
+    https://github.com/*) path="${url#https://github.com/}" ;;
+    *) return 1 ;;
+  esac
+  path="${path%/}"
+  path="${path%.git}"
+  [[ "$path" =~ ^[^/]+/[^/]+$ ]] || return 1
+  printf '%s\n' "$path"
+}
+
+with_timeout() {
+  perl -e 'alarm shift; exec @ARGV or exit 127' "$GH_TIMEOUT_SECONDS" "$@"
+}
+
+pull_request_rules() {
+  local repository="$1" branch="$2"
+  with_timeout gh api "repos/$repository/rules/branches/$branch" \
+    --jq '[.[] | select(.type == "pull_request")] | length'
+}
+
+check_branch_push() {
+  local repository="$1" branch="$2" count
+  if ! command -v gh > /dev/null; then
+    refuse "gh is missing, so the rules of $repository $branch could not be checked"
+    return 0
+  fi
+  if ! count="$(pull_request_rules "$repository" "$branch" 2> /dev/null)" || [[ ! "$count" =~ ^[0-9]+$ ]]; then
+    refuse "gh api could not read the rules of $repository $branch (network, auth or timeout): push refused rather than unchecked"
+    return 0
+  fi
+  if [[ "$count" -gt 0 ]]; then
+    refuse "$repository $branch requires a pull request: push a feature branch and open one"
+  fi
+}
+
+check_push() {
+  local url="$1" input="$2" repository remote_ref
+  repository="$(github_repository "$url")" || return 0
+  while read -r _ _ remote_ref _; do
+    [[ "$remote_ref" == refs/heads/* ]] || continue
+    check_branch_push "$repository" "${remote_ref#refs/heads/}"
+  done <<< "$input"
+  return 0
+}
+
 run_repository_hook() {
   local common_dir hook
   common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2> /dev/null)" || exit 0
   hook="$common_dir/hooks/$HOOK_NAME"
   [[ -x "$hook" && ! "$hook" -ef "$0" ]] || exit 0
+  if [[ "$HOOK_NAME" == pre-push ]]; then
+    exec "$hook" "$@" < <(printf '%s' "$PUSH_INPUT")
+  fi
   exec "$hook" "$@"
 }
 
 case "$HOOK_NAME" in
   commit-msg) foreign_changes_in_progress || check_commit_message "$1" ;;
   pre-commit) foreign_changes_in_progress || check_staged_files ;;
+  pre-push)
+    PUSH_INPUT="$(cat; printf x)"
+    PUSH_INPUT="${PUSH_INPUT%x}"
+    check_push "${2:-}" "$PUSH_INPUT"
+    ;;
 esac
 
 if [[ "$FAILED" == true ]]; then
-  hint "fix the commit, or bypass deliberately with git commit --no-verify"
+  case "$HOOK_NAME" in
+    pre-push) hint "nothing was pushed; only the user bypasses this, with git push --no-verify" ;;
+    *) hint "fix the commit, or bypass deliberately with git commit --no-verify" ;;
+  esac
   exit 1
 fi
 
