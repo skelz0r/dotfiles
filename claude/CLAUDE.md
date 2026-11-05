@@ -44,6 +44,7 @@ cannot see.
 | Commit subject <= 50, blank line, body <= 72 | git `commit-msg` in `~/dotfiles/git-hooks` | imperative mood, repository's language |
 | No read under `secrets/`, no `git-crypt unlock`/`export-key` | Claude Code PreToolUse hook `~/dotfiles/claude/hooks/block-secrets.sh` (not Codex) | Secrets section: scripts, recursive greps, globs |
 | No read under `pii/` | same hook | Personal data section: what goes there, aggregates only |
+| No push to a branch whose ruleset requires a PR; refused too when `gh` cannot tell | git `pre-push` in `~/dotfiles/git-hooks`; its bypasses (`--no-verify`, `commit -n`, `core.hooksPath`) blocked by PreToolUse hook `~/dotfiles/claude/hooks/block-hook-bypass.sh` (not Codex) | a push GitHub accepts with a bypass warning is not allowed; `--no-verify` is mine alone |
 | No `is_a?` / `respond_to?` | RuboCop cop `config/rubocop/duck_typing.rb` of dotfiles, only where copied | Ruby section |
 
 ## Code Style
@@ -71,7 +72,7 @@ cannot see.
 - Internal tooling (skills, commands, CLAUDE.md, agent config, personal
   dotfiles scripts), never code shipped to clients: once verified it
   works, rebase on the default branch and push directly, without PR nor
-  review
+  review, if the `pre-push` accepts it; refused: open a PR
 - PR description written for the human reviewer first: a TL;DR on top,
   readable in 90 seconds, at most ~1,500 characters
 - Single-commit PR: the commit message is the TL;DR, verbatim
