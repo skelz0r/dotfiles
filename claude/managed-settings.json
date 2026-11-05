@@ -182,6 +182,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "hook=~/dotfiles/claude/hooks/block-hook-bypass.sh; [ -x \"$hook\" ] || { echo \"Blocked: $hook is missing, so the tool call could not be checked\" >&2; exit 2; }; exec \"$hook\"",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }

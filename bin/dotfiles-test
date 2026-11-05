@@ -25,7 +25,8 @@ Suites:
   smoke     bin --help, zsh and vim startup, statusline, install dry run
   tests     behaviour tests: install.sh, migration, upload-assets prepare,
             gh-media-log, tidy-commits, agentic-review, block-secrets,
-            git-hooks, herdr-dispatch, cve-watch, ci-slot
+            block-hook-bypass, git-hooks, herdr-dispatch, cve-watch,
+            ci-slot
 
 Options:
   -v, --verbose   Show the output of every bats test, not only failures
