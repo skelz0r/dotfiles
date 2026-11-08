@@ -209,6 +209,29 @@ Record as you go, never reconstruct afterwards:
   `/code-review`, and `decision --axis --problem --decision --why [--commit]` for a design pass,
   where "kept" is a valid decision and the why quotes the author when they settled it.
 
+The comment opens on a merge risk for the human reviewer, then the gaps of each category, and
+nothing for a category without one. After the last triage, record the gaps in one call, which
+replaces the previous ones (no option: assessed, no gap):
+
+```bash
+~/.claude/skills/codex-review/scripts/agentic-review risk \
+  --alignment "<behaviour changed or assumed that neither the description nor the issue states>" \
+  --impact "<blast radius beyond the diff, sensitive area touched>" \
+  --verification "<behaviour or edge case nothing proves: no test, no capture>" \
+  --rollback-cost "<a one-way door: data dropped or rewritten, a message sent, a contract published>" \
+  --error-detection "<a breakage nobody would see before users: error swallowed, no log, Sentry nor alert>"
+```
+
+Every option is repeatable. A gap is a fact a reviewer can check, one line, never a grade; leave a
+category out when it has none, error detection included when the diff has no runtime flow.
+Verification is what the `pr-proof` comment will not prove, rollback cost only a real one-way door.
+The level is computed, never chosen: `high` when a security, P0 or P1 finding ships unfixed (open,
+`intentional` or `deferred`) or rollback cost has a gap; `medium` when any other finding ships unfixed
+(nits, `wrong` and `pre-existing` aside) or any category has a gap; `low` otherwise. Warp's skill
+weights five grades into a score: a number averaging a one-way door with four good grades reads
+reassuring for the one change that cannot be undone. The merge risk informs the reviewer, it does
+not change the status.
+
 Freshness lives in the status, never in the comment's wording: the status is `success` when a pass
 read exactly the diff of the pushed head (a rebase without conflict keeps it), `pending` with a
 description starting with `Stale:` otherwise (a pass is due, nothing known is wrong). `failure` is

@@ -27,6 +27,9 @@ EXECUTED_PROOFS = ["ran", "reproduced"]
 HIGH_STAKES_SEVERITIES = ["P0", "P1"]
 HUMAN_KINDS = ["product"]
 HUMAN_VERDICTS = ["intentional"]
+CLEARING_VERDICTS = ["wrong", "pre-existing"]
+RISK_CATEGORIES = [("alignment", "Alignment"), ("impact", "Impact"), ("verification", "Verification"),
+                   ("rollback_cost", "Rollback cost"), ("error_detection", "Error detection")]
 STATE_VERSION = 1
 
 DESCRIPTION = """\
@@ -47,6 +50,14 @@ The status is failure while a finding is not triaged, or a security,
 P0 or P1 finding is left unfixed as intentional; otherwise
 pending when stale (a pass is due), success when covered. Going to
 failure posts a one-line notice.
+
+The comment opens on a merge risk for the human reviewer: high when a
+security, P0 or P1 finding ships unfixed (open, intentional or
+deferred) or the rollback cost has a gap (a one-way door); medium when
+any other finding ships unfixed or any category has a gap; low
+otherwise. The gaps per category (alignment, impact, verification,
+rollback cost, error detection) are recorded with `risk`. The merge
+risk does not change the status.
 """
 
 EPILOG = """\
@@ -58,6 +69,7 @@ examples:
   agentic-review known
   agentic-review finding --id f3 --fixed "..."
   agentic-review decision --axis "..." --problem "..." --decision kept --why "..."
+  agentic-review risk --rollback-cost "drops column x" --error-detection "sync rescues every error"
   agentic-review check
   agentic-review gate --require "Local CI"
   agentic-review publish --dry-run
@@ -260,11 +272,11 @@ def coverage(state, base):
     current_digest = files_digest(current)
     for review in reversed(state["passes"]):
         if pass_digest(review) == current_digest:
-            return {"covered": True, "head": head, "pass": review, "changed": []}
+            return {"covered": True, "head": head, "digest": current_digest, "pass": review, "changed": []}
     last_files = state["passes"][-1].get("files", {}) if state["passes"] else {}
     changed = sorted(path for path in set(current) | set(last_files)
                      if current.get(path) != last_files.get(path))
-    return {"covered": False, "head": head, "pass": None, "changed": changed}
+    return {"covered": False, "head": head, "digest": current_digest, "pass": None, "changed": changed}
 
 
 def next_id(prefix, items):
@@ -391,6 +403,57 @@ def command_decision(args):
     print(decision["id"])
 
 
+def command_risk(args):
+    state = load_state(args)
+    base = resolve_base(args, find_pull_request(args.pr))
+    head = git("rev-parse", "HEAD").strip()
+    state["risk"] = {"gaps": {key: getattr(args, key) for key, _ in RISK_CATEGORIES},
+                     "at": now_iso(), "head": head, "digest": files_digest(file_patch_ids(base, head))}
+    bump(state)
+    print(merge_risk(state))
+
+
+def shipped_unfixed(finding):
+    if finding["status"] == "fixed" or finding["kind"] == "nit":
+        return False
+    return finding["status"] == "open" or finding.get("verdict") not in CLEARING_VERDICTS
+
+
+def risk_gaps(state):
+    return (state.get("risk") or {}).get("gaps", {})
+
+
+def merge_risk(state):
+    gaps = risk_gaps(state)
+    shipped = [f for f in state["findings"] if shipped_unfixed(f)]
+    if gaps.get("rollback_cost") or any(high_stakes(f) for f in shipped):
+        return "high"
+    if shipped or any(gaps.values()):
+        return "medium"
+    return "low"
+
+
+def risk_lines(state, result):
+    risk = state.get("risk")
+    gaps = risk_gaps(state)
+    lines = [f"**Merge risk: {merge_risk(state)}**"]
+    for key, label in RISK_CATEGORIES:
+        lines += [f"- {label}: {cell(gap)}" for gap in gaps.get(key, [])]
+    shipped = [f for f in state["findings"] if shipped_unfixed(f)]
+    if shipped:
+        kept = sum(1 for f in shipped if high_stakes(f))
+        detail = f", {kept} of them security, P0 or P1" if kept else ""
+        noun = "finding" if len(shipped) == 1 else "findings"
+        lines.append(f"- Findings: {len(shipped)} {noun} neither fixed nor cleared{detail}, listed below")
+    if risk is None:
+        lines.append("- Categories not assessed")
+    elif risk.get("digest") != result.get("digest"):
+        lines.append(f"- Categories assessed on `{short(risk['head'])}`, before the last changes")
+    if risk is not None and not any(gaps.values()):
+        lines.append("- No gap in alignment, impact, verification, rollback cost or error detection")
+    return lines
+
+
 def cell(text):
     return (text or "").replace("|", "\\|").replace("\n", " ").strip()
 
@@ -475,7 +538,7 @@ def verdict(result):
 
 def render(state, result, base):
     passes = {review["id"]: review for review in state["passes"]}
-    lines = [COMMENT_MARKER, "### Agentic review", "", verdict(result), "",
+    lines = [COMMENT_MARKER, "### Agentic review", "", *risk_lines(state, result), "", verdict(result), "",
              "| Pass | When | Scope | Fixed | Left |", "|---|---|---|---|---|"]
     for review in state["passes"]:
         fixed, left = pass_counts(state, review)
@@ -756,6 +819,13 @@ def parser():
     decision.add_argument("--decision", required=True, help='e.g. "kept", "split the service"')
     decision.add_argument("--why", required=True, help="the reason, quoting the author when they decided")
     decision.add_argument("--commit", help="commit applying the decision")
+
+    risk = add("risk", "record the gaps of each merge risk category, replacing the previous ones, "
+               "print the merge risk", command_risk)
+    risk.add_argument("--base")
+    for key, label in RISK_CATEGORIES:
+        risk.add_argument(f"--{key.replace('_', '-')}", dest=key, action="append", default=[], metavar="GAP",
+                          help=f"a gap in {label.lower()}, repeatable; leave out when there is none")
 
     check = add("check", "tell whether a pass covers HEAD (exit 1 when stale)", command_check)
     check.add_argument("--base")

@@ -36,7 +36,7 @@ esac'
 
 agentic_review() {
   case "$1" in
-    start|publish|check|show) "$AGENTIC_REVIEW" "$@" --base main ;;
+    start|publish|check|show|risk) "$AGENTIC_REVIEW" "$@" --base main ;;
     *) "$AGENTIC_REVIEW" "$@" ;;
   esac
 }
@@ -255,4 +255,58 @@ review_branch() {
 
   agentic_review publish > /dev/null
   assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | wrong (cited): a.txt:5 is never read |"
+}
+
+@test "the comment opens on the merge risk, before the coverage" {
+  review_branch
+
+  agentic_review publish > /dev/null
+  comment="$(cat "$STUB_DIR/comment.md")"
+  assert_equal "$(sed -n 2,4p "$STUB_DIR/comment.md")" $'### Agentic review\n\n**Merge risk: medium**'
+  assert_contains "$comment" "- Findings: 1 finding neither fixed nor cleared, listed below"
+  assert_contains "$comment" "- Categories not assessed"
+}
+
+@test "a branch with every finding fixed and no gap in any category is a low merge risk" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --fixed "spelled out" > /dev/null
+  agentic_review finding --kind bug --title "six is wrong" --left "on main too" --verdict pre-existing > /dev/null
+
+  run agentic_review risk
+  assert_equal "$output" "low"
+  agentic_review publish > /dev/null
+  assert_contains "$(cat "$STUB_DIR/comment.md")" $'**Merge risk: low**\n- No gap in alignment, impact, verification, rollback cost or error detection'
+}
+
+@test "only the categories with a gap are listed, and any gap is a medium merge risk" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review risk --alignment "renames five, not in the description" --error-detection "a.txt errors are swallowed" > /dev/null
+
+  agentic_review publish > /dev/null
+  comment="$(cat "$STUB_DIR/comment.md")"
+  assert_contains "$comment" $'**Merge risk: medium**\n- Alignment: renames five, not in the description\n- Error detection: a.txt errors are swallowed\n\nCovered'
+  assert_not_contains "$comment" "- Impact:"
+}
+
+@test "a one-way door or a P1 shipped unfixed is a high merge risk, without changing the status" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  run agentic_review risk --rollback-cost "drops the column holding five"
+  assert_equal "$output" "high"
+
+  agentic_review risk > /dev/null
+  agentic_review finding --kind security --title "leaks five" --left "own ticket" --verdict deferred > /dev/null
+  agentic_review publish > /dev/null
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "**Merge risk: high**"
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "- Findings: 1 finding neither fixed nor cleared, 1 of them security, P0 or P1"
+  assert_contains "$(status_calls)" "state=success"
+}
+
+@test "categories assessed before the last changes say so" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review risk > /dev/null
+  sed -i.bak 's/^6$/six/' a.txt && rm a.txt.bak
+  git commit -qam "fixup! Spell five"
+
+  agentic_review publish > /dev/null
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "before the last changes"
 }
