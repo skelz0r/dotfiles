@@ -36,7 +36,7 @@ esac'
 
 agentic_review() {
   case "$1" in
-    start|publish|check|show|risk) "$AGENTIC_REVIEW" "$@" --base main ;;
+    start|publish|check|show|risk|gate) "$AGENTIC_REVIEW" "$@" --base main ;;
     *) "$AGENTIC_REVIEW" "$@" ;;
   esac
 }
@@ -309,4 +309,14 @@ review_branch() {
 
   agentic_review publish > /dev/null
   assert_contains "$(cat "$STUB_DIR/comment.md")" "before the last changes"
+}
+
+@test "a one-way door waits for a human before an agent merges" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review risk --rollback-cost "drops the column holding five" > /dev/null
+  agentic_review publish > /dev/null
+
+  run agentic_review gate
+  assert_equal "$status" 1
+  assert_contains "$output" "rollback cost \"drops the column holding five\": a one-way door waits for a human"
 }

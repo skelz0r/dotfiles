@@ -646,6 +646,8 @@ def gate_reasons(state, pull, result, required):
             reasons.append(f"{label}: a product or intentional choice waits for a human")
         if finding["pass"] != first_pass:
             reasons.append(f"{label}: raised after the first pass, the fixes did not converge")
+    for gap in risk_gaps(state).get("rollback_cost", []):
+        reasons.append(f"rollback cost \"{gap}\": a one-way door waits for a human")
     if pull["headRefOid"] != result["head"]:
         reasons.append(f"pull request head {short(pull['headRefOid'])} differs from local HEAD "
                        f"{short(result['head'])}: push or pull first")

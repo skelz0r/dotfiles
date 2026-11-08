@@ -277,7 +277,8 @@ When the project lets an agent merge without a human, `gate` is the check that d
 ```
 
 It exits 0 only when every finding is fixed or cleared as `wrong`, `pre-existing` or `deferred`;
-none is security, P0, P1, `product` or `intentional` (a human arbitrates those, fixed or not); only
+none is security, P0, P1, `product` or `intentional` (a human arbitrates those, fixed or not); no
+rollback cost gap was recorded with `risk` (a one-way door); only
 the first pass raised findings, so the confirmation pass on the fixes found nothing; the status is
 published and covers the head; and every check of the pull request is green. Otherwise it lists
 what waits for a human. A stale status blocks it even after a one-line fix: run the short
