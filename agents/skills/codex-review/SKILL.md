@@ -67,6 +67,9 @@ Read `references/prompt-template.md` and fill it in. Non-negotiable parts:
   Codex must confirm or refute it with a repro. Include the doubts you cannot resolve yourself —
   especially a divergence you introduced knowingly.
 - **Blast radius**, naming the callers by file, above all outward-facing ones.
+- **What the change claims to do**: the pull request description and the linked issue, pasted, for
+  the alignment item (undocumented behaviour, drive-bys).
+- **Error detection**: whether a breakage in production would be seen before users report it.
 - **A test-quality item**: would the new specs actually fail against the pre-change code?
 - **The anti-fabrication clause**, verbatim: high effort without it pads the report with
   speculation to look thorough.

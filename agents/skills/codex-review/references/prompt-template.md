@@ -14,13 +14,24 @@ Domain context you need:
 - <NON-OBVIOUS COUPLING BETWEEN LAYERS>
 - <WHAT PRODUCTION DATA ACTUALLY LOOKS LIKE, IF IT MATTERS>
 
+What the change claims to do:
+<PULL REQUEST DESCRIPTION, VERBATIM>
+<LINKED ISSUE (LINEAR OR GITHUB): TITLE, DESCRIPTION, DECISIONS FROM ITS COMMENTS>
+
 Focus, in order of importance:
 
 1. <YOUR OWN STRONGEST SUSPICION, STATED AS A HYPOTHESIS TO CONFIRM OR REFUTE>
 2. <SECOND RISK>
 3. <BLAST RADIUS: WHAT ELSE CONSUMES THE CHANGED METHOD>
 4. <PERFORMANCE, IF A HOT PATH IS TOUCHED>
-5. Test quality: would the new specs actually fail against the pre-change code, or are any vacuous?
+5. Alignment: does the diff do what the description and the issue above say, and only that? Report
+   behaviour the diff changes or assumes without either saying so, and changes unrelated to the
+   topic (drive-bys).
+6. Error detection: if this breaks in production, does anyone see it before users report it? Report
+   errors swallowed, a rescue or fallback that turns a failure into a plausible result, and a
+   critical flow touched by the diff that logs nothing, reports nothing to Sentry and raises no
+   alert. Say "not applicable" when the diff touches no flow that can fail at runtime.
+7. Test quality: would the new specs actually fail against the pre-change code, or are any vacuous?
 
 <ON A LATER PASS ONLY>
 Already triaged by earlier passes, do not report them again, whatever their status:
@@ -53,6 +64,17 @@ budget goes elsewhere.
 own and a silent behaviour change there is the expensive kind. Point it at the readers a symbol
 search misses: the JSON an endpoint returns, a database column another job or app reads, a feature
 flag, a serialized payload, code several calls downstream.
+
+**What the change claims to do.** Codex has no access to GitHub or Linear: paste the pull request
+description and the linked issue, comments with decisions included. Without them the alignment item
+has nothing to compare the diff with; with no description nor issue yet, write the intent in two
+lines and say it comes from you. Triage an undocumented behaviour change as `product` (a human
+arbitrates it) and a drive-by as `design`.
+
+**Error detection.** The other half of the cost of a defect: a bug that raises and pages someone is
+cheap, the same bug behind a `rescue => e; nil` ships silently for weeks. Name the critical flow
+when you know it (payment, sync, outbound email), so Codex checks its failure path, not the happy
+one.
 
 **Already triaged.** On a later pass, the target is the range-diff of the fixes, not the branch, and
 this list keeps Codex from re-reporting what was decided: a finding left as intentional or wrong
