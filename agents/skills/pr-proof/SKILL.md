@@ -80,7 +80,7 @@ Proof at [abc1234de](https://github.com/OWNER/REPO/commit/<sha40>): <verdict in 
 
 Review guide: <url>
 
-CI: [Local CI success](<url>), [Tests (RSpec) success](<url>)
+CI green ([run](<url>))
 Tests: [spec/features/x_spec.rb](<blob url at sha>) drives <the journey>; [spec/models/y_spec.rb](<url>) <the rule>
 
 Measured: <base value> → <head value>
@@ -93,8 +93,14 @@ Not verified: <what, and why>
 - "Tests" lists files, each with one clause on what it proves, never
   its examples one by one; say which one fails without the fix when it
   was checked.
+- "CI" with every check green is one link to the run: `CI green
+  ([run](<url>))`. List checks one by one only when one is red,
+  pending or skipped. A retried check that ended green is not told:
+  on datagouv/apistration#664 a paragraph on Brakeman passing at the
+  4th attempt was noise for the reviewer.
 - "Not verified" stays, honest and short: an empty one is written
-  "Not verified: nothing".
+  "Not verified: nothing". It holds the verification gaps of the
+  agentic review too: `codex-review` only counts them.
 - Omit the lines that do not apply (no guide, no measure); keep the
   order.
 - Portrait captures side by side as `<img width="240">`, per `gh-image`.
