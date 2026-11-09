@@ -27,7 +27,9 @@ scope    Read the pull request diff and print the proofs it requires:
          the head commit, all linked.
 publish  Check the comment against the skeleton (starts with the head
          commit link, at most ${MAX_TEXT_CHARS} characters of text outside media
-         and links), then create or replace the single proof comment.
+         and links, holds an artefact, no Tests line, no CI line when all
+         green, no media already in the description), then create or
+         replace the single proof comment.
          New media go through gh --attach, which only creates comments:
          the new comment is posted, then the previous proof comment of
          the current user is deleted. Without media, it is edited.
@@ -180,14 +182,28 @@ visible_text_length() {
     | tr -d '\n' | wc -m | tr -d ' '
 }
 
+ARTEFACT_LINE='^(Fails without the fix|Measured|Ran|Watch at deploy):'
+MEDIA_URL='https://github\.com/user-attachments/[^ )"]+'
+
 check_body() {
-  local sha="$1" first length
+  local sha="$1" pr="$2" first length description duplicated red
   first=$(grep -vF -- "$MARKER" "$BODY_FILE" | grep -m1 -v '^[[:space:]]*$' || true)
   [[ "$first" =~ ^Proof\ at\ \[${sha:0:9}\]\(https://github\.com/[^/]+/[^/]+/commit/${sha}\) ]] \
     || die "first line must start with: Proof at [${sha:0:9}](https://github.com/$REPO/commit/$sha)"
   length=$(visible_text_length "$BODY_FILE")
   (( length <= MAX_TEXT_CHARS )) \
-    || die "$length characters of text outside media and links, cap is $MAX_TEXT_CHARS: list test files, not their examples"
+    || die "$length characters of text outside media and links, cap is $MAX_TEXT_CHARS"
+  ! grep -qE '^Tests:' "$BODY_FILE" \
+    || die "no 'Tests:' line: the diff lists them; write 'Fails without the fix: <file>' once checked, else nothing"
+  if grep -qE '^CI[ :]' "$BODY_FILE"; then
+    red=$(ci_lines "$sha" | grep -vE ': success ' || true)
+    [[ -n "$red" ]] || die "every check is green and GitHub shows it: drop the CI line"
+  fi
+  (( ${#ATTACHMENTS[@]} > 0 )) || grep -qE -- "$MEDIA_URL" "$BODY_FILE" || grep -qE -- "$ARTEFACT_LINE" "$BODY_FILE" \
+    || die "no artefact (media, 'Fails without the fix:', 'Measured:', 'Ran:', 'Watch at deploy:'): post no proof comment"
+  description=$(gh pr view "$pr" -R "$REPO" --json body -q .body)
+  duplicated=$(grep -oE -- "$MEDIA_URL" "$BODY_FILE" | sort -u | while read -r url; do grep -qF -- "$url" <<<"$description" && echo "$url"; done || true)
+  [[ -z "$duplicated" ]] || die "media already in the PR description, link to it instead: $duplicated"
 }
 
 previous_proof_ids() {
@@ -206,12 +222,12 @@ publish() {
   if [[ -z "$explicit_repo" ]] && git rev-parse --git-dir > /dev/null 2>&1 && [[ "$(git rev-parse HEAD)" != "$sha" ]]; then
     echo "${YELLOW}local HEAD differs from the pushed head ${sha:0:9}: the proof is about the pushed one${RESET}" >&2
   fi
-  check_body "$sha"
+  check_body "$sha" "$pr"
   for file in "${ATTACHMENTS[@]+"${ATTACHMENTS[@]}"}"; do
     [[ "$file" == /* && -f "$file" ]] || die "attachment must be an existing absolute path: $file"
   done
   body=$(mktemp -t pr-proof)
-  { echo "$MARKER"; cat "$BODY_FILE"; } > "$body"
+  { echo "$MARKER"; grep -vF -- "$MARKER" "$BODY_FILE"; } > "$body"
   previous=$(previous_proof_ids "$pr")
 
   if (( ${#ATTACHMENTS[@]} == 0 )) && [[ -n "$previous" ]]; then
