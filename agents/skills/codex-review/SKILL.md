@@ -224,7 +224,15 @@ replaces the previous ones (no option: assessed, no gap):
 
 Every option is repeatable. A gap is a fact a reviewer can check, one line, never a grade; leave a
 category out when it has none, error detection included when the diff has no runtime flow.
-Verification is what the `pr-proof` comment will not prove, rollback cost only a real one-way door.
+Verification is what the `pr-proof` comment will not prove: the comment only counts those gaps,
+their text lives once, under "Not verified" in the proof comment. Rollback cost is only a real
+one-way door. A gap already carried by a finding left unfixed is not recorded again: on
+datagouv/apistration#664 an error-detection gap restated the INVALID index finding of the table.
+
+Measure before recording a gap: what can be checked from here (a table size through an aggregate
+query, the deploy order in the repository's deploy config) is checked, and a gap names only what
+could not be. On the same pull request, "production table size not measured" made the risk medium
+when one `pg_total_relation_size` would have settled it.
 The level is computed, never chosen: `high` when a security, P0 or P1 finding ships unfixed (open,
 `intentional` or `deferred`) or rollback cost has a gap; `medium` when any other finding ships unfixed
 (nits, `wrong` and `pre-existing` aside) or any category has a gap; `low` otherwise. Warp's skill

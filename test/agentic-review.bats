@@ -257,14 +257,43 @@ review_branch() {
   assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | wrong (cited): a.txt:5 is never read |"
 }
 
-@test "the comment opens on the merge risk, before the coverage" {
+@test "the comment opens on the merge risk, before the passes" {
   review_branch
 
   agentic_review publish > /dev/null
   comment="$(cat "$STUB_DIR/comment.md")"
   assert_equal "$(sed -n 2,4p "$STUB_DIR/comment.md")" $'### Agentic review\n\n**Merge risk: medium**'
-  assert_contains "$comment" "- Findings: 1 finding neither fixed nor cleared, listed below"
+  assert_not_contains "$comment" "- Findings:"
   assert_contains "$comment" "- Categories not assessed"
+}
+
+@test "a covered head needs no coverage line, a stale one says so" {
+  review_branch
+  agentic_review publish > /dev/null
+  assert_not_contains "$(cat "$STUB_DIR/comment.md")" "Covered"
+
+  sed -i.bak 's/^6$/six/' a.txt && rm a.txt.bak
+  git commit -qam "fixup! Spell five"
+  agentic_review publish > /dev/null
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "Stale: the head commit"
+}
+
+@test "verification gaps are counted, their text is left to the proof comment" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review risk --verification "five is never rendered" --verification "six neither" > /dev/null
+
+  agentic_review publish > /dev/null
+  comment="$(cat "$STUB_DIR/comment.md")"
+  assert_contains "$comment" $'**Merge risk: medium**\n- Verification: 2 gaps, under Not verified in the proof comment'
+  assert_not_contains "$comment" "never rendered"
+}
+
+@test "a decision longer than one sentence is refused" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  run agentic_review finding --kind bug --title "five is wrong" --verdict intentional \
+    --left "$(printf 'because %.0s' {1..30})"
+  assert_equal "$status" 2
+  assert_contains "$output" "at most 200"
 }
 
 @test "a branch with every finding fixed and no gap in any category is a low merge risk" {
@@ -284,7 +313,7 @@ review_branch() {
 
   agentic_review publish > /dev/null
   comment="$(cat "$STUB_DIR/comment.md")"
-  assert_contains "$comment" $'**Merge risk: medium**\n- Alignment: renames five, not in the description\n- Error detection: a.txt errors are swallowed\n\nCovered'
+  assert_contains "$comment" $'**Merge risk: medium**\n- Alignment: renames five, not in the description\n- Error detection: a.txt errors are swallowed\n\n| Pass |'
   assert_not_contains "$comment" "- Impact:"
 }
 
@@ -297,7 +326,7 @@ review_branch() {
   agentic_review finding --kind security --title "leaks five" --left "own ticket" --verdict deferred > /dev/null
   agentic_review publish > /dev/null
   assert_contains "$(cat "$STUB_DIR/comment.md")" "**Merge risk: high**"
-  assert_contains "$(cat "$STUB_DIR/comment.md")" "- Findings: 1 finding neither fixed nor cleared, 1 of them security, P0 or P1"
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| security | leaks five | deferred: own ticket |"
   assert_contains "$(status_calls)" "state=success"
 }
 

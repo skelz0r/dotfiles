@@ -31,6 +31,7 @@ CLEARING_VERDICTS = ["wrong", "pre-existing"]
 RISK_CATEGORIES = [("alignment", "Alignment"), ("impact", "Impact"), ("verification", "Verification"),
                    ("rollback_cost", "Rollback cost"), ("error_detection", "Error detection")]
 STATE_VERSION = 1
+DECISION_MAX_CHARS = 200
 
 DESCRIPTION = """\
 Record the agentic review passes of the current branch and publish them
@@ -343,6 +344,9 @@ def apply_triage(finding, args):
     elif args.left is not None:
         if args.verdict is None:
             raise Failure(f"--left needs --verdict ({', '.join(VERDICTS)})")
+        if len(args.left) > DECISION_MAX_CHARS:
+            raise Failure(f"--left is {len(args.left)} characters, at most {DECISION_MAX_CHARS}: "
+                          "one sentence stating the fact that keeps it, not the whole reasoning")
         finding.update(status="left", reason=args.left, verdict=args.verdict, fix="",
                        proof=checked_proof(finding, args))
     elif args.open:
@@ -438,13 +442,11 @@ def risk_lines(state, result):
     gaps = risk_gaps(state)
     lines = [f"**Merge risk: {merge_risk(state)}**"]
     for key, label in RISK_CATEGORIES:
+        if key == "verification" and gaps.get(key):
+            noun = "gap" if len(gaps[key]) == 1 else "gaps"
+            lines.append(f"- {label}: {len(gaps[key])} {noun}, under Not verified in the proof comment")
+            continue
         lines += [f"- {label}: {cell(gap)}" for gap in gaps.get(key, [])]
-    shipped = [f for f in state["findings"] if shipped_unfixed(f)]
-    if shipped:
-        kept = sum(1 for f in shipped if high_stakes(f))
-        detail = f", {kept} of them security, P0 or P1" if kept else ""
-        noun = "finding" if len(shipped) == 1 else "findings"
-        lines.append(f"- Findings: {len(shipped)} {noun} neither fixed nor cleared{detail}, listed below")
     if risk is None:
         lines.append("- Categories not assessed")
     elif risk.get("digest") != result.get("digest"):
@@ -528,17 +530,15 @@ def unreviewed_scope(state, result):
 
 
 def verdict(result):
-    head = short(result["head"])
     if result["covered"]:
-        review = result["pass"]
-        return (f"Covered: the head commit `{head}` carries the diff {review['label']} "
-                f"read on {short_date(review['at'])}.")
-    return f"Stale: the head commit `{head}` is not covered by any pass."
+        return None
+    return f"Stale: the head commit `{short(result['head'])}` is not covered by any pass."
 
 
 def render(state, result, base):
     passes = {review["id"]: review for review in state["passes"]}
-    lines = [COMMENT_MARKER, "### Agentic review", "", *risk_lines(state, result), "", verdict(result), "",
+    coverage = [verdict(result), ""] if verdict(result) else []
+    lines = [COMMENT_MARKER, "### Agentic review", "", *risk_lines(state, result), "", *coverage,
              "| Pass | When | Scope | Fixed | Left |", "|---|---|---|---|---|"]
     for review in state["passes"]:
         fixed, left = pass_counts(state, review)
