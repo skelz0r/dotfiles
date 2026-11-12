@@ -14,6 +14,11 @@ Domain context you need:
 - <NON-OBVIOUS COUPLING BETWEEN LAYERS>
 - <WHAT PRODUCTION DATA ACTUALLY LOOKS LIKE, IF IT MATTERS>
 
+Scale:
+<HOW OFTEN THIS CODE RUNS IN PRODUCTION, ITS REALISTIC PEAK, WHAT ONE FAILURE COSTS>
+Report only defects reachable at this scale. A race or failure that needs timing or volume this
+code never sees is not a finding: mention it in one line at the end, without severity.
+
 What the change claims to do:
 <PULL REQUEST DESCRIPTION, VERBATIM>
 <LINKED ISSUE (LINEAR OR GITHUB): TITLE, DESCRIPTION, DECISIONS FROM ITS COMMENTS>
@@ -52,6 +57,14 @@ so plainly instead of inventing findings.
 badly. State the invariant the diff is supposed to preserve, in prose. Example: "status X means the
 contact claimed the document is not applicable and the consumer must still arbitrate; it is pending
 consumer work even though no file was uploaded."
+
+**Scale.** Mandatory. Without it Codex reviews against an absolute invariant and reports every
+theoretical violation, each fix opens a surface the next pass attacks, and the code grows mechanisms
+the traffic never needed. On superdocu/app#2302 an INPI client doing a few calls a day, with an
+import firing one job per second at peak, got a Redis NX lock then a Lua compare-and-delete
+against a process stalled past 30 s behind a 5 s HTTP timeout. "A few calls a day, one job per
+second during a CSV import at most, one failure = one extra wrong login" would have kept both out.
+Measure the numbers when you can (job counts, request logs) instead of guessing.
 
 **Focus item 1.** Put a real hypothesis here, not a topic. "Check the SQL" wastes the budget.
 "The subquery joins the table directly while the association applies `active` and `enabled` scopes —

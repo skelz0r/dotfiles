@@ -63,6 +63,8 @@ Read `references/prompt-template.md` and fill it in. Non-negotiable parts:
 
 - **Domain context in prose.** The invariant the diff must preserve, the state machine, what
   production data really looks like. This is the highest-leverage section.
+- **Scale**: how often the code runs, its realistic peak, what one failure costs. Never state the
+  invariant as absolute without it: Codex then hunts theoretical races the traffic never produces.
 - **Focus item 1 is a hypothesis, not a topic.** Put the thing that worries you most, phrased so
   Codex must confirm or refute it with a repro. Include the doubts you cannot resolve yourself —
   especially a divergence you introduced knowingly.
@@ -100,7 +102,7 @@ before Codex, stop it and relaunch.
 
 ### 5. Triage, do not auto-apply
 
-Sort every finding into one of three buckets and say which is which:
+Sort every finding into one of four buckets and say which is which:
 
 - **Regression introduced by this diff** → fix now, with a regression test.
 - **Pre-existing problem the diff merely exposes** → report it, do not silently widen the scope. If
@@ -113,6 +115,14 @@ Sort every finding into one of three buckets and say which is which:
   scenario followed step by step does not reach), `ran` (a small script calling the real code fails
   loud if the fact is false), `reproduced` (in the running app). `agentic-review` refuses a `wrong`
   without that level, and below `ran` on a security, P0 or P1 finding.
+
+- **Real but disproportionate** → before fixing a finding that holds, weigh the fix against the
+  bug at the real scale: how often it happens, what it costs, how much code and how many new
+  mechanisms the fix adds (lock, script, rescheduling, error class). When the fix costs more, leave
+  it as `disproportionate` with the numbers (`agentic-review` refuses a reason without one). A P0,
+  P1 or security finding still waits for a human: ask before fixing it with a new mechanism. On
+  superdocu/app#2302 every finding was fixed in turn, and a client doing a few calls a day ended
+  with an NX lock and a Lua compare-and-delete the user called "rocket science".
 
 When a finding names a class of defect, fix every instance of the class in the diff in the same
 round, not only the line Codex pointed at: otherwise the next pass finds the next instance.
@@ -209,8 +219,9 @@ Record as you go, never reconstruct afterwards:
 - One `finding` per triaged finding, when it is triaged. Kinds: security, bug, product, perf,
   design, test, docs, nit. Keep Codex's severity (`--severity P1`) when it gave one. `--commit` is
   followed through autosquash by its subject.
-- A finding left unfixed carries its verdict: `wrong` (false alarm), `intentional`, `pre-existing`
-  or `deferred` (own ticket). A `wrong` also takes `--proof` and its reason states the fact that
+- A finding left unfixed carries its verdict: `wrong` (false alarm), `intentional`, `pre-existing`,
+  `deferred` (own ticket) or `disproportionate` (real, not worth its fix at this scale; quantified
+  reason). A `wrong` also takes `--proof` and its reason states the fact that
   clears it with the evidence (the `file:line`, the script's output). Be honest with `wrong`: the
   verdicts, read back across pull requests
   from the state in their comments, measure how much of Codex's output is noise at each effort, and
@@ -304,7 +315,8 @@ When the project lets an agent merge without a human, `gate` is the check that d
 ~/.claude/skills/codex-review/scripts/agentic-review gate --require "<CI status the project needs>"
 ```
 
-It exits 0 only when every finding is fixed or cleared as `wrong`, `pre-existing` or `deferred`;
+It exits 0 only when every finding is fixed or cleared as `wrong`, `pre-existing`, `deferred` or
+`disproportionate`;
 none is security (fixed or not), `mitigated`, `product` or `intentional`, nor a P0 or P1 other than
 fixed with `--proof ran` or `reproduced` (a human arbitrates those); no
 rollback cost gap was recorded with `risk` (a one-way door); only

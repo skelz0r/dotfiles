@@ -21,7 +21,7 @@ STATUS_CONTEXT = "Agentic review"
 STATUS_DESCRIPTION_LIMIT = 140
 KINDS = ["security", "bug", "product", "perf", "design", "test", "docs", "nit"]
 SEVERITIES = ["P0", "P1", "P2", "P3"]
-VERDICTS = ["wrong", "intentional", "pre-existing", "deferred"]
+VERDICTS = ["wrong", "intentional", "pre-existing", "deferred", "disproportionate"]
 PROOFS = ["cited", "walked", "ran", "reproduced"]
 EXECUTED_PROOFS = ["ran", "reproduced"]
 HIGH_STAKES_SEVERITIES = ["P0", "P1"]
@@ -74,6 +74,7 @@ examples:
   agentic-review finding --kind bug --severity P1 --title "..." --fixed "..." --commit <sha>
   agentic-review finding --kind security --title "..." --left "own ticket" --verdict pre-existing
   agentic-review finding --id f2 --left "only stale keys: <script output>" --verdict wrong --proof ran
+  agentic-review finding --id f5 --left "at most 1 extra login/hour, a few calls a day" --verdict disproportionate
   agentic-review known
   agentic-review finding --id f3 --fixed "..." --proof ran --at bin/x:12
   agentic-review finding --id f4 --mitigated "..." --at bin/x:12 --question "..." --scenario "..." \
@@ -365,6 +366,10 @@ def apply_triage(finding, args):
         if len(args.left) > DECISION_MAX_CHARS:
             raise Failure(f"--left is {len(args.left)} characters, at most {DECISION_MAX_CHARS}: "
                           "one sentence stating the fact that keeps it, not the whole reasoning")
+        if args.verdict == "disproportionate" and not re.search(r"\d", args.left):
+            raise Failure("--verdict disproportionate needs a quantified --left: how often it happens "
+                          "and what it costs at the real scale, e.g. \"at most 1 extra login per hour, "
+                          "a few calls a day\"")
         finding.update(status="left", reason=args.left, verdict=args.verdict, fix="",
                        proof=checked_proof(finding, args))
     elif args.open:
@@ -917,7 +922,8 @@ def parser():
                         help="how it was fixed only partly; waits for a human, needs --at and the fields below")
     triage.add_argument("--open", action="store_true", help="not triaged yet")
     finding.add_argument("--verdict", choices=VERDICTS,
-                         help="why a left finding stays: wrong (false alarm), intentional, pre-existing, deferred")
+                         help="why a left finding stays: wrong (false alarm), intentional, pre-existing, deferred, "
+                              "disproportionate (real, but the fix costs more than the bug at this scale)")
     finding.add_argument("--proof", choices=PROOFS,
                          help="for --verdict wrong, how far the fact clearing it was proven: cited (file:line), "
                               "walked (failing scenario shown not to reach), ran (script on the real code), "
