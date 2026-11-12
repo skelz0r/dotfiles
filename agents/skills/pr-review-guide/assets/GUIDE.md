@@ -104,6 +104,21 @@ de valeur vides est un intertitre. Sans cible, retirer target. -->
 <Ce qu'on suppose, pourquoi, et qui devra s'adapter si c'est faux.>
 :::
 
+<!-- tab: Flows -->
+<!-- Seulement si la PR change un parcours sur plusieurs écrans ou canaux, ou si plusieurs points d'entrée convergent vers une même logique. Voir « Flows tab » dans references/content.md. -->
+
+## <Parcours de l'utilisateur>
+
+<Ce que fait l'utilisateur, en une phrase ; ce que le schéma montre.>
+
+<!-- diagram: user_journey -->
+
+## <Flux système>
+
+<Les déclencheurs, l'étape commune, ce qui en sort.>
+
+<!-- diagram: system_flow -->
+
 <!-- tab: Design -->
 <!-- Seulement si la PR touche une interface. Voir references/design.md. -->
 

@@ -33,6 +33,10 @@ GUIDE.md syntax, on top of CommonMark:
                      shares and total computed
                      both: a first paragraph made only of bold text is the
                      title, other paragraphs are the caption
+  <!-- diagram: name -->
+                     inline SVG drawn by the function `name` of
+                     diagrams.py (Flows tab); the build fails on a linked
+                     path or line missing at the pinned commit
   ::: flows          side-by-side flows, each a ::: {.flow title="…"} holding
                      a list: one node per item, arrows between them; an item
                      starting with "↓" is an arrow label, [text]{.ok},
@@ -52,6 +56,8 @@ import subprocess
 import sys
 import urllib.parse
 import urllib.request
+
+import diagrams
 
 ROOT = pathlib.Path(__file__).parent
 SOURCE = ROOT / "GUIDE.md"
@@ -636,11 +642,13 @@ def main():
     offset = raw[: len(raw) - len(body)].count("\n") + 1
     labels = {**LABELS.get(meta.get("lang", "fr"), LABELS["fr"]), "lang": meta.get("lang", "fr")}
 
+    body = re.sub(r"^<!-- diagram: (\w+) -->$", r"DIAGRAMSLOT\1", body, flags=re.M)
     check_sources(body, offset)
     links = Links(meta, Source(body, offset))
     ast = json.loads(pandoc(["-f", "commonmark_x", "-t", "json"], body))
     ast["blocks"] = transform(ast["blocks"], links, labels)
     rendered = enhance(pandoc(["-f", "json", "-t", "html5", "--wrap=none"], json.dumps(ast)))
+    rendered = re.sub(r"<p>DIAGRAMSLOT(\w+)</p>", lambda m: diagrams.render(m.group(1), meta), rendered)
 
     parts = re.split(r"^<!-- tab: (.+?) -->\s*$", rendered, flags=re.M)
     intro, tabs = parts[0], list(zip(parts[1::2], parts[2::2]))

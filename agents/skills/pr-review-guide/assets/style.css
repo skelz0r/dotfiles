@@ -225,3 +225,37 @@ footer { border-top: 2px solid var(--primary); padding: 1.5rem 0; font-size: .81
   .paths > .head.first { display: none; }
   .paths > .label { margin-top: .35rem; }
 }
+
+.diagram { overflow-x: auto; margin: 0 0 2rem; border: 1px solid var(--border); border-radius: .5rem; background: #fff; padding: .5rem; }
+.diagram svg { display: block; max-width: none; font-family: var(--font); }
+@media (min-width: 1300px) { .diagram svg { width: 100%; height: auto; } }
+.diagram .lane { fill: var(--surface); stroke: var(--border); }
+.diagram .lane-label { font-size: 12px; font-weight: 700; fill: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.diagram .box { fill: #fff; stroke: #c8d3ec; stroke-width: 1.2; }
+.diagram .box.error { fill: var(--error-bg); stroke: var(--error); }
+.diagram .box.api { fill: var(--primary-lighter); stroke: var(--primary); }
+.diagram .box.store { fill: #eefbf2; stroke: var(--good); }
+.diagram .box.hub { fill: var(--primary-light); stroke: var(--primary-hover); stroke-width: 2; }
+.diagram .box.move { fill: #fff; stroke: var(--primary); stroke-width: 1.6; }
+.diagram .box.copy { fill: #fff; stroke: var(--warning); stroke-width: 1.6; }
+.diagram .box.note { fill: var(--surface-2); stroke: var(--border); stroke-dasharray: 4 3; }
+.diagram .box.wall { fill: var(--warning-bg); stroke: var(--warning); stroke-dasharray: 6 3; }
+.diagram text { font-size: 12.5px; fill: var(--text); }
+.diagram .t { font-weight: 700; font-size: 13.5px; }
+.diagram .s { fill: var(--strong-muted); }
+.diagram .c { font-family: var(--mono); font-size: 11.5px; fill: var(--primary-hover); }
+.diagram .e { font-family: var(--mono); font-size: 11.5px; fill: var(--error); }
+.diagram a text { fill: var(--primary); text-decoration: underline; }
+.diagram a:hover text { fill: var(--primary-hover); }
+.diagram .edge { fill: none; stroke: #8a94a6; stroke-width: 1.6; }
+.diagram .edge.error { stroke: var(--error); }
+.diagram .edge.api { stroke: var(--primary); stroke-dasharray: 5 3; }
+.diagram .edge.move { stroke: var(--primary); stroke-width: 2; }
+.diagram .edge.copy { stroke: var(--warning); stroke-width: 2; }
+.diagram .head { fill: #8a94a6; }
+.diagram .head-error { fill: var(--error); }
+.diagram .head-api, .diagram .head-move { fill: var(--primary); }
+.diagram .head-copy { fill: var(--warning); }
+.diagram .edge-label { font-size: 11.5px; font-style: italic; fill: var(--muted); paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.diagram .edge-label.api, .diagram .edge-label.move { fill: var(--primary); }
+.diagram .edge-label.copy { fill: var(--warning); }

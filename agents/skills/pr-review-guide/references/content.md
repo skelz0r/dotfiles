@@ -64,6 +64,43 @@ the docstring of `build.py`):
   `SELECT`, measured read-only on production and dated, against the
   total.
 
+## Flows tab
+
+Only when the diff gives a flow to draw; otherwise no tab, and nothing said
+about it. Two diagrams, each when its signal fires:
+
+- **User journey**, when the PR adds or changes a journey across several
+  screens, or across channels (web, API, MCP, CLI): what the user does,
+  screen by screen, the checks that can refuse it with their error codes,
+  what gets stored and where it shows up. Other channels go in a side lane
+  converging on the same organizer; a space that must never see the data
+  (the end customer's) gets its own box with the specs proving it.
+- **System flow**, when several entry points converge on shared logic
+  (jobs, organizers, callbacks, webhooks) or a state machine changes: each
+  trigger as a box listing the chain of classes it runs, arrows converging
+  on the shared step, then its branches, the end state the user sees, and
+  the side cases (what does nothing, what deletes). Every branch links the
+  spec that proves it.
+
+On superdocu/app#2304 the user could not tell from the prose whether
+archiving took the verification proofs along; a system flow where three
+triggers converged on `ArchiveValidationProofs`, then split into move and
+copy, answered it at a glance.
+
+Draw them in `diagrams.py` (API and example in its docstring), one
+function per diagram, referenced from GUIDE.md with
+`<!-- diagram: name -->`. Every node names the real class, method or route
+and links it with `d.url(path, line)`: the build checks each one at the
+pinned commit, which is what keeps a diagram from lying. On the same PR,
+the brief said automatic validation went through
+`Consumer::ApproveDocumentsGroup`; reading the code to link it showed
+`System::ApproveDocumentsGroup`. Check every name in the code before
+drawing it, never from a summary. Redraw the diagrams when `sha` moves:
+line anchors drift with the code.
+
+Keep each diagram under ~1200 px wide: wider ones scroll inside their
+frame on a phone, which is acceptable, but must not widen the page.
+
 ## End-to-end tab
 
 Pick one real case that crosses most layers of the change, and follow it
