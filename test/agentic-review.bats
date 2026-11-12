@@ -227,7 +227,7 @@ review_branch() {
   review_branch
 
   agentic_review publish > /dev/null
-  assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | intentional: by design |"
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| f1 | bug | five is wrong | **Waiting for you above.** intentional: by design |"
 }
 
 @test "a finding dismissed as wrong must say how far the fact clearing it was proven" {
@@ -254,7 +254,7 @@ review_branch() {
   agentic_review finding --kind bug --title "five is wrong" --left "a.txt:5 is never read" --verdict wrong --proof cited > /dev/null
 
   agentic_review publish > /dev/null
-  assert_contains "$(cat "$STUB_DIR/comment.md")" "| bug | five is wrong | wrong (cited): a.txt:5 is never read |"
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| f1 | bug | five is wrong | wrong (cited): a.txt:5 is never read |"
 }
 
 @test "the comment opens on the merge risk, before the passes" {
@@ -326,7 +326,7 @@ review_branch() {
   agentic_review finding --kind security --title "leaks five" --left "own ticket" --verdict deferred > /dev/null
   agentic_review publish > /dev/null
   assert_contains "$(cat "$STUB_DIR/comment.md")" "**Merge risk: high**"
-  assert_contains "$(cat "$STUB_DIR/comment.md")" "| security | leaks five | deferred: own ticket |"
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| f1 | security | leaks five | **Waiting for you above.** deferred: own ticket |"
   assert_contains "$(status_calls)" "state=success"
 }
 
@@ -348,4 +348,63 @@ review_branch() {
   run agentic_review gate
   assert_equal "$status" 1
   assert_contains "$output" "rollback cost \"drops the column holding five\": a one-way door waits for a human"
+}
+
+mitigate_five() {
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --mitigated "spelled out in a.txt only" \
+    --at a.txt:5 --question "Is leaving b.txt as is OK?" --scenario "b.txt line 5 still says 5 after a rebase" \
+    --residual "b.txt keeps the digit" --cost "two spellings" --alternative "spell it in b.txt too" "$@"
+}
+
+@test "a P1 whose fix was run no longer waits for a human, one fixed on reasoning alone does" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "five is wrong" --fixed "spelled out" --proof ran > /dev/null
+  agentic_review finding --kind bug --severity P1 --title "six is wrong" --fixed "spelled out" > /dev/null
+  agentic_review publish > /dev/null
+
+  run agentic_review gate
+  assert_not_contains "$output" "five is wrong"
+  assert_contains "$output" "f2 bug P1 \"six is wrong\": P0 and P1 wait for a human unless the fix carries --proof ran or reproduced"
+}
+
+@test "a security finding waits for a human even with a fix that was run" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  agentic_review finding --kind security --title "leaks five" --fixed "masked" --proof ran > /dev/null
+  agentic_review publish > /dev/null
+
+  run agentic_review gate
+  assert_contains "$output" "f1 security \"leaks five\": security waits for a human, fixed or not"
+}
+
+@test "a partial fix is refused without what the human needs to settle it" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+
+  run agentic_review finding --kind bug --severity P1 --title "five is wrong" --mitigated "a.txt only" --at a.txt:5
+  assert_equal "$status" 2
+  assert_contains "$output" "needs --question, --scenario, --residual, --cost, --alternative"
+}
+
+@test "a partial fix waits for a human, on top of the comment, under the id of the findings table" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  mitigate_five > /dev/null
+  agentic_review publish > /dev/null
+  comment="$(cat "$STUB_DIR/comment.md")"
+  head="$(git rev-parse HEAD)"
+
+  assert_contains "$comment" $'#### Waiting for you (1)\n\n**f1 · bug P1 · five is wrong**\nIs leaving b.txt as is OK?\n\n- Scenario: b.txt line 5 still says 5 after a rebase'
+  assert_contains "$comment" "- Fix: [a.txt:5](https://github.com/acme/app/blob/$head/a.txt#L5): spelled out in a.txt only"
+  assert_contains "$comment" $'- Still possible: b.txt keeps the digit\n- Cost: two spellings\n- Alternative: spell it in b.txt too\n\nReply yes to merge as is.\n\n| Pass |'
+  assert_contains "$comment" "| f1 | bug P1 | Codex 1 | five is wrong | **Partly, waiting for you above.** spelled out in a.txt only |"
+  assert_contains "$comment" "**Merge risk: high**"
+}
+
+@test "a partial fix keeps an agent from merging and points to the comment to read" {
+  agentic_review start --reviewer Codex --scope "whole branch" > /dev/null
+  mitigate_five > /dev/null
+  agentic_review publish > /dev/null
+
+  run agentic_review gate
+  assert_equal "$status" 1
+  assert_contains "$output" "f1 bug P1 \"five is wrong\": fixed only partly, the trade-off waits for a human"
+  assert_contains "$output" "Paste in Needs you: https://github.com/acme/app/pull/12#issuecomment-101"
 }

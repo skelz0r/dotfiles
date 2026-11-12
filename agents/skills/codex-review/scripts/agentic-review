@@ -27,6 +27,8 @@ EXECUTED_PROOFS = ["ran", "reproduced"]
 HIGH_STAKES_SEVERITIES = ["P0", "P1"]
 HUMAN_KINDS = ["product"]
 HUMAN_VERDICTS = ["intentional"]
+WAITING_FIELDS = [("question", "--question"), ("scenario", "--scenario"), ("residual", "--residual"),
+                  ("cost", "--cost"), ("alternative", "--alternative")]
 CLEARING_VERDICTS = ["wrong", "pre-existing"]
 RISK_CATEGORIES = [("alignment", "Alignment"), ("impact", "Impact"), ("verification", "Verification"),
                    ("rollback_cost", "Rollback cost"), ("error_detection", "Error detection")]
@@ -46,6 +48,11 @@ A pass covers the head commit when the per-file patch-ids of
 `git diff <merge-base>..HEAD` equal the ones recorded when the pass
 started: a rebase without conflict keeps the coverage, a fix or a
 conflict resolution makes it stale.
+
+A finding fixed only partly is recorded with --mitigated: it always
+waits for a human, with the question to settle, a concrete scenario,
+the fix location, what is still possible, the cost and the
+alternative, shown on top of the comment under "Waiting for you".
 
 The status is failure while a finding is not triaged, or a security,
 P0 or P1 finding is left unfixed as intentional; otherwise
@@ -68,7 +75,9 @@ examples:
   agentic-review finding --kind security --title "..." --left "own ticket" --verdict pre-existing
   agentic-review finding --id f2 --left "only stale keys: <script output>" --verdict wrong --proof ran
   agentic-review known
-  agentic-review finding --id f3 --fixed "..."
+  agentic-review finding --id f3 --fixed "..." --proof ran --at bin/x:12
+  agentic-review finding --id f4 --mitigated "..." --at bin/x:12 --question "..." --scenario "..." \
+      --residual "..." --cost "..." --alternative "..."
   agentic-review decision --axis "..." --problem "..." --decision kept --why "..."
   agentic-review risk --rollback-cost "drops column x" --error-detection "sync rescues every error"
   agentic-review check
@@ -339,8 +348,17 @@ def command_start(args):
 
 
 def apply_triage(finding, args):
+    for field, _ in WAITING_FIELDS + [("at", "--at")]:
+        if getattr(args, field) is not None:
+            finding[field] = getattr(args, field)
     if args.fixed is not None:
-        finding.update(status="fixed", fix=args.fixed, reason="")
+        finding.update(status="fixed", fix=args.fixed, reason="", proof=args.proof or "")
+    elif args.mitigated is not None:
+        missing = [flag for field, flag in WAITING_FIELDS + [("at", "--at")] if not finding.get(field)]
+        if missing:
+            raise Failure(f"--mitigated waits for a human and needs {', '.join(missing)}: "
+                          "the reader must settle it from the comment alone")
+        finding.update(status="mitigated", fix=args.mitigated, reason="", proof="")
     elif args.left is not None:
         if args.verdict is None:
             raise Failure(f"--left needs --verdict ({', '.join(VERDICTS)})")
@@ -353,8 +371,8 @@ def apply_triage(finding, args):
         finding.update(status="open", fix="", reason="")
     if args.verdict is not None and args.left is None:
         raise Failure("--verdict goes with --left")
-    if args.proof is not None and args.verdict != "wrong":
-        raise Failure("--proof goes with --verdict wrong")
+    if args.proof is not None and args.verdict != "wrong" and args.fixed is None:
+        raise Failure("--proof goes with --fixed or --verdict wrong")
     if args.commit:
         finding["commit"] = commit_reference(args.commit)
 
@@ -417,7 +435,35 @@ def command_risk(args):
     print(merge_risk(state))
 
 
+def fix_proven(finding):
+    return finding["status"] == "fixed" and finding.get("proof") in EXECUTED_PROOFS
+
+
+def waits_for_human(finding):
+    if finding["status"] == "mitigated":
+        return True
+    if finding["kind"] in HUMAN_KINDS or finding.get("verdict") in HUMAN_VERDICTS:
+        return True
+    if finding["kind"] == "security":
+        return True
+    return finding.get("severity") in HIGH_STAKES_SEVERITIES and not fix_proven(finding)
+
+
+def human_reason(finding):
+    if finding["status"] == "mitigated":
+        return "fixed only partly, the trade-off waits for a human"
+    if finding["kind"] in HUMAN_KINDS or finding.get("verdict") in HUMAN_VERDICTS:
+        return "a product or intentional choice waits for a human"
+    if finding["kind"] == "security":
+        return "security waits for a human, fixed or not"
+    if finding["status"] == "fixed":
+        return f"P0 and P1 wait for a human unless the fix carries --proof {' or '.join(EXECUTED_PROOFS)}"
+    return "P0 and P1 left unfixed wait for a human"
+
+
 def shipped_unfixed(finding):
+    if finding["status"] == "mitigated":
+        return True
     if finding["status"] == "fixed" or finding["kind"] == "nit":
         return False
     return finding["status"] == "open" or finding.get("verdict") not in CLEARING_VERDICTS
@@ -535,10 +581,61 @@ def verdict(result):
     return f"Stale: the head commit `{short(result['head'])}` is not covered by any pass."
 
 
-def render(state, result, base):
+def location_link(location, repo, head):
+    if not location:
+        return ""
+    path, _, line = location.partition(":")
+    if not repo:
+        return f"`{location}`"
+    anchor = f"#L{line}" if line else ""
+    return f"[{location}](https://github.com/{repo}/blob/{head}/{path}{anchor})"
+
+
+def heading(finding):
+    return f"{finding['id']} · {kind_cell(finding)} · {cell(finding['title'])}"
+
+
+def waiting_block(finding, repo, head):
+    lines = [f"**{heading(finding)}**"]
+    if finding.get("question"):
+        lines.append(cell(finding["question"]))
+    lines.append("")
+    if finding.get("scenario"):
+        lines.append(f"- Scenario: {cell(finding['scenario'])}")
+    fix = finding.get("fix") or finding.get("reason")
+    if fix:
+        at = location_link(finding.get("at"), repo, head)
+        lines.append(f"- Fix: {at + ': ' if at else ''}{cell(fix)}")
+    for field, label in (("residual", "Still possible"), ("cost", "Cost"), ("alternative", "Alternative")):
+        if finding.get(field):
+            lines.append(f"- {label}: {cell(finding[field])}")
+    return lines
+
+
+def waiting_lines(state, repo, head):
+    waiting = sorted_findings([f for f in state["findings"] if f["status"] != "open" and waits_for_human(f)])
+    if not waiting:
+        return []
+    lines = [f"#### Waiting for you ({len(waiting)})", ""]
+    for finding in waiting:
+        lines += [*waiting_block(finding, repo, head), ""]
+    return lines + ["Reply yes to merge as is.", ""]
+
+
+def fix_cell(finding, base):
+    text = with_commit(finding["fix"], finding.get("commit"), base)
+    if finding["status"] == "mitigated":
+        return f"**Partly, waiting for you above.** {text}"
+    if waits_for_human(finding):
+        return f"**Waiting for you above.** {text}"
+    return text
+
+
+def render(state, result, base, repo=None):
     passes = {review["id"]: review for review in state["passes"]}
     coverage = [verdict(result), ""] if verdict(result) else []
     lines = [COMMENT_MARKER, "### Agentic review", "", *risk_lines(state, result), "", *coverage,
+             *waiting_lines(state, repo, result["head"]),
              "| Pass | When | Scope | Fixed | Left |", "|---|---|---|---|---|"]
     for review in state["passes"]:
         fixed, left = pass_counts(state, review)
@@ -548,11 +645,14 @@ def render(state, result, base):
         head_date = git("log", "-1", "--format=%cI", "HEAD").strip()
         lines.append(f"| Not reviewed | {short_date(head_date)} | {unreviewed_scope(state, result)} | | |")
 
-    left = sorted_findings([f for f in state["findings"] if f["status"] != "fixed"])
+    left = sorted_findings([f for f in state["findings"] if f["status"] in ("open", "left")])
     if left:
-        lines += ["", "#### Left unfixed", "", "| Kind | Finding | Decision |", "|---|---|---|"]
+        lines += ["", "#### Left unfixed", "", "| # | Kind | Finding | Decision |", "|---|---|---|---|"]
         for finding in left:
-            lines.append(f"| {kind_cell(finding)} | {cell(finding['title'])} | {cell(left_decision(finding))} |")
+            decision = left_decision(finding)
+            if finding["status"] == "left" and waits_for_human(finding):
+                decision = f"**Waiting for you above.** {decision}"
+            lines.append(f"| {finding['id']} | {kind_cell(finding)} | {cell(finding['title'])} | {cell(decision)} |")
 
     if state["decisions"]:
         lines += ["", "#### Design decisions", "", "| Axis | Problem | Decision | Why |", "|---|---|---|---|"]
@@ -561,13 +661,16 @@ def render(state, result, base):
                          f"| {with_commit(decision['decision'], decision.get('commit'), base)} "
                          f"| {cell(decision['why'])} |")
 
-    fixed = sorted_findings([f for f in state["findings"] if f["status"] == "fixed"])
+    fixed = sorted_findings([f for f in state["findings"] if f["status"] in ("fixed", "mitigated")])
     if fixed:
-        lines += ["", "<details>", f"<summary>Fixed findings ({len(fixed)})</summary>", "",
-                  "| Kind | Pass | Finding | Fix |", "|---|---|---|---|"]
+        partly = sum(1 for f in fixed if f["status"] == "mitigated")
+        summary = f"Fixed findings ({len(fixed)})" if not partly else \
+            f"Fixed findings ({len(fixed)}: {len(fixed) - partly} fixed, {partly} partly)"
+        lines += ["", "<details>", f"<summary>{summary}</summary>", "",
+                  "| # | Kind | Pass | Finding | Fix |", "|---|---|---|---|---|"]
         for finding in fixed:
-            lines.append(f"| {kind_cell(finding)} | {cell(passes[finding['pass']]['label'])} "
-                         f"| {cell(finding['title'])} | {with_commit(finding['fix'], finding.get('commit'), base)} |")
+            lines.append(f"| {finding['id']} | {kind_cell(finding)} | {cell(passes[finding['pass']]['label'])} "
+                         f"| {cell(finding['title'])} | {fix_cell(finding, base)} |")
         lines += ["", "</details>"]
 
     lines += ["", state_to_marker(state), ""]
@@ -593,8 +696,9 @@ def status_description(state, result):
         groups[name] = groups.get(name, 0) + 1
     reviewers = ", ".join(f"{name} x{count}" for name, count in groups.items())
     fixed = sum(1 for f in state["findings"] if f["status"] == "fixed")
-    left = len(state["findings"]) - fixed
-    text = f"{reviewers}: {fixed} fixed, {left} not fixed"
+    partly = sum(1 for f in state["findings"] if f["status"] == "mitigated")
+    left = len(state["findings"]) - fixed - partly
+    text = f"{reviewers}: {fixed} fixed, {f'{partly} partly, ' if partly else ''}{left} not fixed"
     if not result["covered"]:
         noun = "file" if len(result["changed"]) == 1 else "files"
         text = f"Stale: {len(result['changed'])} {noun} unreviewed, a pass is due. {text}"
@@ -640,10 +744,8 @@ def gate_reasons(state, pull, result, required):
         label = f"{finding['id']} {kind_cell(finding)} \"{finding['title']}\""
         if finding["status"] == "open":
             reasons.append(f"{label}: not triaged")
-        if high_stakes(finding):
-            reasons.append(f"{label}: security, P0 and P1 wait for a human")
-        if finding["kind"] in HUMAN_KINDS or finding.get("verdict") in HUMAN_VERDICTS:
-            reasons.append(f"{label}: a product or intentional choice waits for a human")
+        elif waits_for_human(finding):
+            reasons.append(f"{label}: {human_reason(finding)}")
         if finding["pass"] != first_pass:
             reasons.append(f"{label}: raised after the first pass, the fixes did not converge")
     for gap in risk_gaps(state).get("rollback_cost", []):
@@ -674,6 +776,9 @@ def command_gate(args):
         print(f"#{pull['number']} waits for a human:")
         for reason in dict.fromkeys(reasons):
             print(f"  - {reason}")
+        url = state.get("published", {}).get("comment_url")
+        if url:
+            print(f"Paste in Needs you: {url}")
         return 1
     print(f"#{pull['number']} can be merged without a human: every finding is fixed or cleared, "
           "the fixes passed a confirmation pass, the checks are green")
@@ -687,8 +792,9 @@ def command_show(args):
         return 0
     if not state["passes"]:
         raise Failure("no pass recorded")
-    base = resolve_base(args, find_pull_request(args.pr))
-    print(render(state, coverage(state, base), base))
+    pull = find_pull_request(args.pr)
+    base = resolve_base(args, pull)
+    print(render(state, coverage(state, base), base, pull["repo"] if pull else None))
     return 0
 
 
@@ -697,6 +803,8 @@ def command_known(args):
     for finding in state["findings"]:
         if finding["status"] == "fixed":
             print(f"- fixed: {finding['title']} ({finding['fix']})")
+        elif finding["status"] == "mitigated":
+            print(f"- fixed partly: {finding['title']} ({finding['fix']}; still possible: {finding['residual']})")
         elif finding["status"] == "left":
             print(f"- left as {left_decision(finding)}: {finding['title']}")
     return 0
@@ -744,7 +852,7 @@ def command_publish(args):
     notify = previous_status in ("success", "pending") and status == "failure"
 
     state["published"] = {**state.get("published", {}), "status": status, "sha": head, "at": now_iso()}
-    body = render(state, result, base)
+    body = render(state, result, base, pull["repo"])
     if len(body) > COMMENT_LIMIT:
         raise Failure(f"comment of {len(body)} characters exceeds GitHub's limit of {COMMENT_LIMIT}: "
                       "shorten the titles, fixes and reasons, or split the findings across pull requests")
@@ -805,13 +913,23 @@ def parser():
     triage = finding.add_mutually_exclusive_group()
     triage.add_argument("--fixed", metavar="FIX", help="how it was fixed")
     triage.add_argument("--left", metavar="DECISION", help="why it stays unfixed")
+    triage.add_argument("--mitigated", metavar="FIX",
+                        help="how it was fixed only partly; waits for a human, needs --at and the fields below")
     triage.add_argument("--open", action="store_true", help="not triaged yet")
     finding.add_argument("--verdict", choices=VERDICTS,
                          help="why a left finding stays: wrong (false alarm), intentional, pre-existing, deferred")
     finding.add_argument("--proof", choices=PROOFS,
                          help="for --verdict wrong, how far the fact clearing it was proven: cited (file:line), "
                               "walked (failing scenario shown not to reach), ran (script on the real code), "
-                              "reproduced (in the running app); ran or reproduced for security, P0 and P1")
+                              "reproduced (in the running app); ran or reproduced for security, P0 and P1. "
+                              "With --fixed, how the fix was proven: a P0 or P1 fixed with ran or reproduced "
+                              "no longer waits for a human")
+    finding.add_argument("--at", metavar="FILE:LINE", help="where the fix lives, linked at the head commit")
+    finding.add_argument("--question", help="for a finding waiting for a human, what to settle, in one line")
+    finding.add_argument("--scenario", help="a concrete failing example, not an abstract description")
+    finding.add_argument("--residual", help="what the partial fix still lets happen")
+    finding.add_argument("--cost", help="what the fix costs")
+    finding.add_argument("--alternative", help="the other way, with its trade-off")
     finding.add_argument("--commit", help="commit holding the fix, followed through autosquash by subject")
 
     decision = add("decision", "record a design decision, print its id", command_decision)

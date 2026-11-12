@@ -197,8 +197,11 @@ Record as you go, never reconstruct afterwards:
 ```bash
 ~/.claude/skills/codex-review/scripts/agentic-review start --reviewer Codex --effort xhigh --scope "whole branch, focus on <hypothesis>"
 ~/.claude/skills/codex-review/scripts/agentic-review finding --kind bug --severity P1 --title "<defect, one line>" --open
-~/.claude/skills/codex-review/scripts/agentic-review finding --id f1 --fixed "<the fix>" --commit <fixup sha>
+~/.claude/skills/codex-review/scripts/agentic-review finding --id f1 --fixed "<the fix>" --commit <fixup sha> --proof ran --at <file:line>
 ~/.claude/skills/codex-review/scripts/agentic-review finding --id f2 --left "<why it stays>" --verdict pre-existing
+~/.claude/skills/codex-review/scripts/agentic-review finding --id f3 --mitigated "<what the fix does>" --at <file:line> \
+  --question "<what to settle, one line>" --scenario "<a concrete failing example>" \
+  --residual "<what can still happen>" --cost "<what the fix costs>" --alternative "<the other way>"
 ```
 
 - `start` right before running Codex: it snapshots the diff the pass reads (per-file patch-ids of
@@ -213,6 +216,15 @@ Record as you go, never reconstruct afterwards:
   from the state in their comments, measure how much of Codex's output is noise at each effort, and
   are the only evidence to move the effort ladder above or the size threshold of
   `manual-review-pr`.
+- A fix that only narrows the defect is `--mitigated`, never `--fixed`: it always waits for a
+  human, and the comment opens on it under "Waiting for you", with the question to settle. On
+  local_events#382, a patch-id collision made unlikely by a wider context was first recorded
+  `--fixed`: a lighter gate would have merged it with nobody seeing the trade-off.
+- Write `--scenario` as an example a reader follows without the code: on the same pull request, "the
+  same edit at another spot with identical context reuses a green fingerprint" left the user asking
+  what f2 was about; two blocks A and B, the edit moved from A to B, same key, iOS skipped, did not.
+- `--fixed` takes `--proof` too: how the fix was seen working. A P0 or P1 fixed with `ran` or
+  `reproduced` no longer waits for a human; on reasoning alone it does.
 - Other passes use the same commands: `--reviewer "Claude code-review" --effort max` for
   `/code-review`, and `decision --axis --problem --decision --why [--commit]` for a design pass,
   where "kept" is a valid decision and the why quotes the author when they settled it.
@@ -293,9 +305,11 @@ When the project lets an agent merge without a human, `gate` is the check that d
 ```
 
 It exits 0 only when every finding is fixed or cleared as `wrong`, `pre-existing` or `deferred`;
-none is security, P0, P1, `product` or `intentional` (a human arbitrates those, fixed or not); no
+none is security (fixed or not), `mitigated`, `product` or `intentional`, nor a P0 or P1 other than
+fixed with `--proof ran` or `reproduced` (a human arbitrates those); no
 rollback cost gap was recorded with `risk` (a one-way door); only
 the first pass raised findings, so the confirmation pass on the fixes found nothing; the status is
 published and covers the head; and every check of the pull request is green. Otherwise it lists
-what waits for a human. A stale status blocks it even after a one-line fix: run the short
+what waits for a human, then the comment URL: paste it as is in "Needs you", the "Waiting for
+you" section there is what the user reads to decide. A stale status blocks it even after a one-line fix: run the short
 confirmation pass instead of leaving it stale.
