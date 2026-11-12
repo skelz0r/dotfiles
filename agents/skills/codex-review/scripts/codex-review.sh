@@ -19,6 +19,7 @@ if [[ -n "$OWN_ROOT" && "$OWN_ROOT" == "$CURRENT_ROOT" ]]; then
 fi
 
 [[ -r "$PROMPT_FILE" ]] || { echo "prompt file not readable: $PROMPT_FILE" >&2; exit 1; }
+[[ -s "$PROMPT_FILE" ]] || { echo "prompt file is empty: $PROMPT_FILE (write it before launching, not in the same background command)" >&2; exit 1; }
 
 exec codex exec \
   --sandbox read-only \

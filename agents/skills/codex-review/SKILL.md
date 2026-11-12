@@ -90,6 +90,14 @@ skill: both refuse to run inside the repository that holds them.
 Run it in the background — `xhigh` takes minutes. The report is the last block of stdout, printed
 twice (streamed, then as the final message).
 
+Write the prompt file with the file-writing tool first, pasting in the output of
+`agentic-review known` for a later pass, and launch only the scripts in the background command,
+with `</dev/null`. Never build the prompt in a heredoc inside that background command: one such
+pass sat 80 minutes on an empty prompt file, `cat` waiting on a heredoc that never reached it, with
+no Codex process started. The script refuses an empty prompt file. Within a minute of launching,
+check that a `codex exec` process runs (`pgrep -fl 'codex exec'`); if none, the launch is stuck
+before Codex, stop it and relaunch.
+
 ### 5. Triage, do not auto-apply
 
 Sort every finding into one of three buckets and say which is which:
