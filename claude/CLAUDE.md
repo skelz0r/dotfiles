@@ -192,6 +192,12 @@ cannot see.
   Artifact: the URL is what gets shared
 - Unreleased feature: publish behind a password
 
+## Meetings
+
+- Meeting notes and transcripts recorded with muesli live in
+  `~/share/meetings/` (`YYYY-MM-DD-<source>[-N].md`), not in Granola:
+  look there first when asked about a meeting
+
 ## Screenshots / screencasts
 
 * When referencing, located within ~/share/screenshots/
