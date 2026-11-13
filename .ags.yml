@@ -6,3 +6,8 @@ jobs:
     catch_up: 1h
     precheck: bin/cve-watch
     prompt_file: .ags/cve-watch.md
+
+  ags-doctor:
+    schedule: "30 9 * * 1-5"
+    precheck: bin/ags-doctor-watch
+    prompt_file: .ags/ags-doctor.md

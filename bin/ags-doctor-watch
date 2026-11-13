@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: ags-doctor-watch [-h|--help]
+
+ags precheck: run `ags doctor` and print its failing checks as JSON.
+Exit 0 when some check fails and this set of failures was not handed
+over yet, exit 1 with a reason on stdout otherwise. The handed-over set
+is kept in $AGS_JOB_STATE_DIR, so a failure ags doctor keeps listing
+(a precheck crash stays 7 days) is not handed over twice.
+USAGE
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  "") ;;
+  *) usage >&2; exit 2 ;;
+esac
+
+command -v ags >/dev/null || { echo "ags not installed" >&2; exit 2; }
+command -v jq >/dev/null || { echo "jq not installed" >&2; exit 2; }
+
+report=$(ags doctor --json || true)
+failures=$(jq -c '[.data[] | select(.ok == false)]' <<<"$report")
+
+if [[ "$failures" == "[]" ]]; then
+  echo "ags doctor: every check passes"
+  exit 1
+fi
+
+state_dir="${AGS_JOB_STATE_DIR:-$HOME/.local/state/ags-doctor-watch}"
+seen_file="$state_dir/handed-over.json"
+if [[ -f "$seen_file" && "$(cat "$seen_file")" == "$failures" ]]; then
+  echo "ags doctor: same failures as the last run, already handed over"
+  exit 1
+fi
+
+mkdir -p "$state_dir"
+printf '%s\n' "$failures" > "$seen_file"
+jq . <<<"$failures"
