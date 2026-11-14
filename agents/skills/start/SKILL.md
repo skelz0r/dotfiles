@@ -30,8 +30,8 @@ inside the other inherits its variable, so herdr is checked first):
 - `$TMUX` set: tmux. The tab is a window of the caller's session.
 - neither: no tab can be opened. Run the setup script from this session,
   then hand the user the command to launch the new session themselves
-  (`cd <worktree path> && dclaude "$(cat <brief file>)"`), and skip
-  step 5.
+  (`cd <worktree path> && dclaude "$(cat <brief file>)"`), skip the
+  polling of step 5 but still post the inbox item.
 
 ## Steps
 
@@ -92,6 +92,17 @@ inside the other inherits its variable, so herdr is checked first):
    - the expected outcome: atomic commits, PR against the base branch,
      or direct push for internal tooling as the global CLAUDE.md
      allows — unless the user asked for something else;
+   - the inbox item of the topic (step 5): its key, and the instruction
+     to load the `navette-inbox` skill and update that key when the work
+     ends, before handing back:
+     - PR opened, with its two proofs below: `--status waiting`, `--link`
+       to the PR, description "à relire et merger, puis `/cleanup`". The
+       session never runs `/cleanup` itself on a pull request: it would
+       merge it before the user's review;
+     - internal tooling pushed directly: run `/cleanup` right away, which
+       archives the item;
+     - blocked on the user: `--status waiting`, what is expected in the
+       first line;
    - for every pull request, whatever its kind (feature, bugfix,
      cleanup, refactoring), two proofs once the code is finished and
      pushed, before handing back: an agentic review through the
@@ -152,7 +163,24 @@ inside the other inherits its variable, so herdr is checked first):
 
    On failure, show the error and stop: do not retry blindly.
 
+   Once the session runs, post the topic to the navette inbox (load the
+   `navette-inbox` skill), so it is not lost until `/cleanup` archives
+   it. The key is the one written in the brief, computed from the real
+   worktree path the setup created, since scripts may normalize the
+   name; `/cleanup` derives the same key on its own:
+
+   ```bash
+   KEY="worktree:$(basename "$PRIMARY_ROOT"):$(basename "<worktree path>")"
+   navette post --key "$KEY" --type <feature|bugfix|…> --title "<topic>" \
+     --description "<one or two lines of the brief>" --status info
+   ```
+
+   Write the key into the brief before launching (step 3): it only
+   depends on the worktree name, so derive it from the name the setup
+   script will produce, and check it against the real path here.
+
 ## Report
 
-Tab name, worktree name, path and branch, then two or three lines on what the
-brief asks and which points were left to the new session's judgment.
+Tab name, worktree name, path and branch, inbox item URL, then two or
+three lines on what the brief asks and which points were left to the
+new session's judgment.
