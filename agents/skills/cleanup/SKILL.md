@@ -150,7 +150,24 @@ PR's media and of the tab.
    attached before the manifest existed are not tracked: leave them.
    Never run it when step 3 or 4 stopped the cleanup.
 
-8. Always close the tab of the worktree if it exists, whichever way
+8. Update the topic's item in the navette inbox (load the
+   `navette-inbox` skill) before closing any tab, since step 9 may end
+   this session. `/start` posted it under a key derived from the
+   primary checkout and the worktree directory:
+
+   ```bash
+   KEY="worktree:$(basename "$PRIMARY_ROOT"):$(basename <worktree path>)"
+   navette post --key "$KEY" --type cleanup --title "<PR title>" \
+     --description "<what was removed, PR merged>" --link <PR url> --status done
+   ```
+
+   `--type` and `--title` create the item when the worktree predates
+   this convention. When step 3 or 4 stopped the cleanup, post
+   `--status waiting` instead, with what blocks (missing review, open
+   findings, unpublished commits) in the first line: the item must not
+   look archived while the worktree is still there.
+
+9. Always close the tab of the worktree if it exists, whichever way
    step 5 went. Detect the multiplexer like `/start`: herdr when
    `HERDR_ENV=1`, else tmux when `$TMUX` is set, else there is no tab
    to close.
@@ -181,5 +198,5 @@ PR's media and of the tab.
 
 One line per step: PR state (and rebase/merge done in step 3), worktree
 removed, branch deleted, databases dropped, orphan databases dropped,
-media trashed (counts from `gh-media-log`), tab closed (or why each one
-was skipped).
+media trashed (counts from `gh-media-log`), inbox item archived, tab
+closed (or why each one was skipped).
