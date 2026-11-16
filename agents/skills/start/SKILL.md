@@ -92,8 +92,13 @@ inside the other inherits its variable, so herdr is checked first):
    - the expected outcome: atomic commits, PR against the base branch,
      or direct push for internal tooling as the global CLAUDE.md
      allows — unless the user asked for something else;
-   - the inbox item of the topic (step 5): its key, and the instruction
-     to load the `navette-inbox` skill and update that key when the work
+   - the inbox item of the topic (step 5): its key, type and title, and
+     the instruction to load the `navette-inbox` skill, then, as the
+     very first step, repost that key from the new session with the
+     same `--type` and `--title` and `--status info`. That repost
+     attaches the session link and the pane to the new session (the
+     item step 5 posts carries neither), and creates the item if the
+     new session gets there first. Then update that key when the work
      ends, before handing back:
      - PR opened, with its two proofs below: `--status waiting`, `--link`
        to the PR, description "à relire et merger, puis `/cleanup`". The
@@ -167,13 +172,24 @@ inside the other inherits its variable, so herdr is checked first):
    `navette-inbox` skill), so it is not lost until `/cleanup` archives
    it. The key is the one written in the brief, computed from the real
    worktree path the setup created, since scripts may normalize the
-   name; `/cleanup` derives the same key on its own:
+   name; `/cleanup` derives the same key on its own.
+
+   Post it without this session's context: navette reads the session
+   link from `CLAUDE_CODE_BRIDGE_SESSION_ID` and the pane where actions
+   come back from `HERDR_PANE_ID`, and both would point at this session
+   instead of the new one. The new session reposts the key first thing
+   (step 3) and takes them over; a post without them never erases them,
+   so the order does not matter:
 
    ```bash
    KEY="worktree:$(basename "$PRIMARY_ROOT"):$(basename "<worktree path>")"
-   navette post --key "$KEY" --type <feature|bugfix|…> --title "<topic>" \
+   env -u CLAUDE_CODE_BRIDGE_SESSION_ID -u HERDR_PANE_ID \
+     navette post --key "$KEY" --type <feature|bugfix|…> --title "<topic>" \
      --description "<one or two lines of the brief>" --status info
    ```
+
+   Never `--option` on this post: its actions would have no pane to go
+   back to.
 
    Write the key into the brief before launching (step 3): it only
    depends on the worktree name, so derive it from the name the setup
