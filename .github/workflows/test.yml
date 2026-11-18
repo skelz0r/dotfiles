@@ -8,11 +8,19 @@ on:
 jobs:
   dotfiles-test:
     runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
       - name: Install test tooling
-        run: brew install bats-core shellcheck neovim
+        run: |
+          brew install bats-core shellcheck neovim
+          gem install --no-document rubocop rspec
       - name: Run lint, smoke and behaviour suites
         run: bin/dotfiles-test
