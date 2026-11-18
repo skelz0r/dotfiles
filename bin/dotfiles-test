@@ -41,10 +41,13 @@ Suites:
 
 Options:
   -v, --verbose   Show the output of every bats test, not only failures
+  -j, --jobs N    Run N bats tests at once (default: CPU count, or
+                  DOTFILES_TEST_JOBS; 1 without GNU parallel)
   -h, --help      Show this help message
 
 Requires bats-core and shellcheck (brew bundle), python3, and the
-rubocop and rspec gems.
+rubocop and rspec gems. GNU parallel (brew bundle) runs the bats tests
+concurrently: most of their time is spent waiting.
 EOF
   exit 0
 }
@@ -56,11 +59,15 @@ success() { echo -e "${GREEN}[OK]${NC} $*"; }
 section() { echo -e "\n${BLUE}==> $*${NC}"; }
 
 VERBOSE=false
+JOBS="${DOTFILES_TEST_JOBS:-}"
 SUITES=()
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     -v|--verbose) VERBOSE=true; shift ;;
+    -j|--jobs)
+      [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] || { error "--jobs needs a positive number"; exit 1; }
+      JOBS="$2"; shift 2 ;;
     -h|--help) usage ;;
     lint|smoke|tests) SUITES+=("$1"); shift ;;
     *) error "Unknown suite or option: $1 (use --help)"; exit 1 ;;
@@ -85,6 +92,20 @@ require python3 "brew install python"
 
 bats_args=()
 $VERBOSE && bats_args+=(--verbose-run)
+
+cpu_count() {
+  getconf _NPROCESSORS_ONLN 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 1
+}
+
+if command -v parallel > /dev/null; then
+  JOBS="${JOBS:-$(cpu_count)}"
+elif [[ "${JOBS:-1}" -gt 1 ]]; then
+  warn "GNU parallel is missing (brew install parallel): bats runs serially"
+  JOBS=1
+fi
+if [[ "${JOBS:-1}" -gt 1 ]]; then
+  bats_args+=(--jobs "$JOBS")
+fi
 
 FAILED=()
 

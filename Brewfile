@@ -40,6 +40,7 @@ brew "awscli"
 brew "azure-cli"
 brew "base64"
 brew "bats-core"
+brew "parallel"
 brew "bdw-gc"
 brew "boost@1.85"
 brew "bzip2", link: true
