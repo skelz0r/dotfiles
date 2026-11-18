@@ -45,7 +45,8 @@ cannot see.
 | No read under `secrets/`, no `git-crypt unlock`/`export-key` | Claude Code PreToolUse hook `~/dotfiles/claude/hooks/block-secrets.sh` (not Codex) | Secrets section: scripts, recursive greps, globs |
 | No read under `pii/` | same hook | Personal data section: what goes there, aggregates only |
 | No push to a branch whose ruleset requires a PR; refused too when `gh` cannot tell | git `pre-push` in `~/dotfiles/git-hooks`; its bypasses (`--no-verify`, `commit -n`, `core.hooksPath`) blocked by PreToolUse hook `~/dotfiles/claude/hooks/block-hook-bypass.sh` (not Codex) | a push GitHub accepts with a bypass warning is not allowed; `--no-verify` is mine alone |
-| No `is_a?` / `respond_to?` | RuboCop cop `config/rubocop/duck_typing.rb` of dotfiles, only where copied | Ruby section |
+| No `is_a?` / `respond_to?` | RuboCop cop `Custom/DuckTyping` of `~/dotfiles/config/rubocop`, loaded by `RUBOCOP_OPTS`, only in projects that enable it | Ruby section |
+| No comments in Ruby, no fixed `sleep` in specs | `Custom/NoComments`, `Custom/NoFixedSleep`, same opt-in, per-file quota lowered by `rubocop-ratchet` | comments outside Ruby (ERB, JS) |
 
 ## Code Style
 

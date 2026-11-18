@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+return if defined?(RuboCop::Cop::Custom::DuckTyping)
+
 module RuboCop
   module Cop
     module Custom

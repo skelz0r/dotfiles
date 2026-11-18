@@ -36,13 +36,15 @@ Suites:
   tests     behaviour tests: install.sh, migration, upload-assets prepare,
             gh-media-log, tidy-commits, agentic-review, block-secrets,
             block-hook-bypass, git-hooks, herdr-dispatch, cve-watch,
-            ci-slot
+            ci-slot, rubocop-ratchet and the opt-in of the global
+            RuboCop cops; specs of the cops (rspec)
 
 Options:
   -v, --verbose   Show the output of every bats test, not only failures
   -h, --help      Show this help message
 
-Requires bats-core and shellcheck (brew bundle) and python3.
+Requires bats-core and shellcheck (brew bundle), python3, and the
+rubocop and rspec gems.
 EOF
   exit 0
 }
@@ -112,6 +114,16 @@ run_python_tests() {
   fi
 }
 
+run_rubocop_cop_specs() {
+  section "rubocop cops (rspec)"
+  require rspec "gem install rspec rubocop"
+  if rspec test/rubocop; then
+    success "rubocop cops"
+  else
+    FAILED+=("rubocop cops")
+  fi
+}
+
 for suite in "${SUITES[@]}"; do
   case $suite in
     lint)
@@ -128,6 +140,7 @@ for suite in "${SUITES[@]}"; do
     tests)
       run_bats "behaviour (bats)" test/*.bats
       run_python_tests
+      run_rubocop_cop_specs
       ;;
   esac
 done

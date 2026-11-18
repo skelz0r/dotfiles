@@ -13,3 +13,9 @@ if [ -z "$SSH_AUTH_SOCK" ]; then
   fi
   unset local_agent_status
 fi
+
+rubocop_custom_cops="$HOME/dotfiles/config/rubocop/custom.rb"
+if [ -r "$rubocop_custom_cops" ] && [[ "$RUBOCOP_OPTS" != *"$rubocop_custom_cops"* ]]; then
+  export RUBOCOP_OPTS="${RUBOCOP_OPTS:+$RUBOCOP_OPTS }--require $rubocop_custom_cops"
+fi
+unset rubocop_custom_cops

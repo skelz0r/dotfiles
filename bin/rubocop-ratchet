@@ -1,0 +1,95 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'json'
+require 'open3'
+require 'pathname'
+require 'yaml'
+
+CUSTOM_COPS = File.expand_path('../config/rubocop/custom.rb', File.dirname(File.realpath(__FILE__)))
+QUOTA_FILE_NAME = '.rubocop_ratchet.yml'
+
+def usage(status)
+  (status.zero? ? $stdout : $stderr).puts <<~USAGE
+    Usage: rubocop-ratchet            lower every quota to the offenses left
+           rubocop-ratchet --init COP  write the first quota of a new ratchet cop
+           rubocop-ratchet --help      show this help
+
+    Writes the nearest #{QUOTA_FILE_NAME}, else creates it next to the
+    nearest .rubocop.yml, which must inherit it, both searched up to the
+    root of the git repository. Paths are relative to it.
+    A quota only goes down: once a cop is in the file, its files can lose
+    offenses, never gain any. Refuses to write when RuboCop could not
+    inspect every file. Loads the cops of #{CUSTOM_COPS}.
+  USAGE
+  exit status
+end
+
+def nearest_dir_holding(name)
+  Pathname(Dir.pwd).ascend do |dir|
+    return dir.to_s if dir.join(name).exist?
+    return nil if dir.join('.git').exist?
+  end
+  nil
+end
+
+def project_root
+  nearest_dir_holding(QUOTA_FILE_NAME) || nearest_dir_holding('.rubocop.yml') ||
+    abort('No .rubocop.yml in this directory nor its parents')
+end
+
+def rubocop_command(root)
+  rubocop = %w[rubocop --no-server --cache false --require] + [CUSTOM_COPS]
+  File.exist?(File.join(root, 'Gemfile')) ? %w[bundle exec] + rubocop : rubocop
+end
+
+def offense_counts(root, cop)
+  env = { 'RUBOCOP_RATCHET_COUNT_ONLY' => '1' }
+  command = rubocop_command(root) + ['--only', cop, '--format', 'json']
+  output, errors, status = Open3.capture3(env, *command, chdir: root)
+  abort "rubocop failed for #{cop}:\n#{errors}" if status.exitstatus > 1 || errors.include?('An error occurred while')
+
+  report = JSON.parse(output)
+  abort_on_incomplete_inspection(report, cop)
+  report['files'].to_h { |file| [file['path'], file['offenses'].count { |o| o['cop_name'] == cop }] }
+                 .select { |_path, count| count.positive? }
+end
+
+def abort_on_incomplete_inspection(report, cop)
+  unreadable = report['files'].select do |file|
+    file.fetch('errors', []).any? || file['offenses'].any? { |offense| offense['cop_name'] == 'Lint/Syntax' }
+  end
+  summary = report.fetch('summary', {})
+  return if unreadable.empty? && summary['error_count'].to_i.zero? &&
+            summary['inspected_file_count'] == summary['target_file_count']
+
+  abort "#{cop} could not inspect #{unreadable.map { |file| file['path'] }.join(', ')}: no quota written"
+end
+
+def lowered(quota, counts)
+  quota.to_h { |path, allowed| [path, [allowed, counts.fetch(path, 0)].min] }
+       .select { |_path, allowed| allowed.positive? }
+end
+
+usage(0) if %w[-h --help].include?(ARGV.first)
+
+root = project_root
+quota_file = File.join(root, QUOTA_FILE_NAME)
+created = !File.exist?(quota_file)
+File.write(quota_file, {}.to_yaml) if created
+at_exit { File.delete(quota_file) if created && !$!.nil? && File.exist?(quota_file) }
+quotas = YAML.load_file(quota_file) || {}
+
+if ARGV.empty?
+  quotas.each { |cop, settings| settings['Allow'] = lowered(settings['Allow'], offense_counts(root, cop)) }
+elsif ARGV.size == 2 && ARGV.first == '--init'
+  cop = ARGV.last
+  abort "#{cop} already has a quota: it can only be lowered" if quotas.key?(cop)
+  quotas[cop] = { 'Allow' => offense_counts(root, cop) }
+else
+  usage(1)
+end
+
+sorted = quotas.sort.to_h { |cop, settings| [cop, { 'Allow' => settings['Allow'].sort.to_h }] }
+File.write(quota_file, sorted.to_yaml)
+puts "#{quota_file} written"

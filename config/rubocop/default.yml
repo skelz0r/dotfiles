@@ -1,0 +1,15 @@
+Custom/DuckTyping:
+  Description: 'Ban is_a?, kind_of? and respond_to?: rely on duck typing.'
+  Enabled: false
+
+Custom/NoComments:
+  Description: 'Ban comments other than magic comments, directives and shebangs, under a per-file quota.'
+  Allow: {}
+  Enabled: false
+
+Custom/NoFixedSleep:
+  Description: 'Ban fixed sleeps in specs, under a per-file quota.'
+  Allow: {}
+  Enabled: false
+  Include:
+    - 'spec/**/*.rb'

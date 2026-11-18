@@ -49,12 +49,15 @@ exempt() {
     shebang:bin/agent-screencast) return 0 ;;
     shebang:bin/cve-watch) return 0 ;;
     shebang:bin/find_and_replace) return 0 ;;
+    shebang:bin/rubocop-ratchet) return 0 ;;
     strict:bin/agent-screencast) return 0 ;;
     strict:bin/battery) return 0 ;;
     strict:bin/cve-watch) return 0 ;;
+    strict:bin/rubocop-ratchet) return 0 ;;
     shellcheck:bin/agent-screencast) return 0 ;;
     shellcheck:bin/cve-watch) return 0 ;;
     shellcheck:bin/find_and_replace) return 0 ;;
+    shellcheck:bin/rubocop-ratchet) return 0 ;;
   esac
   return 1
 }
