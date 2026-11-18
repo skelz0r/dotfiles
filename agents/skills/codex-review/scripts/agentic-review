@@ -884,10 +884,55 @@ def command_publish(args):
     bump(state)
     print(f"{status}: {description}\n{published['url']}")
     if args.request_reviewer:
-        reviewers = [arg for login in args.request_reviewer for arg in ("-f", f"reviewers[]={login}")]
         gh("api", "-X", "POST", f"repos/{pull['repo']}/pulls/{pull['number']}/requested_reviewers",
-           *reviewers, "--silent")
+           *reviewer_fields(args.request_reviewer), "--silent")
         print(f"review requested from {', '.join(args.request_reviewer)}")
+    return 0
+
+
+def reviewer_fields(names):
+    fields = []
+    for name in names:
+        team = name.lstrip("@").partition("/")[2]
+        fields += ["-f", f"team_reviewers[]={team}" if team else f"reviewers[]={name.lstrip('@')}"]
+    return fields
+
+
+def ruleset_reviewers(pull):
+    owner = pull["repo"].split("/")[0]
+    rules = json.loads(gh("api", f"repos/{pull['repo']}/rules/branches/{pull['baseRefName']}"))
+    reviews = [rule["parameters"] for rule in rules if rule["type"] == "pull_request"]
+    required = any(params.get("required_approving_review_count", 0) >= 1 or params.get("required_reviewers")
+                   for params in reviews)
+    names = []
+    for params in reviews:
+        for entry in params.get("required_reviewers") or []:
+            reviewer = entry["reviewer"]
+            if reviewer["type"] != "Team":
+                continue
+            org_id = json.loads(gh("api", f"orgs/{owner}"))["id"]
+            team = json.loads(gh("api", f"organizations/{org_id}/team/{reviewer['id']}"))
+            names.append(f"{owner}/{team['slug']}")
+    return required, list(dict.fromkeys(names))
+
+
+def command_reviewer(args):
+    pull = find_pull_request(args.pr)
+    if pull is None:
+        raise Failure(f"no pull request for {current_branch()}")
+    required, names = ruleset_reviewers(pull)
+    decision = json.loads(gh("pr", "view", pull["url"], "--json", "reviewDecision"))["reviewDecision"]
+    if not required:
+        print(f"#{pull['number']}: {pull['baseRefName']} requires no review", file=sys.stderr)
+        return 1
+    if decision == "APPROVED":
+        print(f"#{pull['number']}: already approved", file=sys.stderr)
+        return 1
+    if not names:
+        print(f"#{pull['number']}: {pull['baseRefName']} requires an approval but its ruleset names "
+              "no reviewer", file=sys.stderr)
+    for name in names:
+        print(name)
     return 0
 
 
@@ -977,7 +1022,11 @@ def parser():
     publish.add_argument("--note", help="what changed since the last pass, shown in the Not reviewed row")
     publish.add_argument("--dry-run", action="store_true", help="print what would be posted, post nothing")
     publish.add_argument("--request-reviewer", action="append", default=[], metavar="LOGIN",
-                         help="request a human review once the status and comment are posted (repeatable)")
+                         help="request a human review once the status and comment are posted (repeatable); "
+                              "org/team for a team, as printed by the reviewer command")
+
+    add("reviewer", "print the teams the base branch ruleset requires a review from; exit 1 when "
+        "the base requires no review or the pull request is already approved", command_reviewer)
     return root
 
 

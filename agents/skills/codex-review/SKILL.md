@@ -297,7 +297,9 @@ Publish only at the end of the triage, after pushing:
 A human reviewer is requested here, through `--request-reviewer`, never when the pull request is
 opened: GitHub notifies them at once, and the passes that follow rewrite what they would read. "Open
 a PR and request a review from X" means `gh pr create` without `--reviewer`, the review loops, then
-`publish --request-reviewer X`. On PR 645 the reviewer was requested at `gh pr create`, then two
+`publish --request-reviewer X`. `X` is a login or an `org/team`; with no name given, take the
+ones `agentic-review reviewer` prints, the teams the base branch ruleset requires (exit 1 when the
+base requires no review or the pull request is already approved). On PR 645 the reviewer was requested at `gh pr create`, then two
 passes found nine defects and rewrote the commit.
 
 It refuses a pull request opened by someone else or a local HEAD that differs from the pushed one.
