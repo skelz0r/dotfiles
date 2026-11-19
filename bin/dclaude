@@ -5,17 +5,59 @@
 
 set -euo pipefail
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+usage() {
   cat << EOF
-Usage: $(basename "$0") [CLAUDE_ARGS...]
+Usage: $(basename "$0") [--brief-file FILE] [CLAUDE_ARGS...]
 
 Run claude with --dangerously-skip-permissions, forwarding every
 argument.
 
 Options:
-  -h, --help    Show this help message
+  --brief-file FILE  Start the session on the brief in FILE without
+                     putting its text in the command line: it is copied
+                     to a neutral temporary path and the initial prompt
+                     only points to that copy, so a \`pkill -f\` on a word
+                     of the brief cannot hit this session. A brief that
+                     starts with a slash command (/goal ...) keeps it.
+  -h, --help         Show this help message
 EOF
-  exit 0
+}
+
+brief_file=""
+claude_args=()
+while (($#)); do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --brief-file)
+      [[ $# -ge 2 ]] || { echo "dclaude: --brief-file needs a file" >&2; exit 1; }
+      brief_file="$2"
+      shift 2
+      ;;
+    --brief-file=*)
+      brief_file="${1#--brief-file=}"
+      shift
+      ;;
+    *)
+      claude_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -n "$brief_file" ]]; then
+  [[ -r "$brief_file" ]] || { echo "dclaude: cannot read $brief_file" >&2; exit 1; }
+  tmp_dir="${TMPDIR:-/tmp}"
+  brief_copy="$(mktemp "${tmp_dir%/}/dclaude.XXXXXXXX")"
+  cp "$brief_file" "$brief_copy"
+  command_prefix=""
+  first_word="$(head -n 1 "$brief_copy" | awk '{print $1}')"
+  if [[ "$first_word" =~ ^/[A-Za-z0-9:_-]+$ ]]; then
+    command_prefix="$first_word "
+  fi
+  claude_args+=("${command_prefix}Lis ton brief dans $brief_copy et exécute-le.")
 fi
 
-claude --dangerously-skip-permissions "$@"
+exec claude --dangerously-skip-permissions ${claude_args[@]+"${claude_args[@]}"}
