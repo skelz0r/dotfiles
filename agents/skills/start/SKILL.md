@@ -30,7 +30,7 @@ inside the other inherits its variable, so herdr is checked first):
 - `$TMUX` set: tmux. The tab is a window of the caller's session.
 - neither: no tab can be opened. Run the setup script from this session,
   then hand the user the command to launch the new session themselves
-  (`cd <worktree path> && dclaude "$(cat <brief file>)"`), skip the
+  (`cd <worktree path> && dclaude --brief-file <brief file>`), skip the
   polling of step 5 but still post the inbox item.
 
 ## Steps
@@ -131,7 +131,7 @@ inside the other inherits its variable, so herdr is checked first):
    argument below:
 
    ```bash
-   <setup script> <name> && cd "$(git worktree list --porcelain | awk '/^worktree /{print $2}' | grep -i '/<name>$')" && dclaude "$(cat <brief file>)"
+   <setup script> <name> && cd "$(git worktree list --porcelain | awk '/^worktree /{print $2}' | grep -i '/<name>$')" && dclaude --brief-file <brief file>
    ```
 
    herdr:
@@ -155,7 +155,9 @@ inside the other inherits its variable, so herdr is checked first):
    after a rename.
    The `git worktree list` lookup copes with scripts that lowercase or
    otherwise normalize the name. Always launch Claude with `dclaude`,
-   never `claude` directly.
+   never `claude` directly, and pass the brief with `--brief-file`,
+   never as an argument: its text would sit in the command line of the
+   processes, where any `pkill -f` on one of its words kills the session.
 
 5. Wait for the session to start, polling the pane until the Claude
    prompt shows up or the setup fails (setup can take several minutes:
