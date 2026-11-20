@@ -125,7 +125,7 @@ take_lock() {
         continue
       fi
     else
-      identity="$(lock_identity)"
+      identity="$(lock_identity || true)"
       if [[ -z "$identity" || "$identity" != "$seen_without_pid" ]]; then
         seen_without_pid="$identity"
         polls_without_pid=0

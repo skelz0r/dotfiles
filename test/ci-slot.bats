@@ -157,3 +157,13 @@ stays_absent() {
   run "$SLOT" status
   [[ "$output" == *"in use: 0"* ]]
 }
+
+@test "runs started at the same instant all run their command" {
+  for round in 1 2 3 4 5; do
+    for run in $(seq 12); do
+      "$SLOT" run -w 1 -- touch "$WORK/ran-$round-$run" 2> /dev/null &
+    done
+    wait
+  done
+  [ "$(ls "$WORK" | grep -c '^ran-')" -eq 60 ]
+}
