@@ -172,12 +172,20 @@ navette proof --key "$KEY" --pr <PR url> --sha <head sha40> --summary proof-summ
   are attached from their local copy when it still exists.
 - `--sha` is the head `scope` printed, `--url` the comment URL
   `publish` printed.
-- No comment posted (no artefact): nothing to record.
+- No comment posted (no artefact): still record a short proof, with
+  nothing on GitHub, so the inbox shows the decision and does not warn
+  that the head has no proof. Summary only, no `--attach`, no `--url`:
+
+  ```bash
+  printf 'Aucun artefact requis : %s\n' "<reason from scope: lock-only bump, config with no run to show...>" > proof-summary.md
+  navette proof --key "$KEY" --pr <PR url> --sha <head sha40> --summary proof-summary.md
+  ```
 
 ## When no proof is possible
 
 A lock-only bump or a config change with no run to show and no risk to
-watch: no comment, say so in the turn's report. Otherwise say it in
+watch: no comment, only the short navette record of step 5; say so
+in the turn's report. Otherwise say it in
 the comment's "Not verified" (what and why: no local reproduction of a
 third-party error, no device...) and in the turn's "Needs you". Never
 replace a required screencast by "checked by hand" (#2268).
