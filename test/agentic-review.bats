@@ -267,6 +267,17 @@ review_branch() {
   assert_contains "$comment" "- Categories not assessed"
 }
 
+@test "the summary recorded in navette keeps the review without any HTML nor state marker" {
+  review_branch
+  agentic_review finding --kind nit --title "typo" --fixed "spelled right" > /dev/null
+
+  summary="$(agentic_review show --markdown)"
+  assert_equal "$(head -n 3 <<<"$summary")" $'### Agentic review\n\n**Merge risk: medium**'
+  assert_contains "$summary" "#### Fixed findings (1)"
+  assert_contains "$summary" "| f1 | bug | five is wrong |"
+  assert_not_contains "$summary" "<"
+}
+
 @test "a covered head needs no coverage line, a stale one says so" {
   review_branch
   agentic_review publish > /dev/null

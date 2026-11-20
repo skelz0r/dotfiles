@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Run an adversarial code review of a diff, commit or branch through the Codex CLI (a different model family), sizing the reasoning effort to the complexity of the change, then triage the findings and publish a proof of review (status and comment) on one's own pull request. Use when the user asks to review something with Codex, wants a second opinion or an external/independent review of code just written, says "review avec codex", "codex review", "fais relire ça", "double-check this diff", or asks to cross-check a change before opening or merging a PR, or to show reviewers which agentic reviews a PR went through ("publie la review sur la PR", "agentic review status"), or to request a human reviewer on one's pull request ("ouvre une PR et request une review à X"), which waits for the review loops.
+description: Run an adversarial code review of a diff, commit or branch through the Codex CLI (a different model family), sizing the reasoning effort to the complexity of the change, then triage the findings, publish a proof of review (status and comment) on one's own pull request and record it on the navette inbox item of the work. Use when the user asks to review something with Codex, wants a second opinion or an external/independent review of code just written, says "review avec codex", "codex review", "fais relire ça", "double-check this diff", or asks to cross-check a change before opening or merging a PR, or to show reviewers which agentic reviews a PR went through ("publie la review sur la PR", "agentic review status"), or to request a human reviewer on one's pull request ("ouvre une PR et request une review à X"), which waits for the review loops.
 ---
 
 # Codex review
@@ -314,6 +314,24 @@ item in the navette inbox (`navette-inbox`), whoever posts it:
 
 A pull request carrying the label that the repository's `REVIEW.md` lets merge without review
 keeps "Merger puis /cleanup".
+
+#### Record the review in navette
+
+Once `publish` posted the comment, record the review on the work's inbox item: load the
+`navette-evidence` skill and follow it. Skip it silently when `navette` is not installed
+(`command -v navette`) or when the work has no item; a failing `navette review` is told in the
+final message, never retried. The item is the one this session posts to; a `/start` worktree
+posts under `worktree:<primary checkout dir>:<worktree dir>`.
+
+```bash
+~/.claude/skills/codex-review/scripts/agentic-review show --markdown > review.md   # opens on the merge risk
+navette review --key "$KEY" --pr <PR url> --sha "$(git rev-parse HEAD)" \
+  --state <passed|failed|pending> --risk <low|medium|high> --summary review.md --url <comment url>
+```
+
+`--state` follows the status `publish` printed first: `success` → `passed`, `failure` → `failed`,
+`pending` (stale) → `pending`. `--risk` is the "Merge risk" line of `review.md`, `--url` the
+comment URL `publish` printed. A later `publish` on a new head records again.
 
 It refuses a pull request opened by someone else or a local HEAD that differs from the pushed one.
 Before the pull request exists, the state stays in the git dir of the worktree and `publish` says

@@ -799,8 +799,20 @@ def command_show(args):
         raise Failure("no pass recorded")
     pull = find_pull_request(args.pr)
     base = resolve_base(args, pull)
-    print(render(state, coverage(state, base), base, pull["repo"] if pull else None))
+    body = render(state, coverage(state, base), base, pull["repo"] if pull else None)
+    print(markdown_only(body) if args.markdown else body)
     return 0
+
+
+def markdown_only(body):
+    body = re.sub(re.escape(STATE_OPEN) + r".*?" + re.escape(STATE_CLOSE), "", body, flags=re.S)
+    lines = []
+    for line in body.split("\n"):
+        if line in (COMMENT_MARKER, "<details>", "</details>"):
+            continue
+        summary = re.fullmatch(r"<summary>(.*)</summary>", line)
+        lines.append(f"#### {summary.group(1)}" if summary else line)
+    return "\n".join(lines).strip() + "\n"
 
 
 def command_known(args):
@@ -1010,6 +1022,8 @@ def parser():
     show = add("show", "print the comment as it would be published", command_show)
     show.add_argument("--base")
     show.add_argument("--json", action="store_true", help="print the raw state")
+    show.add_argument("--markdown", action="store_true",
+                      help="print the comment without its markers nor HTML, as the summary of `navette review`")
 
     add("known", "print the findings already triaged, for the next pass not to report them again",
         command_known)
