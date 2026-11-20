@@ -1,6 +1,6 @@
 ---
 name: pr-proof
-description: Prove that a pull request's change works, in the single proof comment of the PR rewritten at each push — read the diff, derive the proofs it requires (screencast when an interaction changed, before/after captures when a rendering changed, a review guide past ~500 hand-written lines, ~20 files or when stacked, a real run for backend changes, a test seen failing without the fix), post nothing when there is no artefact, produce them through verify-<app> / bin/qa, screencast, gh-image and pr-review-guide, then post or replace the comment on a fixed skeleton. Use after every push of one's own pull request (feature, bugfix, refactoring), when start or codex-review hand over to it, when the user says "prouve la PR", "poste la preuve", "mets à jour le commentaire de preuve", "proof comment", or when a proof comment cites an outdated SHA. Not the proof of review: that one is codex-review's.
+description: Prove that a pull request's change works, in the single proof comment of the PR rewritten at each push — read the diff, derive the proofs it requires (screencast when an interaction changed, before/after captures when a rendering changed, a review guide past ~500 hand-written lines, ~20 files or when stacked, a real run for backend changes, a test seen failing without the fix), post nothing when there is no artefact, produce them through verify-<app> / bin/qa, screencast, gh-image and pr-review-guide, then post or replace the comment on a fixed skeleton and record the proof on the navette inbox item of the work. Use after every push of one's own pull request (feature, bugfix, refactoring), when start or codex-review hand over to it, when the user says "prouve la PR", "poste la preuve", "mets à jour le commentaire de preuve", "proof comment", or when a proof comment cites an outdated SHA. Not the proof of review: that one is codex-review's.
 ---
 
 # pr-proof
@@ -147,6 +147,32 @@ commit and the length cap, then:
 
 Read the comment back (`gh pr view <pr> --comments`): no local path
 left, media rendered.
+
+## 5. Record in navette
+
+Once the comment is posted or rewritten, record the proof on the
+work's inbox item: load the `navette-evidence` skill and follow it.
+Skip it silently when `navette` is not installed (`command -v
+navette`) or when the work has no item; a failing `navette proof` is
+told in the final message, never retried. The item is the one this
+session posts to; a `/start` worktree posts under
+`worktree:<primary checkout dir>:<worktree dir>`.
+
+```bash
+grep -vE 'user-attachments|<img|<video|^<!--|^\||^/' proof.md | cat -s > proof-summary.md
+navette proof --key "$KEY" --pr <PR url> --sha <head sha40> --summary proof-summary.md \
+  --attach /abs/after.png:"<what it shows>" --attach /abs/journey.mp4 --url <comment url>
+```
+
+- The summary is `proof.md` without the lines that only hold media
+  (videos, captures, the before / after table): navette refuses images
+  and raw HTML. Check it reads alone.
+- `--attach` takes the same local files as `publish`, with a short
+  description; media kept from an earlier push by their hosted URL
+  are attached from their local copy when it still exists.
+- `--sha` is the head `scope` printed, `--url` the comment URL
+  `publish` printed.
+- No comment posted (no artefact): nothing to record.
 
 ## When no proof is possible
 
