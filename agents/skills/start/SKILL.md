@@ -101,9 +101,11 @@ inside the other inherits its variable, so herdr is checked first):
      new session gets there first. Then update that key when the work
      ends, before handing back:
      - PR opened, with its two proofs below: `--status waiting`, `--link`
-       to the PR, description "à relire et merger, puis `/cleanup`". The
-       session never runs `/cleanup` itself on a pull request: it would
-       merge it before the user's review;
+       to the PR, description "à relire et merger, puis `/cleanup`", and
+       the next-step `--option` that `agentic-review reviewer` decides
+       (`codex-review`, step 8). The session never runs `/cleanup`
+       itself on a pull request: it would merge it before the user's
+       review;
      - internal tooling pushed directly: run `/cleanup` right away, which
        archives the item;
      - blocked on the user: `--status waiting`, what is expected in the

@@ -302,6 +302,19 @@ ones `agentic-review reviewer` prints, the teams the base branch ruleset require
 base requires no review or the pull request is already approved). On PR 645 the reviewer was requested at `gh pr create`, then two
 passes found nine defects and rewrote the commit.
 
+The same `agentic-review reviewer` decides the next step offered on the pull request's `waiting`
+item in the navette inbox (`navette-inbox`), whoever posts it:
+
+- exit 1 (no review required, or already approved): `--option "Merger puis /cleanup"`;
+- teams printed: `--option "Demander une review à <team>"`, and no merge option. The click runs
+  `agentic-review publish --request-reviewer <org/team>`, then reposts the key `--status blocked`
+  (« Review demandée à <team> ») instead of archiving it;
+- exit 0 with no team (an approval required, nobody named): ask the user in the item who should
+  review.
+
+A pull request carrying the label that the repository's `REVIEW.md` lets merge without review
+keeps "Merger puis /cleanup".
+
 It refuses a pull request opened by someone else or a local HEAD that differs from the pushed one.
 Before the pull request exists, the state stays in the git dir of the worktree and `publish` says
 so; run it again once the pull request is open. Leaving a pull request stale is fine when the last
