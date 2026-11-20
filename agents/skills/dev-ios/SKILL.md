@@ -78,6 +78,51 @@ installed by `config/herdr/install-daemon`), outside the GUI session.
 
 `devicectl` (install, launch) works from herdr either way.
 
+### Renewing the Apple Distribution certificate
+
+Valid one year; Apple mails 30 days before expiry. Expiry only blocks new
+archives and uploads (`bin/deploy-testflight`): App Store apps and
+uploaded TestFlight builds keep working. Check the date:
+
+```bash
+security find-certificate -c "Apple Distribution" -p ~/Library/Keychains/ci.keychain-db \
+  | openssl x509 -noout -enddate
+```
+
+Done from the shell on ch405, no Keychain Access:
+
+1. Key and CSR (key kept out of `~/share`):
+   ```bash
+   d=~/.local/share/apple-distribution-$(date +%Y); mkdir -p -m 700 "$d"
+   openssl genrsa -out "$d/distribution.key" 2048
+   openssl req -new -key "$d/distribution.key" -out ~/share/distribution.csr \
+     -subj "/CN=Apple Distribution ch405/C=FR"
+   ```
+2. On [developer.apple.com/account/resources/certificates/add](https://developer.apple.com/account/resources/certificates/add):
+   Apple Distribution, upload the CSR, download `distribution.cer`.
+3. Import into the CI keychain, `$pw` its password (`-legacy`: `security` rejects OpenSSL 3's
+   default p12 encryption):
+   ```bash
+   openssl x509 -inform DER -in distribution.cer -out "$d/distribution.pem"
+   openssl pkcs12 -export -legacy -inkey "$d/distribution.key" -in "$d/distribution.pem" \
+     -out "$d/distribution.p12" -passout "pass:$pw"
+   security unlock-keychain -p "$pw" ~/Library/Keychains/ci.keychain-db
+   security import "$d/distribution.p12" -k ~/Library/Keychains/ci.keychain-db -P "$pw" \
+     -T /usr/bin/codesign -T /usr/bin/security
+   security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" ~/Library/Keychains/ci.keychain-db
+   security find-identity -v -p codesigning ~/Library/Keychains/ci.keychain-db
+   ```
+   The intermediate "Apple Worldwide Developer Relations G3" must be
+   trusted on the machine, it already is when the old one signs.
+4. Verify the new identity signs (its SHA-1 from `find-identity`):
+   ```bash
+   cp /usr/bin/true /tmp/signtest
+   ~/dotfiles/bin/with-ci-keychain codesign -f -s <sha1> /tmp/signtest
+   codesign -dvv /tmp/signtest 2>&1 | grep Authority
+   ```
+   The old identity can stay: both sign until it expires, then signing
+   ignores it.
+
 ## Provisioning Profiles
 
 Profiles are cached in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`.
