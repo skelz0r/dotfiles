@@ -158,13 +158,14 @@ PR's media and of the tab.
    ```bash
    KEY="worktree:$(basename "$PRIMARY_ROOT"):$(basename <worktree path>)"
    navette post --key "$KEY" --type cleanup --title "<PR title>" \
-     --description "<what was removed, PR merged>" --link <PR url> --status info
+     --description "<what was removed, PR merged>" --link <PR url> --status unread
    ```
 
-   `info`, never `done`: `done` archives the item, hidden by the
-   inbox's default view, so a worktree that ran autonomously up to its
-   merge ended without the user ever seeing it. The user archives the
-   item once read.
+   `unread` (« À lire »), never `done` nor `info`: `done` archives the
+   item, hidden by the inbox's default view, so a worktree that ran
+   autonomously up to its merge would end without the user ever seeing
+   it; `info` (« En cours ») is running work, and the work is finished.
+   The user archives the item once read.
 
    `--type` and `--title` create the item when the worktree predates
    this convention. When step 3 or 4 stopped the cleanup, post
@@ -203,5 +204,5 @@ PR's media and of the tab.
 
 One line per step: PR state (and rebase/merge done in step 3), worktree
 removed, branch deleted, databases dropped, orphan databases dropped,
-media trashed (counts from `gh-media-log`), inbox item set to info, tab
+media trashed (counts from `gh-media-log`), inbox item set to unread, tab
 closed (or why each one was skipped).
