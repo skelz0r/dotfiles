@@ -19,6 +19,9 @@ Options:
                      only points to that copy, so a \`pkill -f\` on a word
                      of the brief cannot hit this session. A brief that
                      starts with a slash command (/goal ...) keeps it.
+                     The brief must hold a title line "# <title>": it
+                     becomes the session name (--name), otherwise every
+                     session gets named after the pointer prompt.
   -h, --help         Show this help message
 EOF
 }
@@ -49,9 +52,15 @@ done
 
 if [[ -n "$brief_file" ]]; then
   [[ -r "$brief_file" ]] || { echo "dclaude: cannot read $brief_file" >&2; exit 1; }
+  session_name="$(grep -m 1 -E '^# +[^ ]' "$brief_file" | sed -E 's/^# +//; s/[[:space:]]+$//' || true)"
+  if [[ -z "$session_name" ]]; then
+    echo "dclaude: $brief_file has no title line \"# <title>\" to name the session" >&2
+    exit 1
+  fi
   tmp_dir="${TMPDIR:-/tmp}"
   brief_copy="$(mktemp "${tmp_dir%/}/dclaude.XXXXXXXX")"
   cp "$brief_file" "$brief_copy"
+  claude_args=(--name "$session_name" ${claude_args[@]+"${claude_args[@]}"})
   command_prefix=""
   first_word="$(head -n 1 "$brief_copy" | awk '{print $1}')"
   if [[ "$first_word" =~ ^/[A-Za-z0-9:_-]+$ ]]; then

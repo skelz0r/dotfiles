@@ -78,6 +78,11 @@ inside the other inherits its variable, so herdr is checked first):
 
 3. Write the brief. The new session starts with no context, so the brief
    must stand on its own, in the user's language:
+   - a title line `# <title>` (after the slash command line, if any):
+     `dclaude` refuses a brief without one and names the session after
+     it. Write the topic itself, readable in a session list
+     (`Délégations Omnikles : import des mandats`), never a placeholder
+     such as `Brief temporaire` or `Brief /start`;
    - the problem and why it matters (the user's report, ticket id);
    - what was already established in this conversation: diagnosis, file
      paths with line numbers, root cause, so it is not redone;
