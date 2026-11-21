@@ -476,6 +476,14 @@ idle|For Home"
   assert_equal "$(job_states)" ""
 }
 
+@test "--cwd skips a workspace whose tab 1 was closed instead of failing every dispatch" {
+  mkdir -p "$BATS_TEST_TMPDIR/projects/acme"
+  add_workspace wA 2 'Acme' "$BATS_TEST_TMPDIR/projects/acme"
+  add_workspace wW 3 'Outis' "/elsewhere"
+  touch "$FAKE_HERDR_WORLD/without_tab_1_wW"
+  assert_equal "$("$DISPATCH" workspace-for "$BATS_TEST_TMPDIR/projects/acme")" "wA"
+}
+
 @test "--cwd is refused when a workspace cannot be read, rather than resolved among the others" {
   mkdir -p "$BATS_TEST_TMPDIR/projects/acme"
   add_workspace w2 2 'Acme' "$BATS_TEST_TMPDIR/projects/acme"

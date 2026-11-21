@@ -181,7 +181,7 @@ first_tab_id() {
     fi
     index=$((index + 1))
   done
-  return 1
+  return 3
 }
 
 first_pane_of_tab() {
@@ -223,7 +223,11 @@ workspace_for() {
     [[ "$number" != "1" ]] || home_id="$workspace_id"
     index=$((index + 1))
     [[ "$target" != "$(canonical_dir "$HOME")" ]] || continue
-    tab_id="$(first_tab_id "$workspace_id")" || { paint "$RED" "unreadable tab 1 of herdr workspace $workspace_id"; return 1; }
+    tab_id="$(first_tab_id "$workspace_id")" || {
+      [[ $? -eq 3 ]] && continue
+      paint "$RED" "unreadable tab 1 of herdr workspace $workspace_id"
+      return 1
+    }
     cwd="$(first_pane_of_tab "$workspace_id" "$tab_id" cwd)" || { paint "$RED" "unreadable panes of herdr workspace $workspace_id"; return 1; }
     [[ "$(canonical_dir "$cwd")" != "$target" ]] || matches+=("$workspace_id")
   done

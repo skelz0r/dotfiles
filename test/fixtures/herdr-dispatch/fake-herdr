@@ -241,6 +241,11 @@ case "$command" in
     require_positionals 0
     workspace_id="$(option --workspace)"
     [ -f "$world/unreadable_$workspace_id" ] && herdr_error internal "tabs of $workspace_id unreadable"
+    if [ -f "$world/without_tab_1_$workspace_id" ]; then
+      printf '{"id":"cli:tab:list","result":{"tabs":[{"agent_status":"unknown","focused":false,"label":"1","number":3,"pane_count":1,"tab_id":"%s:t3","workspace_id":"%s"}],"type":"tab_list"}}\n' \
+        "$workspace_id" "$workspace_id"
+      exit 0
+    fi
     printf '{"id":"cli:tab:list","result":{"tabs":[{"agent_status":"idle","focused":false,"label":"worktree","number":2,"pane_count":1,"tab_id":"%s:t2","workspace_id":"%s"},{"agent_status":"idle","focused":true,"label":"claude","number":1,"pane_count":2,"tab_id":"%s:t1","workspace_id":"%s"}],"type":"tab_list"}}\n' \
       "$workspace_id" "$workspace_id" "$workspace_id" "$workspace_id"
     ;;
