@@ -40,7 +40,7 @@ ok() { echo -e "${GREEN}✓${NC} $*"; }
 LIBRARIES=(
   bin/lib/common.sh
   agents/skills/upload-assets/scripts/common.sh
-  agents/skills/metabase/scripts/config.sh
+  agents/deprecated/metabase/scripts/config.sh
 )
 
 exempt() {
