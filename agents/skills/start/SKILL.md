@@ -25,8 +25,11 @@ This skill only writes the brief and orchestrates the tab.
 Detect where this session runs, in this order (a multiplexer started
 inside the other inherits its variable, so herdr is checked first):
 
-- `HERDR_ENV=1`: herdr. The tab opens in the caller's workspace
-  (`$HERDR_WORKSPACE_ID`).
+- `HERDR_ENV=1`: herdr. The tab opens in the workspace of the target
+  repository, where the user looks for it, not in the caller's: a job
+  running in the dotfiles workspace that starts sessions on other
+  repositories puts each tab in that repository's workspace. Step 1
+  resolves it into `$WS`.
 - `$TMUX` set: tmux. The tab is a window of the caller's session.
 - neither: no tab can be opened. Run the setup script from this session,
   then hand the user the command to launch the new session themselves
@@ -40,6 +43,18 @@ inside the other inherits its variable, so herdr is checked first):
    ```bash
    PRIMARY_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
    ```
+
+   herdr: find the workspace of that repository, the one whose tab 1
+   first pane sits in `$PRIMARY_ROOT` (always the primary checkout,
+   never a worktree path, which no workspace has as tab 1):
+
+   ```bash
+   WS="$(herdr-dispatch workspace-for "$PRIMARY_ROOT")" || WS="$HERDR_WORKSPACE_ID"
+   ```
+
+   When it fails (exit 2: no workspace for this repository; exit 1:
+   herdr unreadable), the tab falls back to the caller's workspace:
+   say so in the final report, so the user knows where to look.
 
    Read the worktree section of `$PRIMARY_ROOT/CLAUDE.md` (or
    `AGENTS.md`, or the `CLAUDE.md` it points to) to learn which script
@@ -66,7 +81,7 @@ inside the other inherits its variable, so herdr is checked first):
    (example: `bin/setup_worktree.sh` in freebox-delta-vm).
 
 2. Check the names are free: no existing tab with that name (herdr:
-   `herdr tab list --workspace "$HERDR_WORKSPACE_ID"`, field `label`;
+   `herdr tab list --workspace "$WS"`, field `label`;
    tmux: `tmux list-windows -a -F '#{window_name}'`) and no worktree
    already holding a different topic (`git worktree list`). An existing
    worktree for the same topic is fine: setup scripts are idempotent.
@@ -144,7 +159,7 @@ inside the other inherits its variable, so herdr is checked first):
    herdr:
 
    ```bash
-   P=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --label <tab name> --cwd "$PRIMARY_ROOT" --no-focus | jq -r .result.root_pane.pane_id)
+   P=$(herdr tab create --workspace "$WS" --label <tab name> --cwd "$PRIMARY_ROOT" --no-focus | jq -r .result.root_pane.pane_id)
    herdr pane rename "$P" <name>
    herdr pane run "$P" "<command>"
    ```
@@ -206,6 +221,7 @@ inside the other inherits its variable, so herdr is checked first):
 
 ## Report
 
-Tab name, worktree name, path and branch, inbox item URL, then two or
-three lines on what the brief asks and which points were left to the
-new session's judgment.
+Tab name and herdr workspace it opened in (flag the fallback to the
+caller's workspace), worktree name, path and branch, inbox item URL,
+then two or three lines on what the brief asks and which points were
+left to the new session's judgment.

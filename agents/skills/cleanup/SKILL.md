@@ -189,6 +189,11 @@ PR's media and of the tab.
    tmux display-message -p -t "$TMUX_PANE" '#{window_id}'
    ```
 
+   Without `--workspace`, both lists span every workspace: `/start`
+   opens the tab in the workspace of the target repository, which may
+   not be the one of the session that cleans up, so never narrow them
+   to `$HERDR_WORKSPACE_ID`.
+
    The tab to close is the one marked with the worktree name by `/start`
    (herdr: a pane labelled with it; tmux: the `@worktree` window
    option); for tabs opened before that, the one named after the
