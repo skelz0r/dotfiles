@@ -29,6 +29,10 @@ other page, follow this skill directly:
   only file ever edited; generated HTML is overwritten on each build and
   never touched by hand. The build prints its warnings and must end with
   zero.
+- **Videos play at 2×.** Every `<video>` gets `defaultPlaybackRate` and
+  `playbackRate` set to 2 by a few lines of script, and the page says so
+  next to them: screencasts paced for a human demo are slow to watch one
+  after another (the user's request after a nine-video guide).
 - **`noindex`.** Every generated page carries
   `<meta name="robots" content="noindex">`; the server also sends
   `X-Robots-Tag`, the meta keeps it true on any other host.

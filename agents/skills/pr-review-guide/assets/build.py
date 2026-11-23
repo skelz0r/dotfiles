@@ -578,6 +578,12 @@ def check_urls(page, repo, sha):
 
 SCRIPT = """<script>
 (function () {
+  [].forEach.call(document.querySelectorAll('video'), function (video) {
+    video.defaultPlaybackRate = 2;
+    video.playbackRate = 2;
+  });
+})();
+(function () {
   var lists = [].slice.call(document.querySelectorAll('[role="tablist"]'));
   if (!lists.length) return;
   document.documentElement.classList.add('js');

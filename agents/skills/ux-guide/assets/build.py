@@ -33,6 +33,10 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
 NBSP = " "
+SPEED_HINT = {
+    "fr": "Les vidéos se lisent en ×2\u00a0; le menu du lecteur permet de revenir à ×1.",
+    "en": "Videos play at 2×; the player's menu sets them back to 1×.",
+}
 
 
 def parse_front_matter(text):
@@ -155,9 +159,18 @@ def render(meta, intro, sections):
 </header>
 <main class="wrap">
   <nav class="toc"><ol>{toc}</ol></nav>
+  <p class="speed">{SPEED_HINT.get(lang, SPEED_HINT['en'])}</p>
   {''.join(blocks)}
   {f'<section class="notes">{notes_html}</section>' if notes else ''}
 </main>
+<script>
+(function () {{
+  [].forEach.call(document.querySelectorAll('video'), function (video) {{
+    video.defaultPlaybackRate = 2;
+    video.playbackRate = 2;
+  }});
+}})();
+</script>
 </body>
 </html>
 """

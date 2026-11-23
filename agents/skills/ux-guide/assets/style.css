@@ -49,6 +49,8 @@ a { color: var(--brand); }
 .toc a { color: var(--text); text-decoration: none; }
 .toc a:hover { color: var(--brand); text-decoration: underline; }
 
+.speed { margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
+
 .feature {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
