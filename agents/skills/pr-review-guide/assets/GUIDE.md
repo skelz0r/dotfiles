@@ -119,6 +119,16 @@ de valeur vides est un intertitre. Sans cible, retirer target. -->
 
 <!-- diagram: system_flow -->
 
+<!-- tab: UX -->
+
+<!-- Onglet facultatif : quand la PR change plusieurs parcours d'une interface.
+Le guide UX (skill ux-guide) est publié dans ux/, sous le même mot de passe. -->
+
+Une vidéo par fonctionnalité, avec ce qu'elle montre et ce qu'il faut
+regarder en revue. [Ouvrir le guide UX en plein écran](ux/index.html).
+
+<iframe class="ux-frame" src="ux/index.html" title="Guide UX"></iframe>
+
 <!-- tab: Design -->
 <!-- Seulement si la PR touche une interface. Voir references/design.md. -->
 

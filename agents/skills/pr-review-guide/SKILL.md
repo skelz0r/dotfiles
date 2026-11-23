@@ -1,6 +1,6 @@
 ---
 name: pr-review-guide
-description: Turn a large pull request into a review guide published as a static HTML page with tabs (overview, one real end-to-end example, architecture, safety nets, commits and tests), a Flows tab when the PR changes a journey or makes several entry points converge (user journey and system flow drawn as SVG, every node linked to the code and checked at the pinned commit), every file and commit linked on GitHub at the pinned head commit, real code excerpts, payloads and failure messages, screenshots of the real UI, charts in the overview drawn from measured numbers (lines per zone, before / after flow, a value per case on the base branch against the PR, data a migration touches), plus a Design tab for the designer when the PR changes an interface (flow, captioned screens with every state, what to redraw, rules, texts, tokens), styled with the project's visual identity and published through upload-assets. Use when a PR is too long to read, when the user asks for "un guide de revue", "un doc qui explique les grands changements techniques de la PR", "un résumé technique pour les reviewers", "une page partageable qui explique la PR", "avec les écrans pour le designer", "une section design dans le guide", "ajoute des graphes au guide", "des graphes dans la vue d'ensemble", "des flows dans le guide", "un schéma du parcours utilisateur", "un flow système de l'archivage", wants reviewers to know what to read, in which order, and what can be skipped, or when pr-proof requires one (past ~500 hand-written lines, ~20 files, or a stacked PR).
+description: Turn a large pull request into a review guide published as a static HTML page with tabs (overview, one real end-to-end example, architecture, safety nets, commits and tests), a Flows tab when the PR changes a journey or makes several entry points converge (user journey and system flow drawn as SVG, every node linked to the code and checked at the pinned commit), every file and commit linked on GitHub at the pinned head commit, real code excerpts, payloads and failure messages, screenshots of the real UI, charts in the overview drawn from measured numbers (lines per zone, before / after flow, a value per case on the base branch against the PR, data a migration touches), plus a Design tab for the designer when the PR changes an interface (flow, captioned screens with every state, what to redraw, rules, texts, tokens), a UX tab embedding the PR's UX guide (one screencast per feature, ux-guide skill) when the PR changes several journeys of an interface, styled with the project's visual identity and published through upload-assets. Use when a PR is too long to read, when the user asks for "un guide de revue", "un doc qui explique les grands changements techniques de la PR", "un résumé technique pour les reviewers", "une page partageable qui explique la PR", "avec les écrans pour le designer", "une section design dans le guide", "ajoute des graphes au guide", "des graphes dans la vue d'ensemble", "des flows dans le guide", "un schéma du parcours utilisateur", "un flow système de l'archivage", "embed le guide UX dans le guide de revue", "ajoute les vidéos des features au guide", wants reviewers to know what to read, in which order, and what can be skipped, or when pr-proof requires one (past ~500 hand-written lines, ~20 files, or a stacked PR).
 ---
 
 # PR review guide
@@ -40,6 +40,9 @@ Confirm with the user, in one AskUserQuestion round if anything is unclear:
 - **The PR** and its audience (reviewers of the team, another team, a
   designer). When the PR changes an interface, the guide gets the Design
   tab of `references/design.md`, and the designer is part of the audience.
+  When it changes several journeys of an interface (a rebuilt screen, a
+  new flow), the guide also gets a UX tab: the `ux-guide` skill films one
+  video per feature, and the guide embeds that page.
 - **The language** of the guide: the user's.
 - **The end-to-end case**: one real case that crosses most layers of the
   change. Propose the one you would pick and why.
@@ -87,6 +90,20 @@ column headed "Statut", "Status" or "HTTP" get one too), tables, fenced code
 with a language (`ruby`, `json`, `yaml`, `http`, `bash`). Links and comments
 inside code are left alone: `build.py` works on pandoc's syntax tree.
 
+### 5b. Embed the UX guide
+
+With a UX tab, build the UX guide with the `ux-guide` skill (or reuse the
+one already made for the PR), then make it reachable as `ux/` from the
+guide's directory:
+
+```bash
+ln -s ~/share/<project>-pr-<n>-ux ~/share/<slug>/ux
+```
+
+The UX tab of the skeleton embeds `ux/index.html` in an iframe, with a
+link to open it full screen; `build.py` refuses the tab when the file is
+missing. Videos stay in the UX guide: the review guide does not copy them.
+
 ### 6. Build and check
 
 ```bash
@@ -105,7 +122,7 @@ Then look at every tab as described in `static-page`.
 
 Before the upload, `python3 build.py --check-urls` (every external link
 answers 200; links into a private repository are checked with `gh`). Then publish as described in `static-page`, into the
-`<slug>-<suffix>` folder it records, with `--except build.py --except GUIDE.md --except diagrams.py --except __pycache__`, and offer to add the URL to the
+`<slug>-<suffix>` folder it records, with `--except build.py --except GUIDE.md --except diagrams.py --except __pycache__ --except ux`; the UX guide is published on its own into `<slug>-<suffix>/ux`, under the same password (`ux-guide`, step 6), and offer to add the URL to the
 PR description.
 
 ### 8. Iterate
@@ -173,6 +190,10 @@ These come from iterations on a real guide; each was a correction.
   along once three triggers converged on one box. Every node is a real
   name linked at the pinned commit, and the build refuses a name it cannot
   find there.
+- **Show the product in videos, one per feature.** On a rebuilt screen,
+  a reviewer of #2354 got more from nine short videos, each with what it
+  shows and what to check, than from captures: the UX tab embeds that
+  guide rather than retelling it.
 - **Numbers come from commands.** Operation counts, file counts, line
   counts: computed on the pinned commit, identical wherever they appear.
 - **The only script switches tabs** and keeps `#anchors` working; without

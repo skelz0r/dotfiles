@@ -10,6 +10,9 @@ GUIDE.md syntax, on top of CommonMark:
   front matter       title, repo (owner/name), sha (40 hex), plus optional kicker,
                      lang, pr, checkout (local clone used to verify links), footer
   <!-- tab: Name --> starts a tab; what comes before the first one is the intro
+  <iframe class="ux-frame" src="ux/index.html" title="…"></iframe> embeds the
+    UX guide published under ux/ (ux-guide skill); the build refuses a
+    missing file
   <!-- subtab: Name --> inside a tab, starts a sub-tab (DSFR segmented control);
                      what comes before the first one stays above the switch
   gh:path#L10-L20    file at the pinned sha, verified against the local clone
@@ -531,9 +534,9 @@ def check_output(page):
         warn(f"fenced div rendered as text: {leftover} (variants go in braces: ::: {{.callout .warning}})")
     for leftover in sorted(set(re.findall(r"\[[^\]<>]+\]\[[^\]<>]*\]", text))):
         warn(f"unresolved reference link {leftover}")
-    for src in re.findall(r'<img [^>]*src="([^"]+)"', page):
+    for tag, src in re.findall(r'<(img|iframe) [^>]*src="([^"]+)"', page):
         if not re.match(r"[a-z]+:", src) and not (ROOT / urllib.parse.unquote(src)).exists():
-            warn(f"missing image {src}")
+            warn(f"missing {'image' if tag == 'img' else 'embedded page'} {src}")
     for img in re.findall(r"<img [^>]*>", page):
         if 'alt=""' in img:
             warn(f"image without alt text: {img[:80]}")

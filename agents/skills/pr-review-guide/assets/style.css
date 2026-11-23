@@ -259,3 +259,12 @@ footer { border-top: 2px solid var(--primary); padding: 1.5rem 0; font-size: .81
 .diagram .edge-label { font-size: 11.5px; font-style: italic; fill: var(--muted); paint-order: stroke; stroke: #fff; stroke-width: 3px; }
 .diagram .edge-label.api, .diagram .edge-label.move { fill: var(--primary); }
 .diagram .edge-label.copy { fill: var(--warning); }
+
+.ux-frame {
+  display: block;
+  width: 100%;
+  height: 85vh;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
