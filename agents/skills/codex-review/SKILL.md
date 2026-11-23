@@ -298,8 +298,12 @@ A human reviewer is requested here, through `--request-reviewer`, never when the
 opened: GitHub notifies them at once, and the passes that follow rewrite what they would read. "Open
 a PR and request a review from X" means `gh pr create` without `--reviewer`, the review loops, then
 `publish --request-reviewer X`. `X` is a login or an `org/team`; with no name given, take the
-ones `agentic-review reviewer` prints, the teams the base branch ruleset requires (exit 1 when the
-base requires no review or the pull request is already approved). On PR 645 the reviewer was requested at `gh pr create`, then two
+ones `agentic-review reviewer` prints (exit 1 when the base requires no review or the pull request
+is already approved): the teams the base branch ruleset requires, else the owners of the changed
+files in `CODEOWNERS`, else the teams `CONTRIBUTING.md` mentions, each checked to exist on GitHub.
+Never type a team name from memory: on apistration, whose ruleset names nobody, agents asked who
+should review in 13 sessions and six requests went to `datagouv/apistration-tech`, which does not
+exist, while `CONTRIBUTING.md` named `@datagouv/tech-apistration`. On PR 645 the reviewer was requested at `gh pr create`, then two
 passes found nine defects and rewrote the commit.
 
 The same `agentic-review reviewer` decides the next step offered on the pull request's `waiting`
@@ -309,8 +313,9 @@ item in the navette inbox (`navette-inbox`), whoever posts it:
 - teams printed: `--option "Demander une review à <team>"`, and no merge option. The click runs
   `agentic-review publish --request-reviewer <org/team>`, then reposts the key `--status blocked`
   (« Review demandée à <team> ») instead of archiving it;
-- exit 0 with no team (an approval required, nobody named): ask the user in the item who should
-  review.
+- exit 0 with no team (an approval required, nobody named in the ruleset, `CODEOWNERS` nor
+  `CONTRIBUTING.md`): ask the user in the item who should review; several teams printed: one
+  option per team.
 
 A pull request carrying the label that the repository's `REVIEW.md` lets merge without review
 keeps "Merger puis /cleanup".

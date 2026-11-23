@@ -419,3 +419,36 @@ mitigate_five() {
   assert_contains "$output" "f1 bug P1 \"five is wrong\": fixed only partly, the trade-off waits for a human"
   assert_contains "$output" "Paste in Needs you: https://github.com/acme/app/pull/12#issuecomment-101"
 }
+
+stub_reviewer_sources() {
+  stub gh 'case "$*" in
+  "pr view --json"*)
+    printf "{\"number\":12,\"url\":\"https://github.com/acme/app/pull/12\",\"author\":{\"login\":\"me\"},\"headRefOid\":\"abc\",\"baseRefName\":\"main\",\"state\":\"OPEN\"}\n" ;;
+  "api repos/acme/app/rules/branches/main") echo "[{\"type\":\"pull_request\",\"parameters\":{\"required_approving_review_count\":1}}]" ;;
+  *"contents/.github/CODEOWNERS"*) [ -n "$MOCK_CODEOWNERS" ] && printf "%b" "$MOCK_CODEOWNERS" || exit 1 ;;
+  *"contents/CONTRIBUTING.md"*) echo "Then request a review from @acme/app-tech or @acme/ghost-team." ;;
+  *"contents/"*) exit 1 ;;
+  "pr view https://github.com/acme/app/pull/12 --json reviewDecision") echo "{\"reviewDecision\":\"REVIEW_REQUIRED\"}" ;;
+  "pr view https://github.com/acme/app/pull/12 --json files") echo "{\"files\":[{\"path\":\"docs/api.md\"}]}" ;;
+  "api orgs/acme/teams/ghost-team") exit 1 ;;
+  "api orgs/acme/teams/"*|"api users/"*) echo "{}" ;;
+  *) cat > /dev/null ;;
+esac'
+}
+
+@test "a ruleset that names no reviewer falls back to the existing teams of CONTRIBUTING.md" {
+  stub_reviewer_sources
+  run agentic_review reviewer
+  assert_equal "$status" 0
+  assert_contains "$output" "acme/app-tech"
+  assert_contains "$output" "acme/ghost-team, which does not exist"
+  assert_equal "$(echo "$output" | grep -c '^acme/')" "1"
+}
+
+@test "the owners of the changed files in CODEOWNERS come before CONTRIBUTING.md" {
+  export MOCK_CODEOWNERS='* @acme/app-tech\n/docs/ @acme/writers dorine\n'
+  stub_reviewer_sources
+  run agentic_review reviewer
+  assert_equal "$status" 0
+  assert_equal "$output" "acme/writers"
+}

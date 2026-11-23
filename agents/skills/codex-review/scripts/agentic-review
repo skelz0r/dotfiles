@@ -928,11 +928,90 @@ def ruleset_reviewers(pull):
     return required, list(dict.fromkeys(names))
 
 
+def repository_file(pull, path):
+    result = run(["gh", "api", "-H", "Accept: application/vnd.github.raw",
+                  f"repos/{pull['repo']}/contents/{path}?ref={pull['baseRefName']}"], check=False)
+    return result.stdout if result.returncode == 0 else None
+
+
+def codeowners_pattern(pattern):
+    anchored = pattern.startswith("/") or "/" in pattern.rstrip("/")
+    body = pattern.strip("/")
+    regex = ""
+    index = 0
+    while index < len(body):
+        if body.startswith("**", index):
+            regex += ".*"
+            index += 2
+        elif body[index] == "*":
+            regex += "[^/]*"
+            index += 1
+        elif body[index] == "?":
+            regex += "[^/]"
+            index += 1
+        else:
+            regex += re.escape(body[index])
+            index += 1
+    prefix = "^" if anchored else "^(?:.*/)?"
+    return re.compile(f"{prefix}{regex}(?:/.*)?$")
+
+
+def codeowners_reviewers(pull):
+    text = next(filter(None, (repository_file(pull, path)
+                              for path in (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"))), None)
+    if text is None:
+        return []
+    rules = []
+    for line in text.splitlines():
+        fields = line.split("#", 1)[0].split()
+        if fields:
+            rules.append((codeowners_pattern(fields[0]), [owner for owner in fields[1:] if owner.startswith("@")]))
+    files = json.loads(gh("pr", "view", pull["url"], "--json", "files"))["files"]
+    names = []
+    for changed in files:
+        owners = next((owners for pattern, owners in reversed(rules) if pattern.match(changed["path"])), [])
+        names += [owner.lstrip("@") for owner in owners]
+    return list(dict.fromkeys(names))
+
+
+def contributing_reviewers(pull):
+    text = next(filter(None, (repository_file(pull, path)
+                              for path in ("CONTRIBUTING.md", ".github/CONTRIBUTING.md", "docs/CONTRIBUTING.md"))), None)
+    if text is None:
+        return []
+    return list(dict.fromkeys((name.rstrip(".") for name in re.findall(r"@([A-Za-z0-9-]+/[A-Za-z0-9_.-]+)", text))))
+
+
+def reviewer_exists(name):
+    owner, _, team = name.partition("/")
+    path = f"orgs/{owner}/teams/{team}" if team else f"users/{owner}"
+    return run(["gh", "api", path], check=False).returncode == 0
+
+
+def existing_reviewers(names, source):
+    found = []
+    for name in names:
+        if reviewer_exists(name):
+            found.append(name)
+        else:
+            print(f"{source} names {name}, which does not exist or is not visible: ignored", file=sys.stderr)
+    return found
+
+
+def fallback_reviewers(pull):
+    owners = existing_reviewers(codeowners_reviewers(pull), "CODEOWNERS")
+    if owners:
+        return owners
+    return existing_reviewers(contributing_reviewers(pull), "CONTRIBUTING.md")
+
+
 def command_reviewer(args):
     pull = find_pull_request(args.pr)
     if pull is None:
         raise Failure(f"no pull request for {current_branch()}")
     required, names = ruleset_reviewers(pull)
+    if required and not names:
+        names = fallback_reviewers(pull)
     decision = json.loads(gh("pr", "view", pull["url"], "--json", "reviewDecision"))["reviewDecision"]
     if not required:
         print(f"#{pull['number']}: {pull['baseRefName']} requires no review", file=sys.stderr)
@@ -941,8 +1020,8 @@ def command_reviewer(args):
         print(f"#{pull['number']}: already approved", file=sys.stderr)
         return 1
     if not names:
-        print(f"#{pull['number']}: {pull['baseRefName']} requires an approval but its ruleset names "
-              "no reviewer", file=sys.stderr)
+        print(f"#{pull['number']}: {pull['baseRefName']} requires an approval but neither its ruleset, "
+              "CODEOWNERS nor CONTRIBUTING.md names a reviewer", file=sys.stderr)
     for name in names:
         print(name)
     return 0
@@ -1039,7 +1118,8 @@ def parser():
                          help="request a human review once the status and comment are posted (repeatable); "
                               "org/team for a team, as printed by the reviewer command")
 
-    add("reviewer", "print the teams the base branch ruleset requires a review from; exit 1 when "
+    add("reviewer", "print the teams the base branch ruleset requires a review from, else the owners of the "
+        "changed files in CODEOWNERS, else the teams CONTRIBUTING.md names; exit 1 when "
         "the base requires no review or the pull request is already approved", command_reviewer)
     return root
 
