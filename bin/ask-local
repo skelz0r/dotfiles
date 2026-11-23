@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 OLLAMA_URL="http://127.0.0.1:11434"
-DEFAULT_MODEL="qwen3.5:35b-a3b"
+DEFAULT_MODEL="qwen3.8:27b"
 BYTES_PER_TOKEN=2
 
 usage() {
