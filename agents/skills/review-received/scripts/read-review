@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+#
+# read-review - Print, as JSON, what a pull request and its human reviews say
+#
+
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") PR [REVIEW_ID]
+
+PR is a URL (https://github.com/owner/name/pull/12) or owner/name#12.
+Prints one JSON document: the pull request (title, author, branches,
+state, decision, size), the reviews of other people than its author
+and of no bot (the one named by REVIEW_ID, else the latest per
+reviewer) with their inline comments, how the head moved since each
+reviewed commit (GitHub compare: identical, ahead, diverged when the
+branch was rewritten), and the unresolved threads.
+Read-only: it never writes to GitHub.
+
+Options:
+  -h, --help  Show this help message
+EOF
+}
+
+[[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || { usage; exit 0; }
+[[ $# -ge 1 && $# -le 2 ]] || { usage >&2; exit 2; }
+
+reference="$1"
+review_id="${2:-}"
+
+if [[ "$reference" =~ ^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/([0-9]+) ]]; then
+  owner="${BASH_REMATCH[1]}"; name="${BASH_REMATCH[2]}"; number="${BASH_REMATCH[3]}"
+elif [[ "$reference" =~ ^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#([0-9]+)$ ]]; then
+  owner="${BASH_REMATCH[1]}"; name="${BASH_REMATCH[2]}"; number="${BASH_REMATCH[3]}"
+else
+  echo "read-review: not a pull request: $reference" >&2
+  exit 2
+fi
+[[ -z "$review_id" || "$review_id" =~ ^[0-9]+$ ]] || { echo "read-review: not a review id: $review_id" >&2; exit 2; }
+
+pull_request="$(gh api "repos/$owner/$name/pulls/$number")"
+author="$(jq -r '.user.login' <<< "$pull_request")"
+
+reviews="$(gh api --paginate "repos/$owner/$name/pulls/$number/reviews" | jq -s 'add // []')"
+selected="$(jq --arg author "$author" --arg id "$review_id" '
+  map(select(.user.login != $author and (.user.type != "Bot") and (.user.login | endswith("[bot]") | not) and .state != "PENDING"))
+  | if $id != "" then map(select((.id | tostring) == $id))
+    else group_by(.user.login) | map(max_by(.submitted_at)) | sort_by(.submitted_at) end
+  | map({id, login: .user.login, state, submitted_at, commit_id, url: .html_url, body})' <<< "$reviews")"
+
+head_sha="$(jq -r '.head.sha' <<< "$pull_request")"
+since_review='{}'
+for commit in $(jq -r '[.[].commit_id] | unique | .[]' <<< "$selected"); do
+  comparison="$(gh api "repos/$owner/$name/compare/$commit...$head_sha" --jq '{status, ahead_by, behind_by}' 2>/dev/null || echo '{"status": "unknown"}')"
+  since_review="$(jq --arg commit "$commit" --argjson comparison "$comparison" '. + {($commit): $comparison}' <<< "$since_review")"
+done
+
+comments="$(gh api --paginate "repos/$owner/$name/pulls/$number/comments" | jq -s 'add // []')"
+
+# shellcheck disable=SC2016
+threads="$(gh api graphql -F owner="$owner" -F name="$name" -F number="$number" -f query='
+  query($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved isOutdated path line
+            comments(first: 20) { nodes { author { login } body url } }
+          }
+        }
+      }
+    }
+  }' --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)
+    | {path, line, outdated: .isOutdated, comments: [.comments.nodes[] | {login: .author.login, body, url}]}]')"
+
+jq -n \
+  --argjson pull_request "$pull_request" \
+  --argjson reviews "$selected" \
+  --argjson comments "$comments" \
+  --argjson threads "$threads" \
+  --argjson since_review "$since_review" '
+  {
+    pull_request: {
+      repository: $pull_request.base.repo.full_name, number: $pull_request.number, url: $pull_request.html_url,
+      title: $pull_request.title, author: $pull_request.user.login, state: $pull_request.state, draft: $pull_request.draft,
+      merged: $pull_request.merged, head: $pull_request.head.ref, head_sha: $pull_request.head.sha, base: $pull_request.base.ref,
+      changed_files: $pull_request.changed_files, additions: $pull_request.additions, deletions: $pull_request.deletions
+    },
+    reviews: [$reviews[] | . as $review | . + {
+      head_since_review: $since_review[$review.commit_id],
+      comments: [$comments[] | select(.pull_request_review_id == $review.id)
+        | {path, line: (.line // .original_line), body, url: .html_url, outdated: (.position == null)}]
+    }],
+    unresolved_threads: $threads
+  }'
