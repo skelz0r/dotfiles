@@ -1,0 +1,189 @@
+:root {
+  --font: Marianne, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --primary: #000091;
+  --primary-hover: #6a6af4;
+  --primary-light: #e3e3fd;
+  --primary-lighter: #f5f5fe;
+  --text: #161616;
+  --muted: #666;
+  --surface: #f6f6f6;
+  --border: #dddddd;
+  --good: #18753c;
+  --good-bg: #b8fec9;
+  --warning: #b34000;
+  --warning-bg: #ffe9e6;
+  --info: #0063cb;
+  --info-bg: #e8edff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px 64px;
+}
+
+a { color: var(--primary); }
+
+h1, h2, h3 { line-height: 1.25; }
+h1 { font-size: 2.4rem; margin: .2em 0 .5em; }
+h2 {
+  font-size: 1.7rem;
+  margin: 2.4em 0 .8em;
+  padding-top: .6em;
+  border-top: 3px solid var(--primary);
+}
+h3 { font-size: 1.2rem; margin: 1.6em 0 .5em; }
+
+.hero {
+  margin: 0 -24px;
+  padding: 48px 24px 32px;
+  background: var(--primary-lighter);
+  border-bottom: 1px solid var(--primary-light);
+}
+.kicker {
+  margin: 0;
+  color: var(--primary);
+  font-size: .85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.lead { font-size: 1.2rem; max-width: 52em; margin: .4em 0; }
+
+.cards { display: grid; gap: 16px; }
+.cards.three { grid-template-columns: repeat(3, 1fr); }
+.card {
+  padding: 20px;
+  background: var(--surface);
+  border-left: 4px solid var(--primary);
+}
+.card h3 { margin-top: 0; font-size: 1.05rem; }
+.card p { margin: 0; }
+
+.pillar { color: var(--primary); }
+
+ul.checks, ul.crosses { list-style: none; padding-left: 0; }
+ul.checks li, ul.crosses li { position: relative; padding-left: 1.8em; margin: .45em 0; }
+ul.checks li::before { content: "✓"; position: absolute; left: 0; color: var(--good); font-weight: 700; }
+ul.crosses li::before { content: "✕"; position: absolute; left: 0; color: var(--warning); font-weight: 700; }
+
+video {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: #000;
+}
+
+figure { margin: 0; }
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+figcaption { font-size: .92rem; color: var(--muted); margin-top: .5em; }
+
+.ba {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.ba.mails { max-width: 820px; }
+
+.mails.three {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin: 1em 0;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0 .5em;
+  margin-right: .4em;
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+.tag.before { background: var(--warning-bg); color: var(--warning); }
+.tag.after { background: var(--good-bg); color: var(--good); }
+
+.prep {
+  margin: 1.5em 0;
+  padding: 4px 24px 16px;
+  background: var(--surface);
+}
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8em;
+  height: 1.8em;
+  margin-right: .4em;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  font-size: .9em;
+}
+ol.security li { margin: .4em 0; }
+
+.note {
+  padding: 12px 16px;
+  background: var(--info-bg);
+  border-left: 4px solid var(--info);
+}
+
+ol.timeline {
+  list-style: none;
+  padding-left: 0;
+  border-left: 3px solid var(--primary-light);
+  margin-left: 8px;
+}
+ol.timeline li {
+  position: relative;
+  padding: 0 0 20px 24px;
+}
+ol.timeline li::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  background: var(--primary);
+  border-radius: 50%;
+}
+ol.timeline .when {
+  margin: 0;
+  color: var(--primary);
+  font-size: .85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+ol.timeline h3 { margin: .1em 0 .2em; }
+ol.timeline p { margin: .2em 0; }
+.tickets { font-size: .92rem; color: var(--muted); }
+
+.links ul { padding-left: 1.2em; }
+
+@media (max-width: 720px) {
+  body { font-size: 16px; }
+  main { padding: 0 16px 48px; }
+  .hero { margin: 0 -16px; padding: 32px 16px 24px; }
+  h1 { font-size: 1.8rem; }
+  .cards.three, .ba, .mails.three { grid-template-columns: 1fr; }
+}

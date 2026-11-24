@@ -6,7 +6,7 @@ description: Build a self-contained static HTML page (or a small set of pages) s
 # Static page
 
 How to build, check and publish a static HTML page. Skills that generate a
-specific kind of page (`pr-review-guide`, `decision-mockups`) follow these
+specific kind of page (`pr-review-guide`, `decision-mockups`, `feature-pitch`) follow these
 rules and add their own content rules, components and token roles. For any
 other page, follow this skill directly:
 

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{TITRE}}</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <p class="kicker">{{PRODUIT}} · présentation produit</p>
+  <h1>{{TITRE}}</h1>
+  <p class="lead">{{EN UNE PHRASE : ce que l'usager peut faire désormais, sans jargon}}</p>
+  <p class="lead">{{OPTIONNEL : ce que ça prépare, en une phrase}}</p>
+</header>
+
+<section>
+  <h2>Pourquoi</h2>
+  <div class="cards three">
+    <div class="card">
+      <h3>{{PROBLÈME 1, du point de vue de l'usager}}</h3>
+      <p>{{Le constat, chiffré quand on peut : « 8 variantes », « 6 rappels »}}</p>
+    </div>
+    <div class="card">
+      <h3>{{PROBLÈME 2}}</h3>
+      <p>{{…}}</p>
+    </div>
+    <div class="card">
+      <h3>{{PROBLÈME 3}}</h3>
+      <p>{{…}}</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Ce qui change pour l'usager</h2>
+
+  <h3 class="pillar">1. {{PILIER}}</h3>
+  <p>{{Ce que l'usager voit et fait, en une ou deux phrases}}</p>
+
+  <h3 class="pillar">2. {{PILIER}}</h3>
+  <ul class="checks">
+    <li><strong>{{Qui}}</strong> {{peut faire quoi, avec la limite chiffrée}}</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Le parcours en vidéo</h2>
+  <p>{{Durée}}, lue en vitesse ×2 : {{ce que la vidéo montre, étape par étape}}</p>
+  <video controls preload="metadata" src="img/{{screencast}}.mp4"></video>
+</section>
+
+<section>
+  <h2>Avant / après</h2>
+
+  <h3>{{Écran}}</h3>
+  <div class="ba">
+    <figure><img src="img/{{avant}}.png" alt="Avant : {{description}}"><figcaption><span class="tag before">Avant</span> {{Ce qui posait problème}}</figcaption></figure>
+    <figure><img src="img/{{après}}.png" alt="Après : {{description}}"><figcaption><span class="tag after">Après</span> {{Ce qui change}}</figcaption></figure>
+  </div>
+
+  <h3>{{Mail}}</h3>
+  <div class="ba mails">
+    <figure><img src="img/{{mail-avant}}.png" alt="Avant : {{description}}"><figcaption><span class="tag before">Avant</span> {{…}}</figcaption></figure>
+    <figure><img src="img/{{mail-après}}.png" alt="Après : {{description}}"><figcaption><span class="tag after">Après</span> {{…}}</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>Ce qui disparaît</h2>
+  <ul class="crosses">
+    <li>{{Ce qui est retiré, avec ce qui reste quand le retrait est partiel}}</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Ce que ça prépare</h2>
+
+  <div class="prep">
+    <h3><span class="step">A</span> {{CHANTIER SUIVANT}}</h3>
+    <p><strong>Aujourd'hui</strong>, {{…}}. <strong>Demain</strong>, {{…}}.</p>
+    <p>Ce que la livraison met en place :</p>
+    <ul class="checks">
+      <li>{{…}}</li>
+    </ul>
+    <div class="mails three">
+      <figure><img src="img/{{variante-1}}.png" alt="{{…}}"><figcaption><strong>{{Cas}}</strong> : {{…}}</figcaption></figure>
+      <figure><img src="img/{{variante-2}}.png" alt="{{…}}"><figcaption><strong>{{Cas}}</strong> : {{…}}</figcaption></figure>
+      <figure><img src="img/{{variante-3}}.png" alt="{{…}}"><figcaption><strong>{{Cas}}</strong> : {{…}}</figcaption></figure>
+    </div>
+    <p class="note">{{La trajectoire : où on en est à la livraison, comment on avance}}</p>
+  </div>
+
+  <div class="prep">
+    <h3><span class="step">B</span> {{CHANTIER QUI DÉPEND DE A}}</h3>
+    <p>{{Pourquoi il dépend de A}}</p>
+    <ol class="security">
+      <li><strong>{{Étape 1}}</strong> {{État : prêt, à cadrer…}}</li>
+      <li><strong>{{Étape 2}}</strong> {{…}}</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>Ce que ça change pour l'équipe</h2>
+  <ul class="checks">
+    <li><strong>Support</strong> : {{…}}</li>
+    <li><strong>Discours aux usagers</strong> : « {{phrase à reprendre telle quelle}} »</li>
+    <li><strong>Documentation</strong> : {{…}}</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Découpage et suite</h2>
+  <ol class="timeline">
+    <li>
+      <p class="when">{{Livraison}}</p>
+      <h3>{{Ce qui part}}</h3>
+      <p>{{Une phrase}}</p>
+      <p class="tickets"><a href="{{url PR}}">PR #{{n}}</a> · <a href="{{url ticket}}">{{ID}}</a> {{sujet}}</p>
+    </li>
+    <li>
+      <p class="when">{{Ensuite}}</p>
+      <h3>{{…}}</h3>
+      <p>{{…}}</p>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>Décisions prises</h2>
+  <ul class="checks">
+    <li>{{Décision, et sa raison en une demi-phrase}}</li>
+  </ul>
+  <p class="note">{{Ce qu'il faut faire avant la mise en production, s'il y a lieu}}</p>
+</section>
+
+<section class="links">
+  <h2>Pour aller plus loin</h2>
+  <ul>
+    <li><a href="{{url ticket parent}}">Ticket parent {{ID}}</a></li>
+    <li><a href="{{url PR}}">PR #{{n}}</a></li>
+    <li><a href="{{url guide}}">Guide de revue technique</a> (protégé par mot de passe)</li>
+  </ul>
+</section>
+
+</main>
+<script>
+document.querySelectorAll('video').forEach(function (v) {
+  v.defaultPlaybackRate = 2;
+  v.playbackRate = 2;
+  v.addEventListener('loadedmetadata', function () { v.playbackRate = 2; });
+});
+</script>
+</body>
+</html>
