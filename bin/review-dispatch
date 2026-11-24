@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+#
+# review-dispatch - Open a Claude tab per review listed by review-watch (ags hand-off)
+#
+
+set -euo pipefail
+
+HERDR_DISPATCH="${REVIEW_DISPATCH_HERDR_DISPATCH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/herdr-dispatch}"
+WORK_ROOT="${REVIEW_DISPATCH_WORK_ROOT:-$HOME/work}"
+TAB_NAME_LENGTH=32
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS] < PROMPT
+
+Hand-off command of the ags job review-watch. Reads the rendered
+prompt on stdin, keeps only the lines review-watch printed
+(request|received, PR URL, date, keys, tab-separated) and queues one
+Claude tab per line with herdr-dispatch enqueue --new-tab:
+
+  request   the pre-manual-review-pr skill on the PR
+  received  the review-received skill on the PR
+
+The tab is named review-<repo>-<number>. Its Claude runs in the clone
+of the repository found under $WORK_ROOT (two levels deep, by the
+origin remote), preferring one that has a herdr workspace; the tab
+opens in that workspace, else in Home. Without a clone it runs in
+$WORK_ROOT, in Home: a folder Claude trusts, where ~ asks again at each
+session.
+
+Each queued line has its keys appended to \$AGS_JOB_STATE_DIR/dispatched;
+a line that fails is left out, so the next run lists it again.
+
+Exit codes: 0 every line queued, 1 at least one failed, 2 usage.
+
+Options:
+  -h, --help  Show this help message
+EOF
+}
+
+say() {
+  if [[ -t 1 ]]; then
+    echo -e "$1$2${NC}"
+  else
+    echo "$2"
+  fi
+}
+
+repository_of() {
+  git -C "$1" remote get-url origin 2> /dev/null \
+    | sed -E 's#^(git@[^:]+:|ssh://git@[^/]+/|https?://[^/]+/)##; s#\.git$##; s#/$##' \
+    | tr '[:upper:]' '[:lower:]' || true
+}
+
+clone_of() {
+  local wanted first="" candidate
+  wanted="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  for candidate in "$WORK_ROOT"/*/ "$WORK_ROOT"/*/*/; do
+    candidate="${candidate%/}"
+    [[ -e "$candidate/.git" ]] || continue
+    [[ "$(repository_of "$candidate")" == "$wanted" ]] || continue
+    if "$HERDR_DISPATCH" workspace-for "$candidate" > /dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return
+    fi
+    [[ -n "$first" ]] || first="$candidate"
+  done
+  printf '%s' "$first"
+}
+
+tab_name() {
+  local name="$1" number="$2" room
+  name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | LC_ALL=C tr -c 'a-z0-9-' '-')"
+  room=$((TAB_NAME_LENGTH - ${#number} - 8))
+  name="$(printf '%s' "$name" | cut -c1-"$room" | sed 's/-*$//')"
+  printf 'review-%s-%s' "$name" "$number"
+}
+
+prompt_for() {
+  local kind="$1" url="$2" at="$3" keys="$4" reference="$5" review_option=""
+  if [[ "$kind" == "request" ]]; then
+    printf 'Review requested on %s (request of %s). Load the pre-manual-review-pr skill and run it on %s.' "$reference" "$at" "$url"
+  else
+    [[ "$keys" == *,* ]] || review_option=" --review ${keys#review|}"
+    printf 'New review received on %s. Load the review-received skill and run it on %s%s.' "$reference" "$url" "$review_option"
+  fi
+}
+
+dispatch_line() {
+  local kind="$1" url="$2" at="$3" keys="$4" owner name number clone name_of_tab
+  [[ "$url" =~ ^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/([0-9]+)$ ]] || { echo "not a pull request: $url" >&2; return 1; }
+  owner="${BASH_REMATCH[1]}"
+  name="${BASH_REMATCH[2]}"
+  number="${BASH_REMATCH[3]}"
+  clone="$(clone_of "$owner/$name")"
+  name_of_tab="$(tab_name "$name" "$number")"
+  prompt_for "$kind" "$url" "$at" "$keys" "$owner/$name#$number" \
+    | "$HERDR_DISPATCH" enqueue --new-tab "$name_of_tab" --cwd "${clone:-$WORK_ROOT}" > /dev/null || return 1
+  printf '%s\n' "$keys" | tr ',' '\n' >> "$AGS_JOB_STATE_DIR/dispatched"
+  say "$GREEN" "queued $name_of_tab (${clone:-$WORK_ROOT}): $kind $url"
+}
+
+main() {
+  [[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || { usage; exit 0; }
+  [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+  [[ -n "${AGS_JOB_STATE_DIR:-}" && -d "$AGS_JOB_STATE_DIR" ]] || { echo "review-dispatch: AGS_JOB_STATE_DIR is not a directory" >&2; exit 2; }
+
+  local kind url at keys extra failures=0 queued=0
+  while IFS=$'\t' read -r kind url at keys extra || [[ -n "$kind" ]]; do
+    [[ "$kind" == "request" || "$kind" == "received" ]] || continue
+    [[ -n "$url" && -n "$at" && -n "$keys" && -z "$extra" ]] || continue
+    if dispatch_line "$kind" "$url" "$at" "$keys"; then
+      queued=$((queued + 1))
+    else
+      say "$RED" "failed: $kind $url" >&2
+      failures=$((failures + 1))
+    fi
+  done
+  echo "$queued queued, $failures failed"
+  [[ "$failures" -eq 0 ]] || exit 1
+}
+
+main "$@"

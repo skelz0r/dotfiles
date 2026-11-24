@@ -1,6 +1,6 @@
 ---
 name: review-received
-description: Analyse a review someone left on one of the user's GitHub pull requests and fill the navette inbox item of that pull request with a short analysis — what the reviewer asks, how serious each point is, the plan to address it — creating the item when no item tracks the pull request. Read-only on GitHub and on the code: nothing is posted, answered, pushed nor edited. Use when navette launches a session on a review received, when the user says "analyse la review de X", "qu'est-ce que demande la review", "review reçue sur la PR", "regarde ce que dit le reviewer", or passes a pull request URL (or owner/name#12) asking what the review wants.
+description: Analyse a review someone left on one of the user's GitHub pull requests and fill the navette inbox item of that pull request with a short analysis — what the reviewer asks, how serious each point is, the plan to address it — creating the item when no item tracks the pull request. Read-only on GitHub and on the code: nothing is posted, answered, pushed nor edited. Use when the review-watch ags job opens a tab on a review received, when the user says "analyse la review de X", "qu'est-ce que demande la review", "review reçue sur la PR", "regarde ce que dit le reviewer", or passes a pull request URL (or owner/name#12) asking what the review wants.
 ---
 
 # Review received

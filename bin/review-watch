@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+#
+# review-watch - List the GitHub reviews to hand to a new Claude tab (ags precheck)
+#
+
+set -euo pipefail
+
+MAX_PER_RUN=5
+
+usage() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Precheck of the ags job review-watch. Lists, oldest first and at most
+$MAX_PER_RUN, what needs a Claude tab, one TSV line each:
+
+  request   PR_URL  REQUESTED_AT  KEY            a review asked of me or of
+                                                 a team, on an open, ready
+                                                 PR of a human other than me
+  received  PR_URL  SUBMITTED_AT  KEY[,KEY...]   new reviews of humans other
+                                                 than me on an open PR of mine
+
+KEY is what review-dispatch records once the tab is queued. A received
+review is skipped when a Claude of herdr runs on the head branch of
+its PR: navette wakes that session when its item is blocked (D44), and
+otherwise the user works there.
+
+State in \$AGS_JOB_STATE_DIR: dispatched (written by review-dispatch)
+and ignored (written here through \$AGS_STAGED_STATE_DIR). The first
+run records every pending review as ignored and dispatches nothing.
+
+Exit codes: 0 something to dispatch, 1 nothing (ags skips the run),
+2 error.
+
+Options:
+  -h, --help  Show this help message
+EOF
+}
+
+fail() {
+  echo "review-watch: $*" >&2
+  exit 2
+}
+
+requests_query() {
+  cat << 'EOF'
+query {
+  viewer { login }
+  search(query: "is:pr is:open review-requested:@me -author:@me archived:false sort:updated-desc", type: ISSUE, first: 50) {
+    nodes {
+      ... on PullRequest {
+        url
+        isDraft
+        author { __typename login }
+        timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 50) {
+          nodes {
+            ... on ReviewRequestedEvent {
+              createdAt
+              requestedReviewer { __typename ... on User { login } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+EOF
+}
+
+received_query() {
+  cat << 'EOF'
+query {
+  viewer { login }
+  search(query: "is:pr is:open author:@me archived:false sort:updated-desc", type: ISSUE, first: 50) {
+    nodes {
+      ... on PullRequest {
+        url
+        headRefName
+        repository { nameWithOwner }
+        reviews(last: 50) {
+          nodes { databaseId state submittedAt author { __typename login } }
+        }
+      }
+    }
+  }
+}
+EOF
+}
+
+request_rows() {
+  jq -r --rawfile known "$1" '
+    .data.viewer.login as $me
+    | ($known | split("\n")) as $seen
+    | .data.search.nodes[]
+    | select(.url != null and (.isDraft | not) and .author.__typename != "Bot")
+    | [.timelineItems.nodes[] | select(.requestedReviewer.__typename == "Team" or .requestedReviewer.login == $me) | .createdAt] as $mine
+    | (if ($mine | length) > 0 then $mine else [.timelineItems.nodes[].createdAt] end | max) as $at
+    | "request|\(.url)|\($at)" as $key
+    | select($at != null and ($seen | index($key) | not))
+    | ["request", .url, $at, $key, "", ""]
+    | @tsv'
+}
+
+received_rows() {
+  jq -r --rawfile known "$1" '
+    .data.viewer.login as $me
+    | ($known | split("\n")) as $seen
+    | .data.search.nodes[]
+    | select(.url != null)
+    | . as $pr
+    | [.reviews.nodes[]
+       | select(.state != "PENDING" and .author.__typename != "Bot" and .author.login != $me and .databaseId != null)
+       | select(("review|\(.databaseId)") as $key | $seen | index($key) | not)]
+    | select(length > 0)
+    | ["received", $pr.url, (map(.submittedAt) | min), (map("review|\(.databaseId)") | join(",")),
+       ($pr.repository.nameWithOwner | ascii_downcase), $pr.headRefName]
+    | @tsv'
+}
+
+repository_of() {
+  git -C "$1" remote get-url origin 2> /dev/null \
+    | sed -E 's#^(git@[^:]+:|ssh://git@[^/]+/|https?://[^/]+/)##; s#\.git$##; s#/$##' \
+    | tr '[:upper:]' '[:lower:]'
+}
+
+live_branches() {
+  local agents cwd repository branch
+  agents="$(herdr agent list 2> /dev/null)" || fail "unreadable herdr agents"
+  printf '%s' "$agents" | jq -r '.result.agents[] | select(.agent == "claude") | .cwd // empty' | sort -u | while IFS= read -r cwd; do
+    [[ -d "$cwd" ]] || continue
+    repository="$(repository_of "$cwd" || true)"
+    branch="$(git -C "$cwd" rev-parse --abbrev-ref HEAD 2> /dev/null || true)"
+    [[ -z "$repository" || -z "$branch" ]] || printf '%s\t%s\n' "$repository" "$branch"
+  done
+}
+
+main() {
+  [[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || { usage; exit 0; }
+  [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+  [[ -n "${AGS_JOB_STATE_DIR:-}" && -d "$AGS_JOB_STATE_DIR" ]] || fail "AGS_JOB_STATE_DIR is not a directory"
+  [[ -n "${AGS_STAGED_STATE_DIR:-}" && -d "$AGS_STAGED_STATE_DIR" ]] || fail "AGS_STAGED_STATE_DIR is not a directory"
+  command -v gh > /dev/null || fail "gh not found"
+  command -v jq > /dev/null || fail "jq not found"
+
+  local known first_run=false requests received rows ignored_now live kind url at keys repository branch
+  trap 'echo "review-watch: failed at line $LINENO" >&2; exit 2' ERR
+  WORK="$(mktemp -d)"
+  trap 'rm -rf "$WORK"' EXIT
+  known="$WORK/known"
+  [[ -f "$AGS_JOB_STATE_DIR/dispatched" || -f "$AGS_JOB_STATE_DIR/ignored" ]] || first_run=true
+  { cat "$AGS_JOB_STATE_DIR/dispatched" "$AGS_JOB_STATE_DIR/ignored" 2> /dev/null || true; } | sort -u > "$known"
+
+  requests="$(gh api graphql -f query="$(requests_query)" 2> "$WORK/gh.err")" || fail "gh: $(head -n 1 "$WORK/gh.err")"
+  received="$(gh api graphql -f query="$(received_query)" 2> "$WORK/gh.err")" || fail "gh: $(head -n 1 "$WORK/gh.err")"
+
+  rows="$WORK/rows"
+  {
+    printf '%s' "$requests" | request_rows "$known"
+    printf '%s' "$received" | received_rows "$known"
+  } > "$rows"
+
+  ignored_now="$WORK/ignored"
+  : > "$ignored_now"
+  if $first_run; then
+    cut -f4 "$rows" | tr ',' '\n' > "$ignored_now"
+    : > "$rows"
+  elif grep -q '^received' "$rows"; then
+    live="$WORK/live"
+    live_branches > "$live"
+    while IFS=$'\t' read -r kind url at keys repository branch; do
+      if [[ "$kind" == "received" ]] && grep -qxF "$repository"$'\t'"$branch" "$live"; then
+        printf '%s\n' "$keys" | tr ',' '\n' >> "$ignored_now"
+      else
+        printf '%s\t%s\t%s\t%s\n' "$kind" "$url" "$at" "$keys"
+      fi
+    done < "$rows" > "$WORK/kept"
+    mv "$WORK/kept" "$rows"
+  fi
+
+  if [[ -s "$ignored_now" ]]; then
+    { cat "$AGS_JOB_STATE_DIR/ignored" 2> /dev/null || true; cat "$ignored_now"; } | sort -u > "$AGS_STAGED_STATE_DIR/ignored"
+  elif $first_run; then
+    : > "$AGS_STAGED_STATE_DIR/ignored"
+  fi
+
+  if [[ ! -s "$rows" ]]; then
+    if $first_run; then
+      echo "first run: $(wc -l < "$ignored_now" | tr -d ' ') pending reviews recorded, none dispatched"
+    else
+      echo "nothing new ($(wc -l < "$ignored_now" | tr -d ' ') skipped for a live session)"
+    fi
+    exit 1
+  fi
+  sort -t $'\t' -k3,3 "$rows" | cut -f1-4 | head -n "$MAX_PER_RUN"
+}
+
+main "$@"

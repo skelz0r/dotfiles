@@ -11,3 +11,10 @@ jobs:
     schedule: "30 * * * *"
     precheck: bin/ags-doctor-watch
     prompt_file: .ags/ags-doctor.md
+
+  review-watch:
+    schedule: "*/10 * * * *"
+    catch_up: never
+    precheck: bin/review-watch
+    prompt_file: .ags/review-watch.md
+    command: review-tabs

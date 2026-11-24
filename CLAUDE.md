@@ -59,8 +59,9 @@ Before committing:
 
 Behaviour tests exist only where a bug costs data or exposure
 (install.sh, migration, upload-assets prepare, gh-media-log purge,
-tidy-commits, agentic-review publish, block-secrets and
-block-hook-bypass hooks, global git hooks, herdr-dispatch queue,
+tidy-commits, agentic-review publish, review-watch and review-dispatch,
+block-secrets and block-hook-bypass hooks, global git hooks,
+herdr-dispatch queue and new tabs,
 cve-watch outbound requests and memory, rubocop-ratchet quotas and
 the opt-in of the global RuboCop cops);
 the other scripts are covered by lint and `--help` smoke tests. Tests
