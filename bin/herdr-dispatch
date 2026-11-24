@@ -62,13 +62,20 @@ Targets of enqueue (one of):
   --cwd PATH                 The -main of the workspace found by workspace-for
   --home-cwd PATH            The unnamed Claude of the pane of Home (workspace
                              number 1) whose cwd is PATH; never started
+  --new-tab NAME [--cwd PATH]
+                             The Claude named NAME, started in a new tab
+                             labelled NAME when it does not run: cwd PATH (~
+                             without --cwd), in the workspace found by
+                             workspace-for PATH, else in Home; the context
+                             of a running NAME is kept
 
 Options of enqueue:
   --pane PANE_ID             The unnamed Claude of this pane instead of the -main
                              (not with --home-cwd)
   --label LABEL              Workspace label naming a -main to create
                              (default: read from herdr)
-  --keep-context             Do not send /clear before the prompt
+  --keep-context             Do not send /clear before the prompt (implied by
+                             --new-tab)
   -h, --help                 Show this help message
 
 {{job_id}} in the prompt is replaced by the job id.
@@ -303,7 +310,7 @@ launch_runner() {
 }
 
 create_job() {
-  local workspace_id="$1" agent="$2" label="$3" clear="$4" job_id job_dir
+  local workspace_id="$1" agent="$2" label="$3" clear="$4" tab_cwd="${5:-}" job_id job_dir
   valid_queue_target "$agent" || refuse "invalid agent name: $agent"
   [[ -n "$label" ]] || refuse "invalid label"
 
@@ -320,6 +327,7 @@ create_job() {
   printf '%s' "$agent" > "$job_dir.tmp/agent"
   printf '%s' "$label" > "$job_dir.tmp/label"
   printf '%s' "$clear" > "$job_dir.tmp/clear"
+  [[ -z "$tab_cwd" ]] || printf '%s' "$tab_cwd" > "$job_dir.tmp/tab_cwd"
   printf 'queued' > "$job_dir.tmp/state"
   mv "$job_dir.tmp" "$job_dir"
 
@@ -327,10 +335,33 @@ create_job() {
   echo "$job_id"
 }
 
+tab_workspace_for() {
+  local workspace_id status=0
+  workspace_id="$(workspace_for "$1" 2> /dev/null)" || status=$?
+  case "$status" in
+    0) printf '%s' "$workspace_id" ;;
+    2) home_workspace ;;
+    *) paint "$RED" "unreadable herdr workspaces"; return 1 ;;
+  esac
+}
+
+enqueue_new_tab() {
+  local name="$1" cwd="$2" workspace_id status=0
+  valid_agent_name "$name" || refuse "invalid tab name: $name"
+  cwd="$(expand_home "${cwd:-~}")"
+  [[ -d "$cwd" ]] || refuse "no such directory: $cwd"
+  cwd="$(canonical_dir "$cwd")"
+  workspace_id="$(tab_workspace_for "$cwd")" || status=$?
+  [[ "$status" -eq 0 ]] || exit "$status"
+  [[ "$workspace_id" =~ $WORKSPACE_ID_PATTERN ]] || refuse "invalid workspace: $workspace_id"
+  create_job "$workspace_id" "$name" "$name" keep "$cwd"
+}
+
 enqueue() {
-  local workspace_id="" cwd="" home_cwd="" home_target="" targets pane="" label="" clear=clear has_label=false agent status
+  local workspace_id="" cwd="" home_cwd="" home_target="" new_tab="" targets pane="" label="" clear=clear has_label=false agent status
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --new-tab) [[ $# -ge 2 ]] || fail_usage "--new-tab needs a name"; new_tab="$2"; shift 2 ;;
       --workspace) [[ $# -ge 2 ]] || fail_usage "--workspace needs an id"; workspace_id="$2"; shift 2 ;;
       --cwd) [[ $# -ge 2 ]] || fail_usage "--cwd needs a path"; cwd="$2"; shift 2 ;;
       --home-cwd) [[ $# -ge 2 ]] || fail_usage "--home-cwd needs a path"; home_cwd="$2"; shift 2 ;;
@@ -341,6 +372,11 @@ enqueue() {
       *) fail_usage "unknown enqueue argument: $1" ;;
     esac
   done
+  if [[ -n "$new_tab" ]]; then
+    [[ -z "$workspace_id$home_cwd$pane" ]] && ! $has_label || fail_usage "--new-tab takes only --cwd"
+    enqueue_new_tab "$new_tab" "$cwd"
+    return
+  fi
   targets="${workspace_id:+w}${cwd:+c}${home_cwd:+h}"
   [[ "${#targets}" -eq 1 ]] || fail_usage "enqueue takes one of --workspace, --cwd or --home-cwd"
   [[ -z "$home_cwd" ]] || { [[ -z "$pane" ]] && ! $has_label; } || fail_usage "--home-cwd finds its pane: no --pane nor --label"
@@ -449,6 +485,21 @@ start_agent() {
   fi
 }
 
+start_tab_agent() {
+  local job_dir="$1" workspace_id="$2" agent="$3" cwd="$4" created pane_id renamed started
+
+  created="$(herdr tab create --workspace "$workspace_id" --label "$agent" --cwd "$cwd" --no-focus 2>&1)" || { fail_job "$job_dir" "tab create: $created"; return 1; }
+  pane_id="$(printf '%s' "$created" | json_value result.root_pane.pane_id)" || { fail_job "$job_dir" "tab create without root pane"; return 1; }
+  renamed="$(herdr pane rename "$pane_id" "$agent" 2>&1)" || { fail_job "$job_dir" "pane rename: $renamed"; return 1; }
+  if ! started="$(herdr agent start "$agent" --kind claude --pane "$pane_id" --timeout "$START_TIMEOUT_MS" -- --dangerously-skip-permissions --remote-control "$agent" 2>&1)"; then
+    case "$started" in
+      *agent_not_ready*) fail_job "$job_dir" "Claude not ready in the new tab $agent (folder trust prompt in $cwd?)" ;;
+      *) fail_job "$job_dir" "agent start: $started" ;;
+    esac
+    return 1
+  fi
+}
+
 wait_for_clear() {
   local previous_session="$2" waited=0 current_session
   while [[ "$waited" -lt "$CLEAR_TIMEOUT_SECONDS" ]]; do
@@ -484,7 +535,7 @@ wipe_input() {
 }
 
 process_job() {
-  local job_dir="$1" format agent workspace_id label clear agent_workspace mains waited session_before cleared prompted
+  local job_dir="$1" format agent workspace_id label clear tab_cwd agent_workspace mains waited session_before cleared prompted
   format="$(cat "$job_dir/format" 2> /dev/null || true)"
   if [[ "$format" != "$JOB_FORMAT" ]]; then
     fail_job "$job_dir" "job format ${format:-missing} unknown to herdr-dispatch $VERSION ($SELF), which reads format $JOB_FORMAT: update it"
@@ -494,10 +545,13 @@ process_job() {
   workspace_id="$(cat "$job_dir/workspace_id")"
   label="$(cat "$job_dir/label")"
   clear="$(cat "$job_dir/clear" 2> /dev/null || echo clear)"
+  tab_cwd="$(cat "$job_dir/tab_cwd" 2> /dev/null || true)"
 
   agent_workspace="$(agent_field "$agent" workspace_id || true)"
   if valid_pane_id "$agent"; then
     check_pane_target "$job_dir" "$agent" "$workspace_id" || return 1
+  elif [[ -z "$agent_workspace" && -n "$tab_cwd" ]]; then
+    start_tab_agent "$job_dir" "$workspace_id" "$agent" "$tab_cwd" || return 1
   elif [[ -z "$agent_workspace" ]]; then
     mains="$(main_agents_of "$workspace_id")" || { fail_job "$job_dir" "unreadable herdr agents"; return 1; }
     [[ -z "$mains" ]] || { fail_job "$job_dir" "$agent is gone, the -main of $workspace_id is now $(printf '%s' "$mains" | tr '\n' ' '): resend the request"; return 1; }

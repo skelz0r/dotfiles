@@ -590,3 +590,81 @@ idle|From the iPhone"
   assert_equal "$("$DISPATCH" version)" "herdr-dispatch 1.0.0
 job-format 1"
 }
+
+tab_world() {
+  mkdir -p "$HOME/work/acme" "$HOME/work/lonely"
+  add_workspace w1 1 '🏠 Home' "$HOME"
+  add_workspace wA 2 'Acme' "$HOME/work/acme"
+}
+
+tabs_created() {
+  cat "$FAKE_HERDR_WORLD/tabs" 2> /dev/null || true
+}
+
+real_path() {
+  (cd "$1" && pwd -P)
+}
+
+@test "a new tab for a clone that has a workspace opens there, its Claude in the clone" {
+  tab_world
+  printf 'Triage acme#12' | "$DISPATCH" enqueue --new-tab review-acme-12 --cwd "$HOME/work/acme" > /dev/null
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(tabs_created)" "wA	review-acme-12	$(real_path "$HOME/work/acme")"
+  assert_equal "$(cat "$FAKE_HERDR_WORLD/pane_labels")" "wA:p10	review-acme-12"
+  assert_equal "$(starts)" "--kind claude --pane wA:p10 --timeout 60000 -- --dangerously-skip-permissions --remote-control review-acme-12"
+  assert_equal "$(prompts_of review-acme-12)" "idle|Triage acme#12"
+}
+
+@test "a new tab for a clone without workspace opens in Home, its Claude in the clone" {
+  tab_world
+  printf 'Triage lonely#3' | "$DISPATCH" enqueue --new-tab review-lonely-3 --cwd "$HOME/work/lonely" > /dev/null
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(tabs_created)" "w1	review-lonely-3	$(real_path "$HOME/work/lonely")"
+  assert_equal "$(prompts_of review-lonely-3)" "idle|Triage lonely#3"
+}
+
+@test "a new tab without cwd opens in Home, its Claude in the home directory" {
+  tab_world
+  printf 'Triage far#5' | "$DISPATCH" enqueue --new-tab review-far-5 > /dev/null
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(tabs_created)" "w1	review-far-5	$(real_path "$HOME")"
+  assert_equal "$(prompts_of review-far-5)" "idle|Triage far#5"
+}
+
+@test "a new tab whose Claude still runs gets the prompt in its context, without a second tab" {
+  tab_world
+  add_agent review-acme-12 wA idle
+  printf 'Requested again' | "$DISPATCH" enqueue --new-tab review-acme-12 --cwd "$HOME/work/acme" > /dev/null
+  wait_until 15 '[[ "$(job_states)" == "sent " ]]'
+  assert_equal "$(tabs_created)|$(starts)" "|"
+  assert_equal "$(prompts_of review-acme-12)" "idle|Requested again"
+}
+
+@test "a new tab that herdr cannot create leaves the job failed" {
+  tab_world
+  touch "$FAKE_HERDR_WORLD/tab_create_error"
+  printf 'Triage acme#12' | "$DISPATCH" enqueue --new-tab review-acme-12 --cwd "$HOME/work/acme" > /dev/null
+  wait_until 15 '[[ "$(job_states)" == "failed " ]]'
+  assert_contains "$(dispatch_status | cut -f5)" "tab create:"
+  assert_equal "$(starts)" ""
+}
+
+@test "a new tab whose Claude never gets ready leaves the job failed" {
+  tab_world
+  echo agent_not_ready > "$FAKE_HERDR_WORLD/start_error"
+  printf 'Triage acme#12' | "$DISPATCH" enqueue --new-tab review-acme-12 --cwd "$HOME/work/acme" > /dev/null
+  wait_until 15 '[[ "$(job_states)" == "failed " ]]'
+  assert_contains "$(dispatch_status | cut -f5)" "Claude not ready in the new tab review-acme-12"
+  assert_equal "$(prompts_of review-acme-12)" ""
+}
+
+@test "a new tab refuses another target, a bad name or a missing directory" {
+  tab_world
+  run bash -c "echo x | '$DISPATCH' enqueue --new-tab review-acme-12 --workspace wA"
+  assert_equal "$status" 2
+  run bash -c "echo x | '$DISPATCH' enqueue --new-tab 'Review Acme'"
+  assert_equal "$status|$output" "2|invalid tab name: Review Acme"
+  run bash -c "echo x | '$DISPATCH' enqueue --new-tab review-x-1 --cwd '$HOME/work/nowhere'"
+  assert_equal "$status" 2
+  assert_equal "$(job_states)" ""
+}
