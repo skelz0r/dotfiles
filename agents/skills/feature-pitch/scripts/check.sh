@@ -29,7 +29,7 @@ page="$dir/index.html"
 problems=0
 
 fail() {
-  printf "${RED}%s${NC}\n" "$1"
+  printf "%b%s%b\n" "$RED" "$1" "$NC"
   problems=$((problems + 1))
 }
 
@@ -60,8 +60,8 @@ if grep -nE '#k=' "$page" >/dev/null; then
 fi
 
 if [[ "$problems" -gt 0 ]]; then
-  printf "${RED}%d problem(s)${NC}\n" "$problems"
+  printf "%b%d problem(s)%b\n" "$RED" "$problems" "$NC"
   exit 1
 fi
 
-printf "${GREEN}ok${NC}\n"
+printf "%bok%b\n" "$GREEN" "$NC"
