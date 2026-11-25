@@ -25,6 +25,12 @@ git diff --stat <base>...HEAD
 `--commit <SHA>` and `--base <BRANCH>` both conflict with `[PROMPT]`. Domain context matters more
 than that harness, so drive `codex exec` instead and name the range inside the prompt.
 
+On the first pass of a series, run `~/.claude/skills/ux-review/scripts/ux-signal.sh <base>`. On
+`run`, launch a Claude sub-agent in the background, while Codex works, with the brief: follow
+the `ux-review` skill on `<repo>#<n>` at `<sha>`, commit nothing, return the page URL, the number
+of findings and of Important ones. On `offer`, tell the user in one line that a UX review is
+available. Its result is recorded at step 8.
+
 ### 2. Rate the complexity, pick the effort
 
 Score the diff on the axes below. Each one that applies pushes the effort up a rung.
@@ -286,6 +292,10 @@ git range-diff <base> <head reviewed> HEAD     # the fixes, as Codex must read t
 ~/.claude/skills/codex-review/scripts/agentic-review start --reviewer Codex --effort medium --scope "confirmation: fixes of Codex 1"
 ~/.claude/skills/codex-review/scripts/agentic-review check                   # exit 1 and the unreviewed files when stale
 ```
+
+When a UX review ran, record it after the last triage, as step 6 of `ux-review` says
+(`start --advisory`): it shows in the pass table, never covers the head, and its findings stay on
+its page, outside the status, the merge risk and `gate`.
 
 Publish only at the end of the triage, after pushing:
 
