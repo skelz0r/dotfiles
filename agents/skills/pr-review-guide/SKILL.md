@@ -42,7 +42,9 @@ Confirm with the user, in one AskUserQuestion round if anything is unclear:
   tab of `references/design.md`, and the designer is part of the audience.
   When it changes several journeys of an interface (a rebuilt screen, a
   new flow), the guide also gets a UX tab: the `ux-guide` skill films one
-  video per feature, and the guide embeds that page.
+  video per feature, and the guide embeds that page. When a `ux-review`
+  page exists for the PR, the overview and the Design tab link to it (its
+  findings are not copied), and the guide reuses its captures.
 - **The language** of the guide: the user's.
 - **The end-to-end case**: one real case that crosses most layers of the
   change. Propose the one you would pick and why.
