@@ -66,6 +66,11 @@ any other finding ships unfixed or any category has a gap; low
 otherwise. The gaps per category (alignment, impact, verification,
 rollback cost, error detection) are recorded with `risk`. The merge
 risk does not change the status.
+
+A pass started with --advisory (a UX review) is listed with its scope
+but reviews no code: it never covers the head, never counts as the
+first pass of the gate, and findings go to the last code pass unless
+--pass names it.
 """
 
 EPILOG = """\
@@ -186,9 +191,11 @@ def state_from_body(body):
 
 
 def compact_state(state):
-    passes = [{**{key: value for key, value in review.items() if key != "files"}, "digest": pass_digest(review)}
-              for review in state["passes"][:-1]]
-    return {**state, "passes": passes + state["passes"][-1:]}
+    kept = (code_passes(state) or state["passes"] or [None])[-1]
+    passes = [review if review is kept else
+              {**{key: value for key, value in review.items() if key != "files"}, "digest": pass_digest(review)}
+              for review in state["passes"]]
+    return {**state, "passes": passes}
 
 
 def state_to_marker(state):
@@ -277,14 +284,19 @@ def pass_digest(review):
     return review["digest"] if "digest" in review else files_digest(review["files"])
 
 
+def code_passes(state):
+    return [review for review in state["passes"] if not review.get("advisory")]
+
+
 def coverage(state, base):
     head = git("rev-parse", "HEAD").strip()
     current = file_patch_ids(base, head)
     current_digest = files_digest(current)
-    for review in reversed(state["passes"]):
+    passes = code_passes(state)
+    for review in reversed(passes):
         if pass_digest(review) == current_digest:
             return {"covered": True, "head": head, "digest": current_digest, "pass": review, "changed": []}
-    last_files = state["passes"][-1].get("files", {}) if state["passes"] else {}
+    last_files = passes[-1].get("files", {}) if passes else {}
     changed = sorted(path for path in set(current) | set(last_files)
                      if current.get(path) != last_files.get(path))
     return {"covered": False, "head": head, "digest": current_digest, "pass": None, "changed": changed}
@@ -299,7 +311,7 @@ def pass_by_id(state, pass_id):
     if not state["passes"]:
         raise Failure("no pass recorded: run `agentic-review start` first")
     if pass_id is None:
-        return state["passes"][-1]
+        return (code_passes(state) or state["passes"])[-1]
     for review in state["passes"]:
         if review["id"] == pass_id:
             return review
@@ -342,6 +354,8 @@ def command_start(args):
         "base": base,
         "files": file_patch_ids(base, head),
     }
+    if args.advisory:
+        review["advisory"] = True
     state["passes"].append(review)
     state["note"] = ""
     bump(state)
@@ -643,7 +657,7 @@ def render(state, result, base, repo=None):
              *waiting_lines(state, repo, result["head"]),
              "| Pass | When | Scope | Fixed | Left |", "|---|---|---|---|---|"]
     for review in state["passes"]:
-        fixed, left = pass_counts(state, review)
+        fixed, left = ("", "") if review.get("advisory") else pass_counts(state, review)
         lines.append(f"| {cell(pass_name(review))} | {short_date(review['at'])} | {cell(review['scope'])} "
                      f"| {fixed} | {left} |")
     if not result["covered"]:
@@ -696,7 +710,7 @@ def review_status(state, result):
 
 def status_description(state, result):
     groups = {}
-    for review in state["passes"]:
+    for review in code_passes(state):
         name = " ".join(part for part in (review["reviewer"].split()[0], review["effort"]) if part)
         groups[name] = groups.get(name, 0) + 1
     reviewers = ", ".join(f"{name} x{count}" for name, count in groups.items())
@@ -739,12 +753,12 @@ def command_check(args):
 
 
 def gate_reasons(state, pull, result, required):
-    if not state["passes"]:
+    if not code_passes(state):
         return ["no pass recorded"]
     reasons = []
     if not result["covered"]:
         reasons.append(f"stale: {len(result['changed'])} files unreviewed, run a confirmation pass on the fixes")
-    first_pass = state["passes"][0]["id"]
+    first_pass = code_passes(state)[0]["id"]
     for finding in state["findings"]:
         label = f"{finding['id']} {kind_cell(finding)} \"{finding['title']}\""
         if finding["status"] == "open":
@@ -1044,6 +1058,8 @@ def parser():
     start.add_argument("--scope", required=True, help="what the pass read and focused on")
     start.add_argument("--label", help='short name in the findings table (default: "Codex 2")')
     start.add_argument("--base", help="base ref (default: origin/<pull request base> or origin/HEAD)")
+    start.add_argument("--advisory", action="store_true",
+                       help="a pass outside the code review (e.g. a UX review): listed, never covers the head nor holds findings by default")
 
     finding = add("finding", "add a finding to a pass, or update one with --id, print its id", command_finding)
     finding.add_argument("--id", help="finding to update")

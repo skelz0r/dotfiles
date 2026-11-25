@@ -137,6 +137,28 @@ review_branch() {
   assert_contains "$(status_calls)" "description=Codex xhigh x1, Codex medium x1"
 }
 
+@test "a UX review recorded after the fixes leaves the code pass due" {
+  review_branch
+  sed -i.bak 's/^6$/six/' a.txt && rm a.txt.bak
+  git commit -qam "fixup! Spell five"
+  agentic_review start --reviewer "Claude ux-review" --advisory --scope "UX: 12 findings, 3 Important" > /dev/null
+
+  run agentic_review publish
+  assert_contains "$(status_calls)" "state=pending"
+  assert_contains "$(status_calls)" "description=Stale: 1 file unreviewed, a pass is due. Codex xhigh x1:"
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| Claude ux-review | "
+  assert_contains "$(cat "$STUB_DIR/comment.md")" "| UX: 12 findings, 3 Important |  |  |"
+}
+
+@test "a finding recorded after a UX review goes to the code pass" {
+  agentic_review start --reviewer Codex --effort xhigh --scope "whole branch" > /dev/null
+  agentic_review start --reviewer "Claude ux-review" --advisory --scope "UX" > /dev/null
+  agentic_review finding --kind bug --title "five is wrong" --left "by design" --verdict intentional > /dev/null
+
+  run agentic_review show --json
+  assert_contains "$output" '"pass": "p1"'
+}
+
 @test "an existing review comment is edited instead of adding a second one" {
   review_branch
   export MOCK_COMMENTS=$'101\thttps://github.com/acme/app/pull/12#issuecomment-101\n'
