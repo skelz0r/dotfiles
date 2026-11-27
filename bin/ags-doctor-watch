@@ -9,7 +9,10 @@ ags precheck: run `ags doctor` and print its failing checks as JSON.
 Exit 0 when some check fails and this set of failures was not handed
 over yet, exit 1 with a reason on stdout otherwise. The handed-over set
 is kept in $AGS_JOB_STATE_DIR, so a failure ags doctor keeps listing
-(a precheck crash stays 7 days) is not handed over twice.
+(a precheck crash stays 7 days) is not handed over twice. Under ags the
+new set is written to $AGS_STAGED_STATE_DIR, which ags moves into place
+only once the run went through: when the hand-off to the agent fails,
+the next run hands the same failures over again.
 USAGE
 }
 
@@ -37,6 +40,7 @@ if [[ -f "$seen_file" && "$(cat "$seen_file")" == "$failures" ]]; then
   exit 1
 fi
 
-mkdir -p "$state_dir"
-printf '%s\n' "$failures" > "$seen_file"
+staged_dir="${AGS_STAGED_STATE_DIR:-$state_dir}"
+mkdir -p "$staged_dir"
+printf '%s\n' "$failures" > "$staged_dir/handed-over.json"
 jq . <<<"$failures"
