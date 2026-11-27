@@ -1,17 +1,18 @@
 ---
 name: pre-manual-review-pr
-description: First triage of a GitHub pull request on which the user's review is requested, to see whether it will be long before starting it — size S/M/L/XL, risk faible/moyen/élevé and estimated review time, each justified in one line, plus 2 to 4 points to look at — written to a navette inbox item that waits for the user. Read-only on GitHub and on the code: nothing is posted, no branch is checked out. Use when the review-watch ags job opens a tab on a review request, when the user says "regarde si cette review sera longue", "trie cette PR avant que je la relise", "pre-review", "combien de temps pour relire X", or passes a pull request URL (or owner/name#12) asking how big a review it is. The review itself is the manual-review-pr skill.
+description: First triage of a GitHub pull request on which the user's review is requested, to see whether it will be long before starting it — what the PR does in plain words, its size and estimated review time, its risk when not low, 2 to 4 points to look at linked to the code with short diff snippets, and read-only proofs (CI, cited texts, current page) — written to a navette inbox item that waits for the user, with Approuver / review complète / archive options. Read-only on GitHub and on the code until the user clicks: nothing is posted, no branch is checked out. Use when the review-watch ags job opens a tab on a review request, when the user says "regarde si cette review sera longue", "trie cette PR avant que je la relise", "pre-review", "combien de temps pour relire X", or passes a pull request URL (or owner/name#12) asking how big a review it is. The review itself is the manual-review-pr skill.
 ---
 
 # Pre manual review
 
 Someone asked the user to review a pull request they do not own. Before
-opening it, the user wants to read in the navette inbox « review demandée
-sur X, taille M, risque faible, 30 min, regarde ces 3 points », and
-decide when to do it. This skill only reads the pull request and writes
-the inbox item: it never comments, approves, requests changes, checks
-out, fetches nor edits a file. The review is the next step, with
-`manual-review-pr`, on the user's word.
+opening it, the user wants to read in the navette inbox « X ajoute
+telle chose, doc seule, ~10 min, regarde ces 2 points (liens) », and
+approve it right away, review it fully, or leave it. Until the user
+clicks, this skill only reads the pull request and writes the inbox
+item: it never comments, approves, requests changes, checks out,
+fetches nor edits a file. Approving or the full review
+(`manual-review-pr`) comes on the user's word.
 
 Argument: the pull request, as a URL or `owner/name#12`.
 
@@ -64,29 +65,55 @@ copied as is): only the hand-written part counts for the size.
   together (S/faible ~10 min, M ~30 min, L ~1 h 30, XL half a day and
   more; one notch up for `élevé`).
 
-Each of the three gets one line of justification that cites facts:
-line counts, file names, the table a migration touches, the new class.
+Size, risk and time are the agent's reasoning, not what the user
+reads first: almost every request is a small doc or agent-rule PR, and
+an item titled « Review S/faible » with three justification bullets was
+judged incomprehensible. The item says first what the PR does, in plain
+words, then size and time in one sentence; the risk appears only when it
+is not `faible`, with its reason.
 
 Then 2 to 4 **points à regarder**: where the review will spend its time
 (a migration, a rule moved between layers, a missing test on a costly
-case, an unclear responsibility), each with `fichier:ligne` when it is
-anchored. Not a review: no verdict, no line-level nitpick.
+case, an unclear responsibility). Not a review: no verdict, no
+line-level nitpick. Each anchored point is a link the user clicks, not a
+bare `yml:40`: `[<file>:<line>](https://github.com/<o>/<n>/blob/<headRefOid>/<path>#L<line>)`,
+pinned on the head commit, followed when it helps by the few lines of
+the diff it is about, in a fenced `diff` block (at most ~5 lines).
 
-Write it to `$SCRATCH/triage.md`, in French, about 12 lines:
+## 3. Read-only proofs
 
-```markdown
-Review demandée par <author> : <taille>/<risque>, ~<temps>.
+Facts that save the user a check, gathered without leaving read-only
+(no checkout, no worktree, no test run): they are facts, never a
+verdict, since an « Approuver » button sits one click away.
 
-- **Taille <X>** : <justification>
-- **Risque <Y>** : <justification>
-- **Temps ~<Z>** : <justification>
+- CI: `gh pr checks <PR>`, state on the head commit.
+- A cited text (law article, RFC, spec, issue): fetch it and link it
+  (Légifrance for a Code article), say in one line whether it says what
+  the PR claims.
+- A page the PR changes on a deployed site: link the current page as
+  « avant » (production URL), so the user compares with the diff.
 
-Points à regarder :
+Write it to `$SCRATCH/triage.md`, in French, about 15 lines:
+
+````markdown
+<author> <ce que fait la PR, une ou deux phrases>.
+<Nature : doc seule / code>, <n> fichier(s), +<a>/-<d>, ~<temps>.<Risque <moyen|élevé> : raison, seulement s'il n'est pas faible.>
+
+À regarder :
+- [<fichier>:<ligne>](<lien blob pinné>) : <point>
+  ```diff
+  + <ligne concernée>
+  ```
 - <point>
-- <point>
-```
 
-## 3. Find the item of the pull request
+Vérifié : CI <état> sur <sha court>, [<texte cité>](<lien>) <conforme ou non>, [page actuelle](<url>).
+````
+
+A pull request labelled `auto-mergeable:*` merges without the user:
+say it in the first line (« Auto-mergeable : se mergera sans toi si la
+CI passe ») and keep the triage short.
+
+## 4. Find the item of the pull request
 
 The key is `review:<repository name>:pr-<number>`, the same as
 `review-received` uses: a re-request lands on the same item. Before
@@ -97,30 +124,45 @@ old for this lookup, which also counts as none here. When an item with
 another key tracks it, repost that key instead (it belongs to whoever
 created it), without `--option`.
 
-## 4. Fill the item
+## 5. Fill the item
 
 Load the `navette-inbox` skill, then post from this pane, so the options
 come back here:
 
 ```bash
 navette post --key "review:<name>:pr-<number>" --type review \
-  --title "Review <taille>/<risque> : <owner>/<name>#<number> <title>" \
+  --title "[Demande de review] <owner>/<name>#<number> <title> · ~<temps>" \
   --status waiting --pr "<PR URL>" \
   --description "$(cat "$SCRATCH/triage.md")" \
-  --option "Lance la review (manual-review-pr)" --option "Pas pour moi, archive"
+  --option "Approuver" --option "Lancer la review complète (manual-review-pr)" \
+  --option "Pas pour moi, archive"
 ```
+
+The item belongs to the team that tracks the repository, the same as
+its other review items: when `navette post` lands it in the personal
+team while other items of that repository are in a shared one, repost
+with `--team <slug>`.
 
 `navette post` may warn that the pull request is not on one of the
 user's branches: expected, the item tracks a pull request to review,
 not one to ship. Report the warning, do not work around it.
 
-## 5. End
+## 6. End
 
 Final message: the item URL that `navette post` printed, then the
 triage. Leave the session open: the user may click an option or write
 here.
 
-- « Lance la review » is the user's word to run `manual-review-pr` on
-  the pull request in this session.
+- « Approuver » is the user's word to approve on GitHub:
+  `gh pr review <PR> --approve`, then archive the item
+  (`--status done`). Nothing else is posted.
+- « Lancer la review complète » is the user's word to run
+  `manual-review-pr` on the pull request in this session.
 - « Pas pour moi, archive » archives the item (`--status done`); say in
   the final message that the review request is still open on GitHub.
+
+Whatever closes the item (an option, the PR merged without the user),
+the new `--description` starts with what happened (« Approuvée le … »,
+« Mergée sans ta review le … ») followed by the triage, kept as is: a
+description replaced by « PR mergée, rien à nettoyer » lost the triage
+on three items.
