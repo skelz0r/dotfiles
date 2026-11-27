@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases), trash the screenshots and screencasts attached to the PR through gh-image, and close its herdr or tmux tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge or passes --force.
+description: Clean up after a worktree's pull request is merged — check the PR state, then tear the worktree down with the project's own removal script (servers, worktree, local branch, databases), trash the screenshots and screencasts attached to the PR through gh-image, and close its herdr or tmux tab, or at least the session's own pane when it is not the first of its tab. Use when the user runs /cleanup, asks to "nettoie le worktree", "check la PR et nettoie", "la PR est mergée, cleanup", or after confirming a worktree PR was merged. Also lands a PR still open when GitHub allows it: rebases it, resolves the conflicts and merges it before cleaning up, except a feature that had no review or whose latest review still raised findings, unless the user explicitly asks to merge or passes --force.
 ---
 
 # Cleanup
@@ -205,9 +205,28 @@ PR's media and of the tab.
    action, since it ends the session. Never close another session's tab
    whose name does not match.
 
+10. When no tab was closed in step 9 (no worktree to clean, or none of
+    the tabs matched), still close the pane Claude runs in if it is not
+    the first pane of its tab: a session opened in a split next to the
+    main one is done once cleanup ran. The first pane is the first entry
+    of the layout (herdr) or the lowest pane index (tmux); never close
+    it, nor the tab.
+
+    ```bash
+    herdr pane layout --pane "$HERDR_PANE_ID" | jq -r '.result.layout.panes[0].pane_id'
+    ```
+
+    ```bash
+    tmux list-panes -t "$TMUX_PANE" -F '#{pane_index} #{pane_id}' | sort -n | head -1
+    ```
+
+    If it differs from `$HERDR_PANE_ID` (or `$TMUX_PANE`), report first,
+    then close it as the very last action with
+    `herdr pane close "$HERDR_PANE_ID"` or `tmux kill-pane -t "$TMUX_PANE"`.
+
 ## Report
 
 One line per step: PR state (and rebase/merge done in step 3), worktree
 removed, branch deleted, databases dropped, orphan databases dropped,
 media trashed (counts from `gh-media-log`), inbox item set to unread, tab
-closed (or why each one was skipped).
+or pane closed (or why each one was skipped).
